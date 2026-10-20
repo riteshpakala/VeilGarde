@@ -1,0 +1,170 @@
+{
+  "version": 2,
+  "doc": "The battery spec, v2 (2026-10-19): the gate every promote is judged by. v2 retires v1's twelve atlas anchor groups (their images are gone; a new atlas comes later) and reads every image from {IMAGES}: the folder VEILGARDE_BATTERY_IMAGES names, else the work area's battery/images. The eight groups it keeps are v1's: the same images, modes and floors. Modes: HARD (any weighted miss = FAIL) · HARD_SEM (HARD + semantic must agree) · RATCHET (per-group weighted accuracy >= recorded baseline - tolerance) · RATCHET_SEM (RATCHET + semantic floor) · TAXONOMY (tracked, never gates) · REPORT (printed only). The floors live in battery_v2_baseline.json; never rebaseline during a migration, --rebaseline is an explicit, reviewed act. staged[] holds probes that do not gate yet.",
+  "tolerance": 0.001,
+  "baseline": "battery_v2_baseline.json",
+  "vars": {
+    "IMAGES": "battery/images"
+  },
+  "groups": [
+    {
+      "name": "user_real",
+      "mode": "HARD",
+      "want": "real",
+      "paths": [
+        "{IMAGES}/test/2.JPG",
+        "{IMAGES}/test/3.webp",
+        "{IMAGES}/test/4.webp",
+        "{IMAGES}/test/5.webp",
+        "{IMAGES}/test/6.webp",
+        "{IMAGES}/test/7.webp",
+        "{IMAGES}/test/HNT6bs5WMAA_dU5_full_res.jpeg",
+        "{IMAGES}/test/HNT6bs5WMAA_dU5.jpeg",
+        "{IMAGES}/D72FD435-A173-44B8-8D48-45635CD9ADAE_1_105_c.jpeg"
+      ],
+      "note": "The protect-real anchor set. 3.webp is the swing real (knife-edge base boundary; retrains flip it). HNT pair (2026-07-17 preview-cliff finding): full-res gates HARD (passes: real 0.008); the sub-512 preview passes via the v3.4 preview-arbiter — the capture-validity shortcut (invalid-cap rows were 85.5% gen; feature-swap proven). D72FD435 is the majority-trust surfacing fix case (v198)."
+    },
+    {
+      "name": "native_12yrs",
+      "mode": "HARD",
+      "want": "real",
+      "paths": [
+        "{IMAGES}/test/12_years_straigh.jpeg"
+      ],
+      "note": "Native camera-era photo; regression canary for processed-real handling."
+    },
+    {
+      "name": "flux_anchor",
+      "mode": "HARD_SEM",
+      "want": "generated",
+      "paths": [
+        "{IMAGES}/test/flux_jobs.JPG",
+        "{IMAGES}/test/IMG_0291.JPG"
+      ],
+      "note": "Flux-2-Klein anchors. IMG_0291 is knife-edge under XGBoost non-determinism — warm-start only. HARD_SEM: semantic tile vote must also read generated."
+    },
+    {
+      "name": "user_gen",
+      "mode": "HARD",
+      "want": "generated",
+      "globs": [
+        "{IMAGES}/test_generated/*.jpeg",
+        "{IMAGES}/test_generated/*.PNG"
+      ],
+      "paths": [
+        "{IMAGES}/test_generated/IMG_0467.JPG",
+        "{IMAGES}/test_generated/IMG_0500.JPG",
+        "{IMAGES}/test_generated/HNOzJOiWAAAxP0D.jpg",
+        "{IMAGES}/test_resolution/HNOxadyW4AATeNm.jpg",
+        "{IMAGES}/test_resolution/HNOyD6zXUAArDeR.jpg",
+        "{IMAGES}/test_resolution/HNUFoy2bcAA0vDW.jpg"
+      ],
+      "note": "User gen probes. IMG_0467 dark-occult (2026-07-15). IMG_0500 filmic painterly — caught via frame-SEAM v3.3. HNOxadyW4AATeNm full-res gates; its _preview sibling is STAGED (see staged[]). HNOyD6zXUAArDeR full-res added 2026-07-16 (resolution-ladder pair; full gen 0.61, its preview flips real via the fusion itself). HNUFoy2bcAA0vDW full-res promoted staged→HARD 2026-07-16 after the v31 S2 base ship (route generated 0.805; was 0.28 — the blind spot closed at full-res, preview rung stays staged)."
+    },
+    {
+      "name": "native_cam",
+      "mode": "HARD",
+      "want": "real",
+      "globs": [
+        "{IMAGES}/anchors/native_cam/*.jpg"
+      ],
+      "note": "Native camera captures across bodies/eras; the capture-signature + warp foundation must hold all of these real."
+    },
+    {
+      "name": "gen_semantic",
+      "mode": "RATCHET_SEM",
+      "want": "generated",
+      "globs": [
+        "{IMAGES}/anchors/gen_semantic/*"
+      ],
+      "note": "Gens the semantic tile head must keep catching (weighted floor + semantic floor)."
+    },
+    {
+      "name": "wildlife_real",
+      "mode": "RATCHET",
+      "want": "real",
+      "globs": [
+        "{IMAGES}/anchors/wildlife_real/*.jpg"
+      ],
+      "note": "Dramatic-wildlife reals — the class the retired MJ head misread (0.96); protects against art-head vivid-real fires."
+    },
+    {
+      "name": "lion_hard",
+      "mode": "HARD",
+      "want": "real",
+      "paths": [
+        "{IMAGES}/test/1.webp"
+      ],
+      "note": "ADJUDICATED REAL (2026-07-19): provenance-confirmed via TinEye — Atif Saeed, 2015 (the famous Lahore Safari Park charge photo). The f490b4b relabel to generated was the fluxwild manifold firing inside the anchor set (dramatic real wildlife ≡ gen in token space — the stack's own law). Zoom escalation (whose flagship flip was this FP) is default-disabled same day. HARD want=real: the lion is now a protect-real anchor and the semantic lens's permanent humility check."
+    }
+  ],
+  "staged": [
+    {
+      "name": "HNOxadyW4AATeNm_preview",
+      "paths": [
+        "{IMAGES}/test_resolution/HNOxadyW4AATeNm_preview.jpg"
+      ],
+      "want": "generated",
+      "note": "The v3.4 cost-class materialized: preview-arbiter rescues this GEN preview (all conditions honestly met; ph 0.023!). Joins HARD when preview head v2 (dark-filmic class) breaks its rescue."
+    },
+    {
+      "name": "HNOv5PCWwAADOms",
+      "paths": [
+        "{IMAGES}/test_generated/HNOv5PCWwAADOms.jpg"
+      ],
+      "want": "generated",
+      "note": "STAGED probe (2026-07-16): near-black filmic MJ gen, measured uncatchable today (all 13 staged models 0.31-0.44 base; crops LOWER than full — no pooling washout; only the art head fires and w_gen=0 by design). Unblockers: knife-edge curation review → candidate line ships → then a near-black-filmic MJ class. Also the W5 combiner-v2 motivating probe."
+    },
+    {
+      "name": "IMG_0500_filmic_campaign",
+      "paths": [
+        "{IMAGES}/test_generated/IMG_0500.JPG"
+      ],
+      "want": "generated",
+      "note": "Historical staging note kept: 0500 joined user_gen HARD via frame-SEAM v3.3; the filmic data campaign (MJ-class gens + wider cgi/human real floors) remains the durable fix."
+    },
+    {
+      "name": "HNOyD6zXUAArDeR_preview",
+      "paths": [
+        "{IMAGES}/test_resolution/HNOyD6zXUAArDeR_preview.jpg"
+      ],
+      "want": "generated",
+      "note": "Resolution-ladder flip WITHOUT arbiter involvement: full 0.61 gen, preview 0.08 real (fusion 0.57→0.40 — the size-channel cliff itself). Acceptance test for the shortcut-decorrelation candidate (audit §8)."
+    },
+    {
+      "name": "HNUFoy2bcAA0vDW_ladder",
+      "paths": [
+        "{IMAGES}/test_resolution/HNUFoy2bcAA0vDW_preview.jpg"
+      ],
+      "want": "generated",
+      "note": "WAS missed at BOTH rungs (full 0.28; preview 0.01). v31 S2 base ship (2026-07-16) closed the FULL rung (route generated 0.805) — full-res moved to user_gen HARD. Preview rung remains staged (route real 0.066; fusion 0.41): still the HEAD+BASE data campaign class + sub-512 residue."
+    },
+    {
+      "name": "HNOwrHHXsAAf8Ya",
+      "paths": [
+        "{IMAGES}/test_generated/HNOwrHHXsAAf8Ya.jpg"
+      ],
+      "want": "generated",
+      "note": "STAGED probe (2026-07-17): HNOv5's harder sibling — dark-filmic MJ-class X gen, invisible to EVERY lens (base 0.263, sem 0.008, art 0.000, tile_mean at the 36th percentile of the dark-REAL tail). The patent-supports-LensII probe (audit §13) measured no viable warp rescue: warp_weighted gen-lean is the D72 red-herring pattern (39-44% of dark reals in the base-failed tail read the same). Unblocker: mjdark/mjnearblack shards into the BASE corpus (family bulk already reads 0.87; these are outliers) — queued behind the S2 ratchet-debt decision."
+    }
+  ],
+  "retired": {
+    "date": "2026-10-19",
+    "from_version": 1,
+    "groups": [
+      "atlas_art_real",
+      "atlas_art_generated",
+      "atlas_art_shotgen",
+      "atlas_blur_real",
+      "atlas_blur_generated",
+      "atlas_blur_shotgen",
+      "atlas_cgi_real",
+      "atlas_cgi_generated",
+      "atlas_cgi_shotgen",
+      "atlas_human_real",
+      "atlas_human_generated",
+      "atlas_human_shotgen"
+    ],
+    "note": "The atlas anchors behind these groups were deleted; a new atlas will be built and gated in a later version."
+  }
+}

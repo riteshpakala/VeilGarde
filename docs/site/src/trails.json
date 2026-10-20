@@ -1,0 +1,1675 @@
+{
+ "picker": [
+  {
+   "title": "The verdict",
+   "kinds": [
+    "training",
+    "inference"
+   ],
+   "rows": [
+    {
+     "label": "Warp model",
+     "trails": [
+      "warp-training",
+      "warp-inference"
+     ]
+    },
+    {
+     "label": "Fusion head",
+     "trails": [
+      "fusion-training",
+      "fusion-inference"
+     ]
+    },
+    {
+     "label": "Specialist heads",
+     "trails": [
+      "specialist-training",
+      "specialist-inference"
+     ]
+    },
+    {
+     "label": "Noiseprint",
+     "trails": [
+      "noiseprint-training",
+      "noiseprint-inference"
+     ]
+    }
+   ]
+  },
+  {
+   "title": "The watermark",
+   "kinds": [
+    "signing",
+    "matching"
+   ],
+   "rows": [
+    {
+     "label": "Watermark",
+     "trails": [
+      "watermark-signing",
+      "watermark-matching"
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Research",
+   "kinds": [
+    "research"
+   ],
+   "rows": [
+    {
+     "label": "Pruning study",
+     "trails": [
+      "pruning"
+     ]
+    }
+   ]
+  }
+ ],
+ "trails": [
+  {
+   "id": "warp-training",
+   "kind": "training",
+   "title": "Warp training",
+   "mark": "WT",
+   "subtitle": "labelled images to the tile model and its calibration",
+   "say": "From a labelled dataset to the warp tile model and its sensor calibration: the lens cuts each image into tiles once, a native booster learns the tiles, each image is scored the way the detector scores it, and the calibration binds a call to the model's bytes.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "A recipe names the warp model",
+     "chapters": [
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "TrainCommand.Warp.run()",
+       "anchor": "var w = WarpTileModel(dataset: datasetURL(dataset)).shape(s)",
+       "note": "veilgarde train warp declares a one-model recipe: the warp tile model in the deployed shape, and its sensor calibration unless told otherwise.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "TrainingEngine.train(_:)",
+       "anchor": "let plan = try self.plan(recipe)",
+       "link": "none",
+       "note": "Plans first, so a refusal stops the run before anything is written, then copies the parent bundle into the candidate and trains each model in dependency order.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The lens cuts every image into tiles, once",
+     "chapters": [
+      "06-training.html",
+      "01-warp.html"
+     ],
+     "entries": [
+      {
+       "scope": "TrainingEngine.trainWarp(_:into:parentBundle:)",
+       "anchor": "let result = WarpTrainer.train(shards: shards, params: w.params",
+       "note": "Cuts the dataset into the tile cache once, fits the warp tile model on the training tiles, and scores the parent's model on the same partitions for the comparison.",
+       "cite": "ledger#command-22"
+      },
+      {
+       "scope": "TileExtractor.extract(_:into:perShard:maxDim:prefetch:note:)",
+       "anchor": "let t = WarpLens.trainingTiles(prepared: slot.prepared!)",
+       "note": "Runs every image through the detector's own lens and stores its tiles' 19 features and texture weights, so the trainer and the detector read identical rows. Images already in the cache are skipped, so a second run starts at the fit.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "The booster learns the tiles",
+     "chapters": [
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "WarpTrainer.train(shards:params:include:note:)",
+       "anchor": "let boost = BoostTrainer.train(train.data",
+       "note": "Gathers the train, validation and test tiles by their stable partition and hands the training rows to the GBDT trainer. Refit without each part, this shape held: 150 trees or depth 6 already cost held-out AUC, so it is not over-provisioned.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "BoostTrainer.train(_:validation:params:warmStart:featureNames:progress:)",
+       "anchor": "let grown = grower.grow(id: model.trees.count, rows: rows, gradients: g, hessians: h)",
+       "note": "Boosts round by round with XGBoost's logistic gradients and seeded row and column samples. A warm start begins from the parent's trees and keeps their JSON verbatim.",
+       "cite": "test:integer features: xgboost's trees, node for node"
+      },
+      {
+       "scope": "TreeGrower.grow(id:rows:gradients:hessians:)",
+       "anchor": "var level = buildHistograms([rows])",
+       "note": "Grows one tree depth by depth from histograms, building the child with the smaller hessian and taking its sibling by subtraction, as XGBoost's hist method does.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "Each image is scored the way the detector scores it",
+     "chapters": [
+      "06-training.html",
+      "01-warp.html"
+     ],
+     "entries": [
+      {
+       "scope": "WarpTrainer.imageScores(_:_:)",
+       "anchor": "let map = WeightMap.build(patchGrid: grid, texWeights: texGrid, parameters: parameters.weightMap)",
+       "note": "Rebuilds the detector's arithmetic from the cached tiles: the weight map and the weighted score, and the strict count of tiles over 0.5 that the sensor lane calibrates. On held-out images the weight map adds 0.021 AUC over a plain mean of the tiles.",
+       "cite": "ledger#command-56",
+       "link": "none"
+      },
+      {
+       "scope": "WarpTrainer.metrics(_:_:)",
+       "anchor": "imageMajorityAUC: Metrics.auc(s.majority, s.labels),",
+       "note": "Reports a partition three ways: tile AUC, the weighted score's image AUC and the tile vote's, with the weighted call's operating point at 0.56 and its band."
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The calibration binds a call to the model's bytes",
+     "chapters": [
+      "06-training.html",
+      "01-warp.html"
+     ],
+     "entries": [
+      {
+       "scope": "TrainingEngine.trainCalibration(_:dataset:sample:into:)",
+       "anchor": "let (file, report) = try CalibrationTrainer.fit(samples, settings: c.settings, sensorModelSHA256: sensor.sha256, sensorVariant: variant)",
+       "note": "Scores the validation images with the candidate's sensor model and fits the contract on their tile votes, then says it as the two cuts on the vote where its call changes, and writes the cuts once the strict validator accepts them.",
+       "link": "none"
+      },
+      {
+       "scope": "CalibrationTrainer.fit(_:settings:sensorModelSHA256:sensorVariant:)",
+       "anchor": "let operating = try OperatingThreshold.choose(labels: hold.map(\\.label), probabilities: selected, maxRealFPR: settings.maxRealFPR)",
+       "note": "Fits Platt on 65% of the validation images and chooses the threshold on the other 35%, after a cross-fitted gate that keeps Platt only if it does not worsen calibration.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "Platt.fit(labels:probabilities:)",
+       "anchor": "let fit = LogisticNewton.fit(x: x, y: labels.map(Double.init), d: 1, C: 1e6, tolerance: 1e-10)",
+       "note": "A two-parameter logistic fit on the logit of the tile vote. The fit is monotone, so the call it feeds equals two cuts on the raw vote: on 1,738 held-out images, real at or under 0.717 and generated at or over 0.837.",
+       "cite": "ledger#command-56"
+      },
+      {
+       "scope": "OperatingThreshold.choose(labels:probabilities:maxRealFPR:)",
+       "anchor": "for (v, y) in zip(p, labels) where v > t { if y == 0 { fp += 1 } else { tp += 1 } }",
+       "note": "Picks the threshold with the best generated recall whose real false-positive rate stays at or under 0.10, ties broken toward 0.5."
+      },
+      {
+       "scope": "SensorCalibrationFile.twoCuts(from:)",
+       "anchor": "let cuts = platt.equivalentCuts()",
+       "note": "Says a fitted contract as the two cuts where its call changes, and keeps the contract they came from beside them for audit; the detector reads only the cuts."
+      },
+      {
+       "scope": "SensorCalibrationContract.equivalentCuts()",
+       "anchor": "while hi - lo > 1 { let mid = lo + (hi - lo) / 2; if call(mid) == \"real\" { lo = mid } else { hi = mid } }",
+       "note": "Bisects the float32 votes of [0, 1] for the largest the contract calls real and the smallest it calls generated; a side it never calls gets a cut outside [0, 1]. The call is monotone in the vote, so the two cuts reproduce it on every input.",
+       "cite": "test:the shipped cuts are where Garde's Platt contract turns, and call every vote as it did"
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "The candidate holds the model, and the flywheel cannot move it",
+     "chapters": [
+      "06-training.html",
+      "07-flywheel.html"
+     ],
+     "entries": [
+      {
+       "scope": "CandidateBundle.put(_:as:role:head:parent:)",
+       "anchor": "manifest.artifacts.removeAll { $0.role == role && $0.head == head }",
+       "note": "Writes a trained model in its parent's place, hashes it and re-pins that slot in the manifest, so the candidate stays a complete bundle the detector can run.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "FlywheelSlot.init(parsing:)",
+       "anchor": "if frozen.contains(name) { throw VeilGardeFailure.usage(\"\\(name) is frozen: the flywheel never promotes it\") }",
+       "note": "The warp tile model, its sensor copy, the fusion reference, the noiseprint and the backbones are frozen: promote refuses to name them, so a retrained warp model reaches live only by a person's hand.",
+       "cite": "PIN",
+       "link": "none"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fusion-training",
+   "kind": "training",
+   "title": "Fusion training",
+   "mark": "FT",
+   "subtitle": "the store to a warm-started base",
+   "say": "From the features-only store to a new fusion base: every row becomes the 397 numbers the head reads, the parent's trees are kept and new ones grown on top, and promote moves the result into live only behind the battery.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The store's rows become the fusion vector",
+     "chapters": [
+      "03-fusion.html",
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "TrainCommand.Fusion.run()",
+       "anchor": "case \"warm\": f = f.warmStart(add: trees ?? 80, eta: eta ?? 0.03)",
+       "note": "veilgarde train fusion declares the fusion head: a warm start of 80 trees by default, the flywheel's only way to move the base, or a scratch fit.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "TrainingEngine.trainFusion(_:into:)",
+       "anchor": "let dataset = try FusionDataset.assemble(FeatureStore(directory: store), settings: f.settings)",
+       "note": "Assembles the store's rows, loads the parent head from the candidate, trains, and writes the head with its parent's hash when it was warm-started.",
+       "link": "none"
+      },
+      {
+       "scope": "FusionDataset.assemble(_:settings:)",
+       "anchor": "for column in FeatureColumn.fusion { x.append(contentsOf: selection.vector(column, row: i)) }",
+       "note": "Stacks each row's warp score, DINOv2 embedding, nine capture values and three sharpness values, in id order, with the trainer's row weights. Refit without the sharpness values, the head moves no more than a re-seed does, at +0.0002 AUC.",
+       "cite": "ledger#command-56"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The parent's trees are kept and new ones grown",
+     "chapters": [
+      "03-fusion.html",
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "FusionTrainer.train(_:settings:parent:note:)",
+       "anchor": "let boost = BoostTrainer.train(training, params: params, warmStart: warm, featureNames: [], progress: { round in",
+       "note": "Trains on every row but the held-out new-generator ones, then measures the candidate's recall on those and its agreement with the parent on the whole corpus.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "BoostTrainer.train(_:validation:params:warmStart:featureNames:progress:)",
+       "anchor": "let grown = grower.grow(id: model.trees.count, rows: rows, gradients: g, hessians: h)",
+       "note": "A warm start begins from the parent's margins and appends trees, keeping the inherited trees' JSON verbatim, so the parent's 940 trees survive byte for byte.",
+       "cite": "test:integer features: xgboost's trees, node for node"
+      },
+      {
+       "scope": "CandidateBundle.put(_:as:role:head:parent:)",
+       "anchor": "manifest.artifacts.removeAll { $0.role == role && $0.head == head }",
+       "note": "Writes a trained model in its parent's place, hashes it and re-pins that slot in the manifest, so the candidate stays a complete bundle the detector can run.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Promote moves it into live, behind the battery",
+     "chapters": [
+      "07-flywheel.html"
+     ],
+     "entries": [
+      {
+       "scope": "Promoter.promote(_:from:store:)",
+       "anchor": "let stamp = try snapshot()",
+       "link": "none",
+       "note": "Moves one slot from a candidate into live: a snapshot first, the file written beside its target and renamed in, the manifest re-pinned, then the battery, and the snapshot restored on a failure.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "Promoter.preview(_:from:store:)",
+       "anchor": "try check(slot, data: data, live: live, current: current, store: store)",
+       "note": "Loads the candidate's artifact for the slot and runs every check before live is touched, logging a refusal when one fails."
+      },
+      {
+       "scope": "Promoter.check(_:data:live:current:store:)",
+       "anchor": "guard let current else { throw VeilGardeFailure.data(\"the live bundle has no fusion head to continue\") }",
+       "note": "Refuses a base that does not keep live's trees byte for byte, a calibration not bound to live's sensor model, a combiner with a negative weight, and an atlas head that fails admission.",
+       "cite": "test:frozen slots, a cold base, an unbound calibration and a blocking head are refused before live moves"
+      },
+      {
+       "scope": "BatteryRunner.run(spec:specURL:gate:baselineURL:verdicts:vars:rebaseline:note:)",
+       "anchor": "if r.weighted == g.want { ok += 1 }",
+       "note": "Runs the full detector on every image of every group the gate names and compares each call with the one its group wants; a hard group passes only at 100%, a ratchet only at its floor.",
+       "cite": "ledger#decision-65",
+       "link": "none"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "specialist-training",
+   "kind": "training",
+   "title": "Specialist training",
+   "mark": "ST",
+   "subtitle": "the store to the heads and the combiner",
+   "say": "From the store's DINOv2 rows to the specialist heads and the combiner that pools them: each head is a logistic regression split by source and admitted only if calm real photos stay real, and the combiner is a bounded fit whose rescue is swept against the protect-real probes.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "Rows are chosen and split by source",
+     "chapters": [
+      "04-specialists.html",
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "TrainingEngine.trainHead(_:into:)",
+       "anchor": "try HeadTrainer.train(h.kind, positives: h.positives",
+       "note": "Trains one head of the recipe on the store's dino_norm column and writes its head.json, recipe and metrics into the candidate.",
+       "link": "none"
+      },
+      {
+       "scope": "HeadTrainer.train(_:positives:negatives:settings:store:parent:note:)",
+       "anchor": "let split = HeadSplit.heads(ids: use.map { store.rows[$0].id }",
+       "note": "Keeps the usable rows, the head's positives and negatives and never a golden anchor, splits them by source, then standardizes and fits.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "HeadSplit.heads(ids:sources:labels:)",
+       "anchor": "let test = Set(shuffled.prefix(max(1, shuffled.count / 4)))",
+       "note": "Holds out a quarter of the sources, drawn by CPython's own shuffle, so a retrained head is tested on the same sources the shipped one was.",
+       "cite": "PIN:Sources/VeilGardeTraining/Data/Splits.swift"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "One logistic regression per head",
+     "chapters": [
+      "04-specialists.html",
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "StandardScaler.fit(_:d:rows:)",
+       "anchor": "return s < 10 * Double.ulpOfOne ? 1 : s",
+       "note": "Centres and scales each of the 384 dimensions on the training rows only, with a constant dimension scaled by 1."
+      },
+      {
+       "scope": "LogisticNewton.fit(x:y:d:C:classWeight:sampleWeight:maxIterations:tolerance:)",
+       "anchor": "cblas_dgemv(CblasRowMajor, CblasTrans, Int32(n), Int32(D), 1, xt, Int32(D), r, 1, 0, &g, 1)",
+       "note": "Newton's method on sklearn's objective, with Accelerate's BLAS for the gradient and Hessian, to within 1e-5 of sklearn's optimum.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Admission: calm real photos stay real",
+     "chapters": [
+      "04-specialists.html",
+      "07-flywheel.html"
+     ],
+     "entries": [
+      {
+       "scope": "FlywheelPolicy.admission(_:store:)",
+       "anchor": "if head.pAI(e) > admissionThreshold { blocked += 1 }",
+       "note": "Counts the golden real anchors outside Bluesky that a head reads above 0.8. A head that blocks more than 10% of them is refused before it can reach the battery.",
+       "cite": "PIN",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The combiner pools the heads",
+     "chapters": [
+      "04-specialists.html",
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "TrainingEngine.trainCombiner(_:into:)",
+       "anchor": "let samples = CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)",
+       "note": "Scores the store's capture-absent rows with the candidate's fusion head and heads, fits the combiner, and writes it in the shipped schema.",
+       "link": "none"
+      },
+      {
+       "scope": "CombinerSample.captureAbsent(_:base:heads:pair:)",
+       "anchor": "heads: heads.map { Double($0.pAI(norm)) }, pair: pair.map { Double($0.pAI(norm)) },",
+       "note": "One row per capture-absent image: the base on its fusion vector, the three heads on its dino_norm, an art-pair head's when the candidate trained one, and its stored noiseprint."
+      },
+      {
+       "scope": "CombinerTrainer.train(_:settings:note:)",
+       "anchor": "let (rescue, sweep) = chooseRescue(w0: fit.w0, w: w, settings: settings)",
+       "note": "Fits the weights with reals counted three times, chooses the rescue weight by the sweep, and floors the noiseprint weight at 0.8 when the fit leaves it near zero. It adjudicates the art head only beside an art-pair head, which the shipped recipe no longer trains.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "CombinerTrainer.fitWeights(features:labels:realsWeight:)",
+       "anchor": "let theta = BoundedLogistic.fit(f: flat, y: labels.map(Double.init), m: m, sampleWeight: labels.map { $0 == 0 ? realsWeight : 1 })",
+       "note": "Zeroes the rescue column, counts each real row three times, and hands the rows to the bounded solver."
+      },
+      {
+       "scope": "BoundedLogistic.fit(f:y:m:sampleWeight:maxIterations:)",
+       "anchor": "let free = (0..<D).filter { $0 == 0 || theta[$0] > 0 || g[$0] < 0 }",
+       "note": "A projected Newton step under every weight at or above zero, so no evidence can be counted backwards.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "CombinerTrainer.chooseRescue(w0:w:settings:)",
+       "anchor": "if real == settings.probes.count && top <= settings.maxProbe && chosen == 0 { chosen = candidate }",
+       "note": "Tries rescue weights 0, 0.5, 0.8, 1.0 and 1.3 and keeps the first under which every protect-real probe reads real and none above 0.42."
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "Promote, behind admission and the battery",
+     "chapters": [
+      "07-flywheel.html"
+     ],
+     "entries": [
+      {
+       "scope": "Promoter.promote(_:from:store:)",
+       "anchor": "let stamp = try snapshot()",
+       "link": "none",
+       "note": "Moves one slot from a candidate into live: a snapshot first, the file written beside its target and renamed in, the manifest re-pinned, then the battery, and the snapshot restored on a failure.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "Promoter.preview(_:from:store:)",
+       "anchor": "try check(slot, data: data, live: live, current: current, store: store)",
+       "note": "Loads the candidate's artifact for the slot and runs every check before live is touched, logging a refusal when one fails."
+      },
+      {
+       "scope": "Promoter.check(_:data:live:current:store:)",
+       "anchor": "guard let current else { throw VeilGardeFailure.data(\"the live bundle has no fusion head to continue\") }",
+       "note": "Refuses a base that does not keep live's trees byte for byte, a calibration not bound to live's sensor model, a combiner with a negative weight, and an atlas head that fails admission.",
+       "cite": "test:frozen slots, a cold base, an unbound calibration and a blocking head are refused before live moves"
+      },
+      {
+       "scope": "BatteryRunner.run(spec:specURL:gate:baselineURL:verdicts:vars:rebaseline:note:)",
+       "anchor": "if r.weighted == g.want { ok += 1 }",
+       "note": "A head, the combiner or a calibration faces the full gate: every group. Taking the noiseprint term, the human push or the art-pair out of the combiner each kept every battery call.",
+       "cite": "ledger#command-54",
+       "link": "none"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "noiseprint-training",
+   "kind": "training",
+   "title": "Noiseprint training",
+   "mark": "NT",
+   "subtitle": "camera originals to P(camera)",
+   "say": "From camera originals and everything that is not a capture to the noiseprint: the split leaves the adversarial anchor out, patches are cut at five recompression levels, a Bayar-constrained net learns for six epochs, its BatchNorms fold into the file the detector loads, and rules fixed before the run decide whether it may be staged.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "Families and the split, the anchor left out",
+     "chapters": [
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "TrainCommand.Noiseprint.run()",
+       "anchor": "let n = NoiseprintModel().epochs(epochs).batch(batch).perFamily(perFamily).seed(seed).cachePatches(!noPatchCache)",
+       "note": "veilgarde train noiseprint declares the noiseprint on the T9's folders: camera originals against seven families that are not a capture.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "TrainingEngine.trainNoiseprint(_:into:)",
+       "anchor": "let (file, report) = try NoiseprintTrainer.run(settings: n.settings, cacheDirectory: NoiseprintTrainer.cacheDirectory(area),",
+       "note": "Finds the parent net by the weight search, trains and tests the candidate beside it, and writes the folded file into the candidate.",
+       "link": "none"
+      },
+      {
+       "scope": "NoiseprintTrainer.run(settings:cacheDirectory:parent:note:)",
+       "anchor": "let adoption = parentEval.map { NoiseprintAdoption.judge(candidate: candidate, parent: $0) }",
+       "note": "Split, patches, training, the folded file and the held-out test, end to end, judged at the end by the adoption rules.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "NoiseprintSettings.split()",
+       "anchor": "try sources.split(excluding: anchor.map { [$0] } ?? [])",
+       "note": "The split the run trains and tests on, with the adversarial anchor excluded, so the image the test scores never trains the net.",
+       "cite": "ledger#decision-66",
+       "link": "none"
+      },
+      {
+       "scope": "NoiseprintSources.split(excluding:)",
+       "anchor": "let kept = all.filter { !exclusion.contains($0) }",
+       "note": "Lists each folder sorted, drops any excluded file by path and by content, and shuffles the camera list and each family from one seeded stream. The photoreal family comes last, so every family before it keeps its split.",
+       "cite": "PIN:Sources/VeilGardeTraining/Noiseprint/NoiseprintData.swift",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "Patches at five recompression levels",
+     "chapters": [
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "NoiseprintTrainer.patches(_:settings:cacheDirectory:note:)",
+       "anchor": "let cam = PatchSampler.sample(split.cameraTrain,",
+       "note": "Cuts the camera and negative patches, keeps as many of each, and caches them in the work area keyed by everything that decides them.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "PatchSampler.sample(_:count:settings:streamOffset:parallel:note:)",
+       "anchor": "let (p, level) = try patches(cg, count: count, settings: settings, rng: &rng)",
+       "note": "Decodes and flattens each image the way inference reads it, then draws its patches from its own seeded stream, six images at a time."
+      },
+      {
+       "scope": "PatchSampler.patches(_:count:settings:rng:)",
+       "anchor": "let level = settings.levels[rng.randbelow(settings.levels.count)]",
+       "note": "Downscales half the images, recompresses each at one of five levels drawn alike for both classes, and keeps only patches with texture, so compression cannot become the label.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Six epochs under the Bayar constraint",
+     "chapters": [
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "NoiseprintTrainer.train(_:settings:note:)",
+       "anchor": "optimizer.update(model: net, gradients: grads)",
+       "note": "Six epochs of Adam at 2e-3 on binary cross-entropy, each in a seeded order, with the constraint projected after every step.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "NoiseprintTrainNet.projectBayar()",
+       "anchor": "let projected = off / (off.sum(axes: [1, 2], keepDims: true) + 1e-8) - m",
+       "note": "Projects the first layer back onto the Bayar constraint, centre −1 and the other taps summing to 1, so it reads prediction residuals rather than content.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The BatchNorms fold into the file the detector loads",
+     "chapters": [
+      "06-training.html",
+      "04-specialists.html"
+     ],
+     "entries": [
+      {
+       "scope": "NoiseprintTrainNet.folded()",
+       "anchor": "let s = gamma[c] / (variance[c] + eps).squareRoot()",
+       "note": "Folds each BatchNorm into the convolution before it, so the file holds the four plain convolutions inference runs.",
+       "cite": "test:the folded file computes what the trained form computes"
+      },
+      {
+       "scope": "NoiseprintTrainNet.file(_:)",
+       "anchor": "layout: .python",
+       "note": "Writes the folded weights in Python safetensors' own layout, the layout the shipped net was exported in."
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The held-out test and the adoption rules",
+     "chapters": [
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "NoiseprintTrainer.evaluate(_:split:settings:note:)",
+       "anchor": "auc[\"ALL\"] = Metrics.auc(cam + pooled,",
+       "note": "Scores the held-out camera originals against each family at three levels, image by image as inference scores, and the anchor at native quality."
+      },
+      {
+       "scope": "NoiseprintAdoption.judge(candidate:parent:family:)",
+       "anchor": "Rule(rule: \"the anchor reads P(camera) below 0.5\"",
+       "note": "The three rules fixed before the photoreal retrain: the anchor under 0.5, the pooled AUC within 0.005 of the parent's, the photoreal family's at least the parent's. The photoreal net passed all three, the anchor at 0.386.",
+       "cite": "ledger#decision-67"
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "The candidate carries the net",
+     "chapters": [
+      "06-training.html"
+     ],
+     "entries": [
+      {
+       "scope": "CandidateBundle.putWeight(_:as:role:)",
+       "anchor": "manifest.weights.append(weight)",
+       "note": "Writes the retrained net inside the candidate and re-pins the noiseprint weight's expected hash, so the candidate runs it with --weights-dir and the shipped net stays untouched.",
+       "cite": "PIN"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "warp-inference",
+   "kind": "inference",
+   "title": "Warp inference",
+   "mark": "WI",
+   "subtitle": "an image to the camera-sensor score",
+   "say": "From an image to the camera-sensor score and the weighted warp verdict: the image is capped and padded, every tile is warped through 16 homographies and measured, the tile model scores each tile, and two calls are made from the same grid.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The command reads the image",
+     "chapters": [
+      "01-warp.html"
+     ],
+     "entries": [
+      {
+       "scope": "ScoreCommand.run()",
+       "anchor": "let cg = try loadImage(image)",
+       "note": "Builds the run's InferenceConfig, decodes the image once and scores it, then prints the patch map or writes the schema-v2 JSON. It runs the pipeline of Garde's main mode, so its JSON and Garde's differ only in times_sec.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "DetectionOptions.config()",
+       "anchor": "var config = InferenceConfig()",
+       "note": "Maps the flags every detection command shares onto an InferenceConfig. The settings are grouped by what they govern, where Garde kept one flat list, and every default is still Garde's.",
+       "cite": "ledger#decision-17"
+      },
+      {
+       "scope": "loadImage(_:)",
+       "anchor": "ImageDecoding.cgImage(contentsOf:",
+       "note": "Expands a ~ in the path and hands the file to the one decoder every command shares.",
+       "cite": ""
+      },
+      {
+       "scope": "ImageDecoding.cgImage(contentsOf:)",
+       "anchor": "NSImage(contentsOf: url)",
+       "note": "Decodes through NSImage, which applies the EXIF orientation, and falls back to ImageIO only for bytes NSImage cannot read. A pixel-exact ImageIO path moved the capture peak by up to 50 on rotated iPhone JPEGs and flipped a verdict, and every shipped artifact saw NSImage's pixels.",
+       "cite": "ledger#decision-15"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The detector binds its models",
+     "chapters": [
+      "01-warp.html",
+      "02-bundle.html"
+     ],
+     "entries": [
+      {
+       "scope": "WarpInference.run(cgImage:config:progress:)",
+       "anchor": "baseModelSHA256 = try ArtifactHashCache.shared.sha256(config.modelURL)",
+       "note": "Loads the base warp model and hashes its bytes, settles the dual-warp law, and counts the 32-px tiles the sensor model reads above 0.5. The shipped sensor is a byte-identical copy of the base, so its grid is reused and no second warp pass runs.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "TreeModelCache.scorer(_:)",
+       "anchor": "XGBoostScorer(model: try model(url))",
+       "note": "Parses a booster file once per process and wraps Frigate's XGBoostTreeModel as the tile scorer. Core's own GBDTModel agrees with it bit for bit on the shipped models, so training can score with one and detection with the other.",
+       "cite": "test:Frigate's evaluator and GBDTModel agree bit for bit"
+      },
+      {
+       "scope": "SensorCalibrationContract.load(url:sensorVariant:sensorModelSHA256:fallbackBand:)",
+       "anchor": "expectedModelSHA256: sensorModelSHA256",
+       "note": "Reads the calibration contract and binds it to the sensor model's exact bytes and column count. A contract that is present but does not match fails closed; only an absent one falls back to the identity at 0.5.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "CaptureLens.signature(_:)",
+       "anchor": "return features.signature",
+       "note": "Measures the camera-capture signature on a native-resolution centre crop: the Nyquist peak a Bayer mosaic leaves in the residual spectrum. It runs before the 512 cap because a single 2× downsample destroys the peak.",
+       "cite": "PIN:Sources/VeilGardeCore/Features/CaptureFeatures.swift"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "The warp lens measures every tile",
+     "chapters": [
+      "01-warp.html"
+     ],
+     "entries": [
+      {
+       "scope": "WarpLens.analyze(cgImage:parameters:scorer:progress:)",
+       "anchor": "let tables = WarpTables.shared(quantizeLikeCV2: parameters.quantizeLikeCV2)",
+       "note": "Loads and pads the image, measures and scores every tile, then weighs the patches into the weighted score and the sharpness the fusion reads. The order and the arithmetic are Garde's base pass, unchanged.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "ImageLoading.load(_:maxDim:patchSize:)",
+       "anchor": "load(try prepare(cgImage, maxDim: maxDim, patchSize: patchSize))",
+       "note": "Loads the image in two halves: the CPU preparation below, then one MLX array, so a batch can prepare the next image while the GPU measures this one. The two halves together give the same bytes as one."
+      },
+      {
+       "scope": "ImageLoading.prepare(_:maxDim:patchSize:)",
+       "anchor": "let padW = ((w + patchSize - 1) / patchSize) * patchSize",
+       "note": "Caps the longest edge at 512 and reflect-pads the right and bottom edges to a multiple of 32, so every tile is a full 32×32 square. The cap truncates and resamples exactly as Garde's loader did.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "WarpLens.score(img:padH:padW:patchSize:tables:scorer:sigPlane:sigH:sigW:progress:)",
+       "anchor": "let probabilities = scorer.scoreBatch(features.rowsArray)",
+       "note": "For one scored canvas: every tile's features, their scores, the tile scores averaged into patches, and each patch's texture weight.",
+       "cite": ""
+      },
+      {
+       "scope": "FullGridExtractor.features(img:padH:padW:tables:signature:sigPlane:sigH:sigW:progress:)",
+       "anchor": "let Rl = WarpResidual.batch(chunk, forward: tables.lowForward, back: tables.lowBack)",
+       "note": "Measures every tile with the training semantics: the residuals and tile-local features in chunks of at most 256 tiles, then the mirrored-pair, seam, demosaic and spectral columns over the whole grid in one graph. Its 19 columns equal Garde's feature dump byte for byte on both parity crops.",
+       "cite": "test:the tile feature matrix equals Garde's dump byte for byte"
+      },
+      {
+       "scope": "WarpResidual.batch(_:forward:back:)",
+       "anchor": "let returned = applyWarpTable(warped, back)",
+       "note": "Warps every tile through the 16 fixed homographies and back, averages the round-trip error over channels and trials, and keeps its high frequencies. A sensor's mosaic and noise do not survive the round trip the way a generator's smooth output does.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "WarpResidual.fragility(low:high:)",
+       "anchor": "(WarpConstants.highStrength - WarpConstants.lowStrength)",
+       "note": "Turns the two residuals into FR, the first column: the mean residual at strength 0.05 minus that at 0.025, over 0.025. A camera tile's residual grows faster under the stronger warp than a generated tile's.",
+       "cite": "comment:Sources/VeilGardeCore/Features/WarpFeatures.swift#residual grows faster under a stronger warp"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "Tiles become the weighted score",
+     "chapters": [
+      "01-warp.html"
+     ],
+     "entries": [
+      {
+       "scope": "XGBoostScorer.scoreBatch(_:)",
+       "anchor": "model.predictBatch(rows)",
+       "note": "Scores every tile row with the shipped warp tile model, 200 trees of depth 8 over the 19 features, giving each tile its P(generated).",
+       "cite": "test:the warp tile model is 200 trees of depth 8 over 19 features"
+      },
+      {
+       "scope": "FullGridExtractor.patchGrid(tileProbabilities:tileCols:padH:padW:patchSize:)",
+       "anchor": "grid[I][J] = s / Float(n * n)",
+       "note": "Averages the tile scores into the presentation grid. At the default patch size of 32 each patch is one tile.",
+       "cite": ""
+      },
+      {
+       "scope": "WeightMap.build(patchGrid:texWeights:parameters:)",
+       "anchor": "let boost = 1.0 + 2.0 * conf",
+       "note": "Weighs each patch by a Gaussian around the texture centroid, a texture weight and a confidence boost, normalized to sum to 1. Flat sky counts little and decisive patches count more.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "WeightedVerdict.score(patchGrid:weightMap:hotspot:)",
+       "anchor": "score = (1 - hotspot.blend) * score + hotspot.blend * m",
+       "note": "Sums each patch's score times its weight, then blends 35% of the way toward the mean of the confident patches on both sides. The blend is symmetric because the one-sided blend inflated real-image scores by 0.03 and flipped about a third of real verdicts.",
+       "cite": "doc:HotspotMode"
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The camera-sensor score and the two calls",
+     "chapters": [
+      "01-warp.html"
+     ],
+     "entries": [
+      {
+       "scope": "SensorCalibrationContract.calibratedProbability(_:)",
+       "anchor": "let z = payload.coef * logit + payload.intercept",
+       "note": "For the shipped two cuts the camera-sensor score is the tile vote itself. A Garde-era Platt contract projects the vote on the logit scale instead, with 1e-6 clipping and a stable sigmoid.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "SensorCalibrationContract.prediction(for:)",
+       "anchor": "if transform == .cuts, let cuts { return cuts.call(calibratedProbability) }",
+       "note": "Calls the vote against the two cuts. A Garde-era contract calls against its threshold with an open band instead.",
+       "cite": ""
+      },
+      {
+       "scope": "SensorCuts.call(_:)",
+       "anchor": "return v <= realAtOrBelow ? \"real\" : v >= generatedAtOrAbove ? \"generated\" : \"inconclusive\"",
+       "note": "Real at or under 0.71687 of the tiles, generated at or over 0.83654, inconclusive between: where Garde's Platt contract changed its call, so the call is Garde's on every vote.",
+       "cite": "test:the shipped cuts are where Garde's Platt contract turns, and call every vote as it did"
+      },
+      {
+       "scope": "DecisionRule.label(_:)",
+       "anchor": "if abs(score - threshold) < band { return \"inconclusive\" }",
+       "note": "Labels the weighted score at 0.56 with a band of 0.04: inside the band is inconclusive, above it generated. The warp-only 0.56 and the fusion's 0.5 are kept apart on purpose.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "The result is written",
+     "chapters": [
+      "02-bundle.html",
+      "05-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "ResultJSON.encode(_:times:device:route:)",
+       "anchor": "options: [.sortedKeys]",
+       "note": "Serializes the result as the schema-v2 JSON with JSONSerialization and sorted keys. This contract alone keeps Garde's bytes, because the battery and the Garde-equivalence check read the JSON.",
+       "cite": "ledger#decision-1"
+      },
+      {
+       "scope": "ResultJSON.object(_:times:device:route:)",
+       "anchor": "\"schema_version\": schemaVersion,",
+       "note": "Builds the JSON object: the verdict with its trust, the calibration, the tile and weight maps, the sensor lane's raw and calibrated values with the contract's provenance, and the capture signature. The keys and the Double conversions are Garde's, moved and not rewritten.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "Trust.sensorVote(_:route:)",
+       "anchor": "return sensorPrediction == r.weightedPrediction ? \"high\" : \"low\"",
+       "note": "Rates the camera-sensor call high only when it is a binary call on a native route, with a valid and present capture signature, and it agrees with the weighted verdict. Two abstentions that agree are not evidence.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "PatchMap.render(_:imagePath:model:times:device:color:)",
+       "anchor": "var out = \"VeilGarde — \\(URL(fileURLWithPath: imagePath).lastPathComponent)\\n\"",
+       "note": "Prints the terminal report: the P(generated) map, the weight map, both verdicts with their trust, and the capture signature. The layout is Garde's printPretty, so a reader of garde photo.jpg reads it the same way.",
+       "cite": "PIN"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fusion-inference",
+   "kind": "inference",
+   "title": "Fusion inference",
+   "mark": "FI",
+   "subtitle": "an image to the fusion base",
+   "say": "From an image to the fusion base: the router picks the domain, the camera expert runs the warp lens, DINOv2 reads what the image depicts, and the 397 numbers of warp, DINOv2, capture and sharpness go through the fusion head.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The router picks the domain",
+     "chapters": [
+      "05-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "RouteCommand.run()",
+       "anchor": "try Detector.shared.detect(cgImage: cg, config: config, hint: domainHint)",
+       "note": "veilgarde route decodes the image once and hands it to the detector, then prints the stack or writes the schema-v2 JSON.",
+       "cite": "PIN:Sources/VeilGardeCLI/Commands/Route.swift"
+      },
+      {
+       "scope": "Detector.detect(cgImage:config:hint:)",
+       "anchor": "let domain = picker.detect(s, hint: hint)",
+       "note": "Picks the image's domain, runs that domain's base expert, then compounds the high-precision priors in a fixed order: capture and the pooled specialists, the frame seam, the semantic chain. The verdict is kept before the semantic chain, so a route can be replayed against it.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "DefaultDomainDetector.detect(_:hint:)",
+       "anchor": "return s.gate.isScreenshot ? .screenshot : .camera",
+       "note": "A hint wins; otherwise the screenshot gate sends a flat UI to the screenshot domain and everything else to the camera domain. Routing is never by size.",
+       "cite": "PIN:Sources/VeilGardeInference/Route/Domain.swift",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The camera expert runs the warp lens",
+     "chapters": [
+      "05-router.html",
+      "03-fusion.html"
+     ],
+     "entries": [
+      {
+       "scope": "CameraFusionHead.verdict(_:)",
+       "anchor": "try Fusion.run(cgImage: s.cgImage, config: s.config)",
+       "note": "The camera domain's base expert is the warp lens and the fusion head, the same path veilgarde fuse runs on its own.",
+       "link": "none"
+      },
+      {
+       "scope": "Fusion.run(cgImage:config:progress:)",
+       "anchor": "return try verdict(warp: warp, cgImage: cgImage, config: config)",
+       "note": "Runs the warp lens of the steps above, then hands its result to the fusion head."
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "DINOv2, capture and sharpness join the warp score",
+     "chapters": [
+      "03-fusion.html"
+     ],
+     "entries": [
+      {
+       "scope": "Fusion.vector(warp:cgImage:variant:)",
+       "anchor": "let emb = try SemanticLens.fusionEmbedding(cgImage, variant: variant)",
+       "note": "The 397-value row: the warp weighted score, DINOv2's 384, the nine capture values and the three sharpness values. On held-out store rows the sharpness values carry nothing a re-seed does not, and capture and DINOv2 each carry more than 0.02 AUC.",
+       "cite": "ledger#command-56",
+       "link": "none"
+      },
+      {
+       "scope": "SemanticLens.fusionEmbedding(_:variant:)",
+       "anchor": "try shared.vit(variant)(Dinov2Preprocess.input(cg)).reshaped(-1).asArray(Float.self)",
+       "note": "DINOv2-small's CLS embedding of the plain input, the one the fusion head was trained on.",
+       "cite": "WHAT:Sources/VeilGardeLens/Semantic/SemanticLens.swift"
+      },
+      {
+       "scope": "Dinov2Preprocess.input(_:target:shortEdge:)",
+       "anchor": "ctx.draw(cg, in: CGRect(x: -cropX, y: -cropY, width: sw, height: sh))",
+       "note": "Scales the short edge to 256, centre-crops 224 and normalizes by ImageNet's mean and deviation, drawn through CoreGraphics so row 0 is the image's top.",
+       "cite": "PIN:Sources/VeilGardeLens/Semantic/Dinov2Preprocess.swift"
+      },
+      {
+       "scope": "CaptureLens.features(_:)",
+       "anchor": "compute(cgImage) ?? .zero",
+       "note": "The nine capture values the fusion reads, zeros when the image cannot be measured.",
+       "cite": "PIN:Sources/VeilGardeLens/Capture/CaptureLens.swift"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The fusion head calls base_p",
+     "chapters": [
+      "03-fusion.html"
+     ],
+     "entries": [
+      {
+       "scope": "Fusion.verdict(warp:cgImage:config:)",
+       "anchor": "let p = head.predict(try vector(warp: warp, cgImage: cgImage, variant: config.dinoVariant))",
+       "note": "Builds the 397-value row from the warp score, DINOv2's embedding, the capture signature and sharpness, and calls the fusion head at 0.5 with its band. A screenshot goes to the screenshot head instead, because the camera-anchored base reads it as generated.",
+       "cite": "PIN"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "specialist-inference",
+   "kind": "inference",
+   "title": "Specialist inference",
+   "mark": "SI",
+   "subtitle": "the fusion base to the final verdict",
+   "say": "From the fusion base to the final verdict: a present capture signature first, then the specialist heads and the noiseprint pooled by the combiner, the frame seam, the semantic chain with its preview tail, and the result the battery and Garde both read.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "Capture comes first",
+     "chapters": [
+      "04-specialists.html",
+      "05-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "CapturePriors.apply(_:_:domain:capture:)",
+       "anchor": "let pooled = comb.pool(base: state.p, heads: hp, pairAI: pairAI, np: np)",
+       "note": "A valid, present capture signature suppresses every generated-side head. Otherwise the art, blur and human priors and the noiseprint are pooled by the combiner; an art-pair head adjudicates the art prior only for a combiner that asks for it, and the shipped one does not.",
+       "cite": "WHAT",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The heads read the force-resized embedding",
+     "chapters": [
+      "04-specialists.html"
+     ],
+     "entries": [
+      {
+       "scope": "AtlasPriors.evaluate(_:)",
+       "anchor": "kinds.compactMap { prior($0.name, $0.kind, s) }",
+       "note": "The art, blur and human priors, skipping any head the bundle lacks."
+      },
+      {
+       "scope": "AtlasPriors.prior(_:_:_:)",
+       "anchor": "let p = head.pAI(emb)",
+       "note": "One head's P(AI) on the 360×640 embedding, a row in the stack whatever it reads."
+      },
+      {
+       "scope": "DetectionSignals.dinoNorm()",
+       "anchor": "let e = try SemanticLens.normalizedEmbedding(cgImage, variant: config.dinoVariant)",
+       "note": "DINOv2 after the 360×640 force-resize, the embedding every head was trained on, computed once per image and shared."
+      },
+      {
+       "scope": "LinearHead.pAI(_:)",
+       "anchor": "z += ((embedding[i] - mean[i]) / s) * coef[i]",
+       "note": "A standardized logistic regression over the 384 values, the whole of a specialist head."
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "The combiner pools the evidence",
+     "chapters": [
+      "04-specialists.html"
+     ],
+     "entries": [
+      {
+       "scope": "StackCombiner.pool(base:heads:pairAI:np:)",
+       "anchor": "if base < gateCeiling {",
+       "note": "Adds each head's generated evidence to the capped base logit, and subtracts the consensus rescue and the noiseprint's camera evidence only while the base sits under 0.75. On 97,181 capture-absent store rows, taking the noiseprint term out moves 3 calls and the human push 68.",
+       "cite": "ledger#command-56"
+      },
+      {
+       "scope": "StackCombiner.headLogits(_:pairAI:)",
+       "anchor": "ls[0] = min(ls[0], lg(pa, capHead))",
+       "note": "Caps each head's logit at 2. Garde's combiner also let an art-pair head lower the art logit; the shipped one no longer asks, since taking it out moved 29 of 97,181 store calls, 19 of them to the right one.",
+       "cite": "ledger#command-56"
+      },
+      {
+       "scope": "StackCombiner.contribution(_:base:heads:pairAI:)",
+       "anchor": "return (base < gateCeiling && maxHeadLogit < 0) ? wRescue * (-maxHeadLogit) : 0",
+       "note": "A head's weight in the stack's rows: its generated push, or, while every head reads real under the gate, the shared rescue. Without the rescue the battery fails: a real wildlife photograph flips to generated.",
+       "cite": "ledger#command-57"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "A dark frame hiding the content",
+     "chapters": [
+      "05-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "FrameSeam.apply(_:_:capture:hint:detector:)",
+       "anchor": "let decisive = pi >= 0.70 && (pi - state.p) >= 0.20",
+       "note": "When a real verdict hides a uniform dark border, runs the whole stack again on the interior and takes that evidence only when it is decisive. In the census it ran on 3 of 300 images and decided one, IMG_0500, a hard battery anchor.",
+       "cite": "ledger#command-52",
+       "link": "none"
+      },
+      {
+       "scope": "FrameSeam.detectFrame(_:)",
+       "anchor": "guard [imgTop, imgBottom, left, right].filter({ $0 }).count >= 2 else { return nil }",
+       "note": "Reads a 96×96 luma grid and calls a frame when at least two border bands are dark, uniform and darker than the interior.",
+       "cite": "PIN:Sources/VeilGardeInference/Route/Mechanisms/FrameSeam.swift"
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The semantic chain and the preview tail",
+     "chapters": [
+      "05-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "SemanticChain.apply(_:_:base:domain:capture:)",
+       "anchor": "PreviewTail.apply(&probe, &state, s, capture: cap, semanticMajority: sm.majority, canDecide: canDecide)",
+       "note": "On the semantic-tile map: the render arbiter, the switched-off zoom escalation, the preview tail, then the authority seam that commits a probe only under the production profile.",
+       "cite": "PIN:Sources/VeilGardeInference/Route/Mechanisms/SemanticChain.swift",
+       "link": "none"
+      },
+      {
+       "scope": "PreviewTail.apply(_:_:_:capture:semanticMajority:canDecide:)",
+       "anchor": "let fires = phv >= 0 && phv <= 0.45 && (pn ?? 1.0) <= 0.30",
+       "note": "A small image read generated with a clean semantic vote flips to real only when the preview head and the neutralized reference agree. It fired once in the census, on a hard battery anchor's preview.",
+       "cite": "ledger#command-52"
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "The final verdict",
+     "chapters": [
+      "02-bundle.html",
+      "05-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "PublicSurface.routed(base:weightedPrediction:weightedScore:capture:specialists:semanticTiles:majorityPrediction:majorityScore:majoritySource:tileMapSource:routeDiagnostics:)",
+       "anchor": "weightedPrediction: weightedPrediction, weightedScore: weightedScore,",
+       "note": "The routed result: the base lane's patches and sensor fields beside the router's weighted verdict and the stack's rows.",
+       "link": "none"
+      },
+      {
+       "scope": "ResultJSON.encode(_:times:device:route:)",
+       "anchor": "options: [.sortedKeys]",
+       "note": "Serializes the result as the schema-v2 JSON with JSONSerialization and sorted keys. This contract alone keeps Garde's bytes, because the battery and the Garde-equivalence check read the JSON.",
+       "cite": "ledger#decision-1",
+       "link": "none"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "noiseprint-inference",
+   "kind": "inference",
+   "title": "Noiseprint inference",
+   "mark": "NI",
+   "subtitle": "pixels to camera evidence",
+   "say": "From an image to the noiseprint's camera evidence: the weights are found once, a gray plane is cut into a 4×4 grid of 128-pixel patches, four folded convolutions give the mean sigmoid P(camera), and the combiner subtracts that evidence only while the base is uncertain.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The weights are found and loaded once",
+     "chapters": [
+      "04-specialists.html",
+      "02-bundle.html"
+     ],
+     "entries": [
+      {
+       "scope": "NoiseprintLens.get()",
+       "anchor": "WeightLocator.shared.url(.noiseprint)",
+       "note": "Loads the net the first time it is asked for, from the first folder the weight search finds it in, and remembers when it is absent.",
+       "cite": "PIN:Sources/VeilGardeLens/Noiseprint/NoiseprintLens.swift",
+       "link": "none"
+      },
+      {
+       "scope": "NoiseprintNet.init(weights:)",
+       "anchor": "self.w = ws; self.b = bs; self.linW = lw; self.linB = lb",
+       "note": "Reads the four folded convolutions and the linear layer by their exported names."
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "A gray plane and a grid of patches",
+     "chapters": [
+      "04-specialists.html"
+     ],
+     "entries": [
+      {
+       "scope": "NoiseprintLens.score(_:)",
+       "anchor": "return net.score(patches)",
+       "note": "P(camera) for one image, or nothing when the net is absent or the image is smaller than a patch or blank.",
+       "link": "none"
+      },
+      {
+       "scope": "NoiseprintLens.grayPlane(_:)",
+       "anchor": "return (bytes.map { Float($0) / 255.0 }, w, h)",
+       "note": "Rounded BT.601 luma at native size, the plane the net was trained on."
+      },
+      {
+       "scope": "NoiseprintLens.gridPatches(_:_:_:)",
+       "anchor": "return MLXArray(rows, [count, n, n, 1])",
+       "note": "The 4×4 grid as one MLX array."
+      },
+      {
+       "scope": "NoiseprintLens.gridPatchValues(_:_:_:)",
+       "anchor": "if variance.squareRoot() > 0.02 { rows += patch; count += 1 }",
+       "note": "Sixteen 128-pixel patches spread evenly over the image, blank ones dropped, the same grid the trainer's test reads."
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Four convolutions and the mean sigmoid",
+     "chapters": [
+      "04-specialists.html"
+     ],
+     "entries": [
+      {
+       "scope": "NoiseprintNet.score(_:)",
+       "anchor": "return sigmoid(logits).mean().item(Float.self)",
+       "note": "Four convolutions with ReLU, a spatial mean and a linear layer per patch, averaged over the grid into P(camera)."
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "Camera evidence, under the gate",
+     "chapters": [
+      "04-specialists.html"
+     ],
+     "entries": [
+      {
+       "scope": "CapturePriors.apply(_:_:domain:capture:)",
+       "anchor": "let np: Float? = comb.wNp != nil ? NoiseprintLens.score(s.cgImage) : nil",
+       "note": "The noiseprint runs only for a capture-absent image and a combiner that weighs it.",
+       "cite": "WHAT:Sources/VeilGardeInference/Route/Mechanisms/CapturePriors.swift",
+       "link": "none"
+      },
+      {
+       "scope": "StackCombiner.pool(base:heads:pairAI:np:)",
+       "anchor": "if let wn = wNp, let pn = np { z -= wn * max(0, lg(pn, capHead)) }",
+       "note": "Subtracts 0.8 times the capped camera logit, only above 0.5 and only while the base sits under 0.75, so it can protect a real image and never accuse one. On the store's rows it moved 3 calls, and the battery held without it.",
+       "cite": "ledger#command-54"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "watermark-signing",
+   "kind": "signing",
+   "title": "Watermark signing",
+   "mark": "WS",
+   "subtitle": "an image to its signature, nothing added to it",
+   "say": "From an image to its watermark, with nothing added to its pixels: the native plane is cut into 32-pixel tiles, the detector's own warp residual gives each tile a fragility rate, each tile becomes four ordinal bits against its neighbours, sixteen tiles pack into a 64-bit word, and the words are named by their SHA-256.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The command reads the image at its own size",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "WatermarkCommand.Sign.run()",
+       "anchor": "let sig = try Watermark.sign(try loadImage(image))",
+       "note": "veilgarde watermark sign prints the signature as one line of vw1 text, or as JSON with --json, and names its grid, its bits and its id on stderr. Nothing is written into the image.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "Watermark.sign(_:)",
+       "anchor": "return WatermarkSignature(grid: TileCodeGrid(try NativePlane(cg).fragility()))",
+       "note": "Signs an image with nothing added to its pixels: its tile codes at native resolution, read from the grid anchored at the top-left corner.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "NativePlane.init(_:)",
+       "anchor": "let p = try ImageLoading.prepare(cg, maxDim: 0, patchSize: 1)",
+       "note": "Decodes the RGB plane once at its native size, with no cap and no padding. A crop must land on the same pixels in the same tiles as its source, and a resize would move every one.",
+       "cite": "WHAT"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "Every tile's fragility, by the detector's own residual",
+     "chapters": [
+      "08-watermark.html",
+      "01-warp.html"
+     ],
+     "entries": [
+      {
+       "scope": "NativePlane.fragility(originX:originY:quantizeLikeCV2:)",
+       "anchor": "let fr = WarpResidual.fragility(low: low, high: high)",
+       "note": "Measures every full tile's fragility rate from a given origin with the lens's own residual and fragility code, never a fork of it.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "WarpResidual.batch(_:forward:back:)",
+       "anchor": "let returned = applyWarpTable(warped, back)",
+       "note": "The round trip through the 16 homographies and back, then the high-pass: the function the detector's warp lens runs, called here rather than copied.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "WarpResidual.fragility(low:high:)",
+       "anchor": "(high.mean(axes: [1, 2]) - low.mean(axes: [1, 2])) / (WarpConstants.highStrength - WarpConstants.lowStrength)",
+       "note": "A tile's fragility rate: how much more of it the stronger warp loses than the weaker, per unit of strength.",
+       "cite": "doc:WarpResidual.fragility(low:high:)"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Four ordinal bits a tile",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "TileCodeGrid.init(_:)",
+       "anchor": "if v > g[nr, nc] { bits[r * g.cols + c] |= 1 << k }",
+       "note": "Turns each tile's fragility into four ordinal bits against its east, south, south-east and north-east neighbours, masking every comparison that leaves the image. An ordinal bit survives any monotone change of the residual's gain.",
+       "cite": "test:tile codes: four ordinal bits against E, S, SE, NE, masked at the edges"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "Sixteen tiles make one 64-bit word",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "WatermarkSignature.init(grid:)",
+       "anchor": "(codes, masks) = Sectioning.pack(grid)",
+       "note": "A signature holds its version, 32-pixel tiles, 4-tile sections, the tile grid's rows and columns, and the packed words."
+      },
+      {
+       "scope": "Sectioning.pack(_:)",
+       "anchor": "codes[s] |= UInt64(g.bits[r * g.cols + c] & 0xF) << k",
+       "note": "Four by four tiles, 128 pixels, pack into one 64-bit word in row-major order, with a mask word beside it. No hash folds them, so a bit that differs is one bit of distance, not a different word.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The words name themselves",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "WatermarkSignature.compact",
+       "anchor": "\"vw1:\" + binary.base64EncodedString()",
+       "note": "The one line sign prints: vw1: and the binary in base64url.",
+       "cite": "WHAT",
+       "link": "none"
+      },
+      {
+       "scope": "WatermarkSignature.binary",
+       "anchor": "for w in codes { withUnsafeBytes(of: w.littleEndian) { d.append(contentsOf: $0) } }",
+       "note": "The binary: a magic, the version, the tile and section sizes, the grid's rows and columns, the section count, then every code word and every mask word, little-endian.",
+       "cite": "PIN",
+       "link": "none"
+      },
+      {
+       "scope": "WatermarkSignature.cid",
+       "anchor": "public var cid: String { ContentHash.sha256Hex(binary) }",
+       "note": "The id is the SHA-256 of exactly those bytes, so two signatures of the same pixels are the same id.",
+       "cite": "PIN",
+       "link": "none"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "watermark-matching",
+   "kind": "matching",
+   "title": "Watermark matching",
+   "mark": "WM",
+   "subtitle": "a crop or a re-encode to its place and score",
+   "say": "From an image and a signature to a match: the signature is read back and checked, the image's codes are read at sixteen grid phases, each phase slides over the signature at every whole-tile offset, the best agreement is the match, and the acceptance run held the matcher to its kill criterion.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The command reads the image and the signature",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "WatermarkCommand.Match.run()",
+       "anchor": "let r = try Watermark.match(try loadImage(image), against: try WatermarkCommand.signature(signature), options: MatchOptions(phases: p))",
+       "note": "veilgarde watermark match prints the score, the bits it compared, the z-score and where the image sits on the signed one; --phases sets the grid phases.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "WatermarkCommand.signature(_:)",
+       "anchor": "if trimmed.hasPrefix(\"vw1:\") { return try WatermarkSignature(compact: trimmed) }",
+       "note": "Takes the signature as vw1 text, as a file holding the text, or as a file of JSON."
+      },
+      {
+       "scope": "WatermarkSignature.init(compact:)",
+       "anchor": "guard let d = Data(base64Encoded: b64) else {",
+       "note": "Undoes the base64url and reads the binary."
+      },
+      {
+       "scope": "WatermarkSignature.init(binary:)",
+       "anchor": "guard b.count == 20 + 16 * n else {",
+       "note": "Refuses bytes that do not add up: a wrong magic, a length other than 20 bytes and 16 a section, a section count the grid does not have, or a version, tile or section size it does not know.",
+       "cite": "PIN",
+       "link": "none"
+      },
+      {
+       "scope": "WatermarkSignature.init(from:)",
+       "anchor": "if let stated = try c.decodeIfPresent(String.self, forKey: .cid), stated != cid {",
+       "note": "The JSON form: the words as 16-digit hex, since a 64-bit number is not safe in every JSON reader, and a stated id that must be the words' own, so an edited signature is refused.",
+       "cite": "PIN",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The image is read at sixteen grid phases",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "Watermark.match(_:against:options:)",
+       "anchor": "match(codes: try phaseCodes(cg, phases: options.phases), against: signature, options: options)",
+       "note": "Reads the image's codes at every phase, then matches them. The acceptance calls the two halves apart, so one crop's codes are matched against its own signature and a stranger's."
+      },
+      {
+       "scope": "MatchOptions.init(phases:minimumBits:threshold:margin:)",
+       "anchor": "public init(phases: [Int] = [0, 8, 16, 24], minimumBits: Int = 256, threshold: Double = 0.75, margin: Int = 1) {",
+       "note": "The defaults: a phase every 8 pixels, a match at 0.75 over at least 256 compared bits, and offsets that run one tile past every edge.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "Watermark.phaseCodes(_:phases:)",
+       "anchor": "out.append((px, py, TileCodeGrid(plane.fragility(originX: px, originY: py))))",
+       "note": "A crop starts at an arbitrary pixel, so its tiles straddle the signature's. Its codes are read from 16 origins, every 8 pixels in each direction, which puts one within 4 pixels of the signed grid.",
+       "cite": "ledger#decision-51"
+      },
+      {
+       "scope": "NativePlane.fragility(originX:originY:quantizeLikeCV2:)",
+       "anchor": "let region = array[originY..<(originY + rows * ts), originX..<(originX + cols * ts), 0...]",
+       "note": "The same measurement as signing, from a shifted origin: only the tiles that fit whole past it.",
+       "cite": "WHAT"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Each phase slides over the signature",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "Watermark.match(codes:against:options:)",
+       "anchor": "guard let b = Matcher.best(crop: crop, stored: stored, margin: options.margin, minimumBits: options.minimumBits) else { continue }",
+       "note": "For each phase, asks the matcher for its best whole-tile offset, and keeps the best score over every phase, more compared bits breaking a tie.",
+       "cite": "ledger#decision-51"
+      },
+      {
+       "scope": "WatermarkSignature.tileCodes",
+       "anchor": "public var tileCodes: TileCodeGrid { Sectioning.unpack(codes: codes, masks: masks, rows: rows, cols: cols) }",
+       "note": "Unpacks the section words back into the tile grid, so the matcher compares tile against tile.",
+       "link": "none"
+      },
+      {
+       "scope": "Matcher.best(crop:stored:margin:minimumBits:)",
+       "anchor": "bad += ((cb[crow + j] ^ sb[srow + j]) & m).nonzeroBitCount",
+       "note": "Slides the crop's codes over the signature's at every whole-tile offset and counts the disagreeing bits among those both sides measured; the offset with the best score wins.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The best agreement is the match",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "Matcher.zScore(score:bits:)",
+       "anchor": "bits > 0 ? (score - 0.5) / (0.25 / Double(bits)).squareRoot() : 0",
+       "note": "How far the score sits above chance, in coin-flip units for the bits compared. It does not replace the 0.75 floor: every crop that compared 256 bits scored at least 9.2 above chance, but strangers reached 11.9, since the matcher keeps the best of thousands of placements.",
+       "cite": "ledger#command-61"
+      },
+      {
+       "scope": "MatchResult.pixelX",
+       "anchor": "public var pixelX: Int { offsetX * 32 - phaseX }",
+       "note": "Where the image's top-left corner sits on the signed image: the offset in tiles times 32, less the phase.",
+       "link": "none"
+      },
+      {
+       "scope": "WatermarkCommand.Verify.run()",
+       "anchor": "if !r.matched { throw ExitCode(1) }",
+       "note": "veilgarde watermark verify gives the same verdict as an exit code: 0 for a match, 1 for none.",
+       "cite": "WHAT",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The acceptance holds v1 to its kill criterion",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "WatermarkCommand.Accept.run()",
+       "anchor": "let report = try WatermarkAcceptance.run(manifest.records.map { (manifest.url($0), $0.label) }, settings: settings, note: note,",
+       "note": "veilgarde watermark accept samples final_mixed by a seed, half real and half generated, and writes each image's row as it is measured, so a long run that stops keeps what it measured.",
+       "cite": "WHAT",
+       "link": "none"
+      },
+      {
+       "scope": "WatermarkAcceptance.run(_:settings:note:measured:)",
+       "anchor": "let cross = Watermark.match(codes: cropCodes, against: other, options: options)",
+       "note": "Signs every image, then measures each: a self-match, a crop of half its area at a random pixel offset, a JPEG at quality 0.75, the crop against the next image's signature, and on every fourth image the crop resized.",
+       "cite": "ledger#decision-64"
+      },
+      {
+       "scope": "TileCodeGrid.balance",
+       "anchor": "return total > 0 ? Double(ones) / Double(total) : .nan",
+       "note": "The share of ones at each bit position. On 198 images every position sat between 0.496 and 0.498, so no bit is close to a constant.",
+       "cite": "ledger#command-44",
+       "link": "none"
+      },
+      {
+       "scope": "WatermarkAcceptance.summarize(_:settings:)",
+       "anchor": "if cropRate < 0.60 { reasons.append(",
+       "note": "The kill criterion, fixed in code before the run: the crop must match with its offset in 60% of images, the median JPEG score must reach 0.75, and some threshold must reach 80% crop recall with at most 5% false matches. On 198 images v1 passed with 73.2%, 0.958, and 81.3% recall at 0.73 with no false match.",
+       "cite": "ledger#command-44"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pruning",
+   "kind": "research",
+   "title": "Pruning study",
+   "mark": "PS",
+   "subtitle": "what the system could do without",
+   "say": "How the pruning study asks what the system could lose: rules first, then paired held-out comparisons of every part against the system without it, the warp model refit part by part, the fusion head's inputs and size, the stack term by term, and a census of the router on real images.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The rules come before the numbers",
+     "chapters": [
+      "10-pruning.html"
+     ],
+     "entries": [
+      {
+       "scope": "ResearchCommand.Prune.run()",
+       "anchor": "let report = try PruningStudy.run(inputs, settings: settings, parts: chosen, note: note)",
+       "note": "veilgarde research prune runs the study on the work area's tile cache and store against the shipped bundle, and writes the report.",
+       "cite": "PIN:Sources/VeilGardeCLI/Commands/Research.swift"
+      },
+      {
+       "scope": "PruningStudy.run(_:settings:parts:note:)",
+       "anchor": "case .warp: report.warp = try warp(inputs, settings, note: note)",
+       "note": "Runs the warp, fusion and stack parts in order and records how long each took.",
+       "cite": "PIN:Sources/VeilGardeTraining/Research/PruningStudy.swift"
+      },
+      {
+       "scope": "PruningRow.judge(_:_:calls:)",
+       "anchor": "if comparisons.contains(where: { $0.delta < -s.aucTolerance }) { return \"costs AUC\" }",
+       "note": "The rule fixed before the study ran: a part is within tolerance when taking it out costs at most 0.005 AUC and moves at most 0.5% of calls.",
+       "cite": "ledger#decision-68",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "Two scorings of the same held-out items",
+     "chapters": [
+      "10-pruning.html"
+     ],
+     "entries": [
+      {
+       "scope": "PairedComparison.measure(reference:variant:labels:resamples:seed:call:)",
+       "anchor": "var rng = SplitMix64(seed: seed &+ UInt64(r))",
+       "note": "Each row of the study: both AUCs, their difference with a 95% interval from 1,000 Poisson resamples, and the calls the change moves.",
+       "cite": "PIN:Sources/VeilGardeTraining/Research/PairedComparison.swift",
+       "link": "none"
+      },
+      {
+       "scope": "RankedScores.auc(_:)",
+       "anchor": "total += p * (below + 0.5 * n)",
+       "note": "A weighted AUC in one pass over scores sorted once, ties counted half, so a resample costs no sort."
+      },
+      {
+       "scope": "poissonOne(_:)",
+       "anchor": "while product > limit {",
+       "note": "A Poisson draw with mean 1, the weight of one item in one resample."
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "The warp model, part by part",
+     "chapters": [
+      "10-pruning.html",
+      "01-warp.html"
+     ],
+     "entries": [
+      {
+       "scope": "PruningStudy.warp(_:_:note:)",
+       "anchor": "let (refModel, refSeconds) = timed {",
+       "note": "Refits the deployed shape about thirty times on final_mixed's train partition and scores its test partition: fewer trees, shallower depth, each feature group shuffled and refit out, each feature refit out, seed-only refits as the noise floor. Only the seam group's refit moves no more calls than a re-seed.",
+       "cite": "ledger#command-56"
+      },
+      {
+       "scope": "PruningStudy.equivalence(_:votes:)",
+       "anchor": "let cuts = contract.equivalentCuts()",
+       "note": "Finds the two cuts where a Platt contract changes its call, over every float32 vote, and counts the images on which both give the same call: 1,738 of 1,738. The shipped contract is now those cuts.",
+       "cite": "ledger#command-56"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The fusion head's inputs and size",
+     "chapters": [
+      "10-pruning.html",
+      "03-fusion.html"
+     ],
+     "entries": [
+      {
+       "scope": "PruningStudy.fusion(_:_:note:)",
+       "anchor": "let isTest = dataset.ids.map { StableSplit.isHoldout($0, salt: \"prune:v1\", fraction: s.fusionHoldout) }",
+       "note": "Refits the scratch recipe on 80% of the store and scores the other 20%: fewer trees, other depths, each input left out, seed-only refits, and the shipped head's reliance on each input.",
+       "cite": "ledger#command-56"
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The stack, term by term",
+     "chapters": [
+      "10-pruning.html",
+      "04-specialists.html"
+     ],
+     "entries": [
+      {
+       "scope": "PruningStudy.stack(_:_:note:)",
+       "anchor": "let samples = CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)",
+       "note": "Pools the store's capture-absent rows with the shipped combiner, then again with one term or head taken out, and counts the calls each change moves.",
+       "cite": "ledger#command-56"
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "A census of the router on real images",
+     "chapters": [
+      "10-pruning.html",
+      "05-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "ResearchCommand.Census.run()",
+       "anchor": "let routed = try Detector.shared.detect(cgImage: cg, config: config)",
+       "note": "Runs the full detector over the battery's images and a final_mixed sample, one at a time, and keeps every result's stack and diagnostics.",
+       "cite": "PIN:Sources/VeilGardeCLI/Commands/Research.swift",
+       "link": "none"
+      },
+      {
+       "scope": "MechanismCensus.add(_:label:_:domain:)",
+       "anchor": "stackMovedCall += 1",
+       "note": "Counts each stack row, each row at full weight, and each call the stack or the semantic chain moved. On 300 images the stack moved the base's call 6 times, once to the right call and 5 times to the wrong one.",
+       "cite": "ledger#command-52"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

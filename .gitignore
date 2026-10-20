@@ -1,0 +1,46 @@
+# SwiftPM / Xcode
+.build/
+.swiftpm/
+xcuserdata/
+*.xcodeproj
+*.dSYM
+DerivedData/
+Package.resolved.orig
+
+# Editors and local tooling (CLAUDE.md is a local working file, never committed)
+.vscode/
+.claude/
+CLAUDE.md
+.DS_Store
+__pycache__/
+
+# Weights and Metal libraries stay out of the repo (they go to the work area or an override folder)
+*.safetensors
+*.metallib
+/WeightOverride/
+# ...except the small files the package ships: the test fixtures, the router's prompts and the noiseprint's weights
+!/Tests/**/Fixtures/**/*.safetensors
+!/Sources/VeilGardeFlywheel/Resources/clip_prompts_v1.safetensors
+!/Sources/VeilGardeInference/Resources/noiseprint_v1.safetensors
+
+# The playground's scratch work area (Playground/run.sh)
+/Playground/.work/
+/Playground/.build/
+/Playground/.swiftpm/
+
+# Local only: everything in docs/ but the site (docs/site is the documentation), and the maintainer's own scripts,
+# which need the research environment, Garde or this Mac's layout
+/docs/*
+!/docs/site/
+/scripts/fixtures/
+/scripts/lib.sh
+/scripts/parity-garde.sh
+/scripts/test.sh
+/scripts/weights.sh
+
+# The site regenerates these: exports and check screenshots
+/docs/site/export/
+/docs/site/.check/
+# The ask orb's key, copied from this Mac's ~/.rao by docs/site/src/askkey.py: never committed
+/docs/site/local/
+/Docs/site/local/

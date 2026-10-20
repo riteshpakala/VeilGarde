@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How does the warp lens see a camera? · VeilGarde</title>
+<meta name="description" content="The warp lens: every 32-pixel tile warped through 16 fixed homographies and back, 19 features per tile, the weighted verdict at 0.56, and the camera-sensor score from the tile vote through two cuts to the trust law.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-groups="Sources-VeilGardeCore,Sources-VeilGardeLens">
+<a class="skip" href="#main">Skip to the chapter</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 1 of 10</span><a href="code.html#trail-warp-inference-3">Walk the lens in the explorer</a></header>
+
+<h1 id="ch-warp">How does the warp lens see a camera?</h1>
+<p class="lede"><em>On the one physical idea VeilGarde starts from, and the two calls it turns into.</em></p>
+
+<p>A camera leaves a trace in its pixels that a generator does not. The sensor sees the scene through a mosaic of red, green and blue filters, and every pixel carries a little noise of its own. Warp a patch of those pixels a hair out of place and back, and the mosaic and the noise do not come back as they were.</p>
+<p>A generator's output is smoother, and it survives the round trip better. What the round trip loses is the warp residual, and the lens reads it tile by tile.</p>
+
+<h2 id="tiles">Thirty-two pixels at a time</h2>
+<p>The lens never reads the whole image at once. It caps the longest edge at 512 pixels, pads the right and bottom edges by reflection to a multiple of 32, and cuts the result into 32×32 tiles. Every tile is a full square of real pixels, so every tile looks like what the model was trained on.</p>
+<p>The cap is a measured choice, not a convenience. The research re-extracted the features at 768 and 1024 pixels and retrained, and both scored a little worse than 512.</p>
+<div class="code" data-excerpt="Sources/VeilGardeLens/Image/ImageLoading.swift:ImageLoading.prepare(_:maxDim:patchSize:)"></div>
+
+<h2 id="warps">Sixteen warps, two strengths</h2>
+<p>Each tile is warped through 16 fixed homographies. Here a homography moves the tile's four corners and drags every pixel with them. The 16 corner moves were drawn once from a seeded generator and are kept as a literal table, because the trained model saw these warps and no others.</p>
+<p>Each warp runs at two strengths. At 0.025 a corner moves up to 0.8 of a pixel along each axis, and at 0.05 up to 1.6.</p>
+<p>The tile goes forward and comes back through cv2's bicubic kernel and its 1/32-pixel coordinates, the arithmetic the model was trained on.</p>
+<p>The residual is the difference between each pixel and its value after the round trip, averaged over the 16 warps and the three colour channels. The lens keeps only its high frequencies: it subtracts a 9×9 Gaussian blur with σ 1.5, the one parameter that won the v29 ablation.</p>
+<div class="code" data-excerpt="Sources/VeilGardeLens/Warp/WarpResidual.swift:WarpResidual.batch(_:forward:back:)"></div>
+
+<h2 id="features">Nineteen numbers per tile</h2>
+<p>From the two residuals and the raw pixels, every tile gets a row of 19 features. The first ten read the warp residual. They say how fragile the tile is, how its residual's texture and direction behave, how it relates to its mirrored tile, and how its seams meet its neighbours'.</p>
+<p>The other nine read the raw pixels' high-pass, not the residual. A Bayer mosaic interpolates its colours in a way that leaves correlated chroma, a variance that changes with the mosaic's phase, and energy at the Nyquist frequency. A generator does not reproduce them.</p>
+<div class="scroll">
+<table class="data" data-feature-names id="feature-table">
+<thead><tr><th class="n">Column</th><th>Name</th><th>What it measures</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td class="mono">FR</td><td>Fragility rate: the mean residual at strength 0.05 minus that at 0.025, over 0.025. A camera tile's residual grows faster under the stronger warp.</td></tr>
+<tr><td class="n">2</td><td class="mono">LV</td><td>Local variance of the weak-warp residual over 2×2 windows, averaged.</td></tr>
+<tr><td class="n">3</td><td class="mono">CV</td><td>Circular variance of the residual's gradient direction over 9×9 windows: 0 when its edges agree, 1 when they point every way.</td></tr>
+<tr><td class="n">4</td><td class="mono">CM</td><td>Residual magnitude where its direction is coherent.</td></tr>
+<tr><td class="n">5</td><td class="mono">CC</td><td>Correlation of the tile's residual with its point-mirrored tile's.</td></tr>
+<tr><td class="n">6</td><td class="mono">CR</td><td>The smaller over the larger residual spread across that mirrored pair.</td></tr>
+<tr><td class="n">7</td><td class="mono">SH</td><td>Horizontal seam step: the bottom four rows against the next tile's top four.</td></tr>
+<tr><td class="n">8</td><td class="mono">SV</td><td>Vertical seam step, across the right and left strips.</td></tr>
+<tr><td class="n">9</td><td class="mono">SH_S</td><td>Horizontal seam spectrum: the first 8 rFFT magnitudes across that seam.</td></tr>
+<tr><td class="n">10</td><td class="mono">SV_S</td><td>Vertical seam spectrum.</td></tr>
+<tr><td class="n">11</td><td class="mono">xcorr_RG</td><td>Correlation of the red and green high-pass planes.</td></tr>
+<tr><td class="n">12</td><td class="mono">cfa_G</td><td>Bayer phase spread of green: the range over the mean of the four 2×2 phase variances.</td></tr>
+<tr><td class="n">13</td><td class="mono">xcorr_BG</td><td>Correlation of the blue and green high-pass planes.</td></tr>
+<tr><td class="n">14</td><td class="mono">xcorr_RB</td><td>Correlation of the red and blue high-pass planes.</td></tr>
+<tr><td class="n">15</td><td class="mono">cfa_R</td><td>Bayer phase spread of red.</td></tr>
+<tr><td class="n">16</td><td class="mono">cfa_B</td><td>Bayer phase spread of blue.</td></tr>
+<tr><td class="n">17</td><td class="mono">noise_ratio</td><td>Spread of the red high-pass over the spread of the green.</td></tr>
+<tr><td class="n">18</td><td class="mono">diag_axial</td><td>Diagonal over axial gradient energy on the raw green plane.</td></tr>
+<tr><td class="n">19</td><td class="mono">nyq_R</td><td>Nyquist energy of the red high-pass.</td></tr>
+</tbody>
+</table>
+</div>
+<p class="note">The table's names and order are checked against WarpFeatures.names in the source each time the self-check runs. The wording is WarpFeatures.swift's doc comments, shortened.</p>
+<p>Six of the residual features look past their own tile: two to the mirrored tile and four to the neighbours. That is why the lens measures the whole grid in one pass rather than tile by tile. Each row then goes to the warp tile model, an ensemble of 200 trees of depth 8, which gives the tile its probability of being generated.</p>
+
+<h2 id="weighted">From tiles to the weighted score</h2>
+<p>The tile probabilities become a grid of patches. At the default patch size of 32, each patch is one tile.</p>
+<p>Not every patch counts the same. A weight map multiplies three things. A Gaussian centred on the texture centroid makes the subject count more than the corners. A texture weight makes flat sky count little, and a confidence boost makes a decisive patch count more than an unsure one. The weights sum to 1.</p>
+<p>The weighted score is each patch's probability times its weight, summed. A hotspot blend then moves it 35% of the way toward the mean of the confident patches, on both sides. The blend is symmetric because the one-sided blend inflated real-image scores by 0.03 and flipped about a third of real verdicts.</p>
+<div class="code" data-excerpt="Sources/VeilGardeCore/Grid/WeightedVerdict.swift:WeightedVerdict.score(patchGrid:weightMap:hotspot:)"></div>
+<p>The weighted verdict calls that score at 0.56 with an open band of 0.04. Between 0.52 and 0.60 it is inconclusive, above that generated, and below it real.</p>
+<p>That operating point comes from the v2.4 recalibration. It stays apart from the fusion base's 0.5 on purpose.</p>
+<div class="code" data-excerpt="Sources/VeilGardeCore/Grid/Verdict.swift:DecisionRule.label(_:)"></div>
+
+<h2 id="sensor">The camera-sensor score</h2>
+<p>The weighted score says how generated the image looks where it matters. The camera-sensor score answers a narrower question: did a real camera make these pixels?</p>
+<p>It starts from a plain vote. Of all the 32-pixel tiles, what fraction does the sensor model read above 0.5? That fraction is the camera-sensor score, and two cuts on it make the call.</p>
+<p>At or under <span data-fact="calibration.cuts.real_at_or_below" data-round="4">0.7169</span> of the tiles, the call is real. At or over <span data-fact="calibration.cuts.generated_at_or_above" data-round="4">0.8365</span>, it is generated, and between the two it is inconclusive.</p>
+<div class="code" data-excerpt="Sources/VeilGardeCore/Heads/SensorCalibration.swift:SensorCuts.call(_:)"></div>
+<p>The cuts are where Garde's calibration contract changed its call. That contract mapped the vote through Platt scaling, with a coefficient of <span data-fact="calibration.derived_from.platt_payload.coef" data-round="5">0.48909</span> and an intercept of <span data-fact="calibration.derived_from.platt_payload.intercept" data-round="5">−0.09095</span>.</p>
+<p>It then called the result against <span data-fact="calibration.derived_from.decision_threshold" data-round="5">0.62987</span>, with an open band of <span data-fact="calibration.derived_from.uncertain_band" data-round="2">0.04</span>. Platt is monotone, so its call was only ever two cuts on the vote. The pruning study found them, and the shipped contract states them: on every vote a float32 can hold, it calls as Platt did.</p>
+<p>Garde's contract was fitted on 65% of a validation set, with its threshold chosen on the other 35%, in the warp-majority campaign. The cuts are bound to the sensor model's SHA-256, <span data-fact="calibration.sensor_model_sha256" data-prefix="8">516119c9</span>…, so a model whose bytes drift fails closed instead of calling with the wrong cuts.</p>
+<p>The shipped sensor model is a byte-identical copy of the base warp model, under its own name. The dual-warp law still keeps their jobs apart: the sensor model owns only this public score, and the base model owns the weighted score and the fusion. With equal bytes the lens reuses the base grid and counts strictly above 0.5.</p>
+
+<h2 id="trust">How much the call deserves</h2>
+<p>The trust law rates the camera-sensor call high only when four things hold together. The call is binary, the route is native, the capture signature is valid and present, and the camera-sensor call agrees with the weighted verdict.</p>
+<p>Anything else is low. Two abstentions that agree are not evidence.</p>
+<p>Present means the capture signature's Nyquist peak reaches 30, Swift's threshold since July 2026. That peak is measured at native resolution, before the 512 cap, because a single halving of the image destroys it.</p>
+
+<h2 id="limits">What the lens cannot see</h2>
+<p>Measured alone, the warp vote has a ceiling. A layer-by-layer study put it near 0.78 AUC, against 0.94 to 0.97 when the same signal feeds the fusion.</p>
+<p>Off native pixels it decays further. The services that resize photographs for the web strip the mosaic's trace, and renders never had a sensor to read. That is why the lens is one axis of the detector and not its arbiter.</p>
+
+<h2 id="sources">Where the numbers come from</h2>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>32-px tiles, 16 homographies, strengths 0.025 and 0.05, high-pass 9×9 at σ 1.5</td><td class="mono"><a href="code.html#Sources/VeilGardeLens/Warp/WarpConstants.swift">WarpConstants.swift</a> PIN, which pins them to the training from v2.4 optimal_6 on</td><td>Ported in phase 3, 2026-10-19</td></tr>
+<tr><td>The 512 cap and the reflect pad</td><td class="mono"><a href="code.html#Sources/VeilGardeLens/Image/ImageLoading.swift">ImageLoading.swift</a> PIN; the research's warp chapter, “The 512 ledger”, quoted</td><td>768 and 1024 measured on 2026-07-16</td></tr>
+<tr><td>The 16 corner moves</td><td class="mono"><a href="code.html#Sources/VeilGardeLens/Warp/WarpDisplacements.swift">WarpDisplacements.swift</a> PIN: numpy default_rng(42)</td><td>Copied from Garde byte for byte</td></tr>
+<tr><td>19 features, their order and their meaning</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Features/WarpFeatures.swift">WarpFeatures.swift</a>; the self-check compares the table</td><td>Every time the self-check runs</td></tr>
+<tr><td>The features equal Garde's dump byte for byte</td><td>Test “the tile feature matrix equals Garde's dump byte for byte”, ledger test-4</td><td>2026-10-19, 5 of 5 passed</td></tr>
+<tr><td>200 trees of depth 8</td><td>Test “the warp tile model is 200 trees of depth 8 over 19 features”, ledger test-3</td><td>2026-10-19, 64 of 64 passed</td></tr>
+<tr><td>Hotspot blend 35%, symmetric; 0.03 and a third</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Grid/Verdict.swift:HotspotMode">Verdict.swift</a>, HotspotRule's defaults and HotspotMode's doc comment, citing Understanding.md F2</td><td>Not recorded</td></tr>
+<tr><td>0.56 with a band of 0.04</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Grid/Verdict.swift:DecisionRule">Verdict.swift</a>, DecisionRule.warpWeighted: the v2.4 recalibration</td><td>Kept apart from 0.5 by Garde's 2026-07-16 audit note</td></tr>
+<tr><td>The two cuts, the Platt contract they replace, the sensor hash</td><td class="mono">Sources/VeilGardeInference/Resources/warp_sensor_calibration.json, read by the build; the self-check compares the page</td><td>Platt shipped in Garde on 2026-08-02, per the research's model registry as of 2026-08-16; the cuts on 2026-10-19</td></tr>
+<tr><td>The cuts call every vote as Platt did</td><td>Test “the shipped cuts are where Garde's Platt contract turns, and call every vote as it did”: every vote k/n up to 1,024 tiles, and either side of each cut</td><td>2026-10-19</td></tr>
+<tr><td>65% to fit and 35% to choose the threshold</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Heads/SensorCalibration.swift">SensorCalibration.swift</a> PIN, citing the warp-majority campaign's campaign_stages.py</td><td>Not recorded</td></tr>
+<tr><td>Capture present at a peak of 30</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Features/CaptureFeatures.swift">CaptureFeatures.swift</a> PIN</td><td>Swift's threshold since 2026-07-11</td></tr>
+<tr><td>A ceiling near 0.78 AUC alone, 0.94 to 0.97 inside the fusion</td><td>The research's warp chapter, “The demotion, measured honestly”, quoted</td><td>Page as of 2026-07-29</td></tr>
+</tbody>
+</table>
+</div>
+
+<details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
+<ul class="plain">
+<li><a href="code.html#trail-warp-inference-3">Warp inference, step 3,</a> walks the lens: WarpLens.analyze, ImageLoading.load and prepare, FullGridExtractor.features, WarpResidual.batch and WarpResidual.fragility.</li>
+<li><a href="code.html#trail-warp-inference-4">Step 4</a> turns tiles into the weighted score, and <a href="code.html#trail-warp-inference-5">step 5</a> computes the camera-sensor score and both calls.</li>
+<li><a href="code.html#trail-warp-training-1">The warp training trail</a> follows the same model from labelled images to its calibration.</li>
+<li>The golden tests hold this lens to Garde's own runs, leaf for leaf; run them after any change under Sources/VeilGardeLens.</li>
+</ul>
+</div></details>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/index.js"></script>
+<script src="js/chapters.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount();</script>
+</body>
+</html>

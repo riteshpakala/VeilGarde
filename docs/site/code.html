@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The change explorer · VeilGarde</title>
+<meta name="description" content="Every file the run changed, verbatim, before and after, with each Swift declaration, its calls, and eleven trails that walk each flow in the order the code runs.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/explorer.css">
+</head>
+<body class="explorer" data-groups="all">
+<a class="skip" href="#explorer">Skip to the code</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · appendix</span><a href="index.html">The change at a glance</a></header>
+
+<h1 id="ch-code">The change explorer</h1>
+<p class="lede"><em>On reading every file the run changed, and walking the change in the order it runs.</em></p>
+<p>Every file the run changed is here, whole, with the line numbers the editor shows. Pick a file, or walk a trail: one flow told declaration by declaration, from where it starts to what it hands on. Four trails train the parts of the verdict and four run them. Two sign an image and match a crop of it, and one is the pruning study.</p>
+<p>Pasting works. Copy a function name, a signature line or a whole body into the box. The page opens the file at that declaration, with what it calls and what calls it.</p>
+<p>Those lists were matched by name and argument labels when the page was built, not by a compiler, and each says how sure it is. Copy a line as File.swift:21, and the editor's Open Quickly lands on the same line.</p>
+
+<div id="explorer" class="xp" data-app="explorer"></div>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/run.js"></script>
+<script src="data/index.js"></script>
+<script src="js/explorer.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount(function () { VeilGarde.explorer.mount(document.getElementById("explorer")); });</script>
+</body>
+</html>

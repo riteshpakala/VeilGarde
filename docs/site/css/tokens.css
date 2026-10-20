@@ -1,0 +1,62 @@
+/* VeilGarde's site: design tokens. Light is paper; dark follows prefers-color-scheme, and data-theme forces either. */
+:root {
+  color-scheme: light dark;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 10px;
+  --radius-s: 6px;
+  --space-xs: .5rem;
+  --space-s: .9rem;
+  --space-m: 1.6rem;
+  --space-l: 2.4rem;
+
+  --bg: #F6F4EF;
+  --bg-raised: #FCFBF8;
+  --bg-sunk: #EEEBE3;
+  --fg: #1B1C1E;
+  --fg-2: #46474B;
+  --dim: #6E6F73;
+  --faint: #A2A29E;
+  --border: #DBD7CD;
+  --border-strong: #C3BDAF;
+  --link: #1F4FA8;
+  --focus: #1F4FA8;
+  --accent: #0E7C74;
+  --accent-ink: #0B5F59;
+  --accent-soft: rgba(14, 124, 116, .14);
+  --add: #1F8A4C;
+  --add-soft: rgba(31, 138, 76, .13);
+  --del: #C2362F;
+  --del-soft: rgba(194, 54, 47, .12);
+  --mod: #A86A0B;
+  --mod-soft: rgba(168, 106, 11, .14);
+  --wm: #7A3E9D;
+  --hl: rgba(214, 170, 52, .20);
+  --hl-strong: rgba(214, 170, 52, .38);
+  --flash: rgba(76, 141, 245, .26);
+  --tk-k: #7A3E9D; --tk-t: #1D5DB8; --tk-s: #A4501B; --tk-c: #707070; --tk-n: #16794A; --tk-a: #8A5A00;
+  --shadow: 0 1px 2px rgba(40, 36, 28, .06), 0 6px 20px rgba(40, 36, 28, .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131416; --bg-raised: #1A1B1E; --bg-sunk: #0F1012; --fg: #E7E5DF; --fg-2: #BFBDB6; --dim: #8D8C88; --faint: #5E5E5C;
+    --border: #2F3034; --border-strong: #46474C; --link: #8DB4FF; --focus: #8DB4FF;
+    --accent: #3FC1B5; --accent-ink: #6ED8CD; --accent-soft: rgba(63, 193, 181, .16);
+    --add: #4FD38A; --add-soft: rgba(79, 211, 138, .14); --del: #FF7D76; --del-soft: rgba(255, 125, 118, .13);
+    --mod: #F0B85A; --mod-soft: rgba(240, 184, 90, .15); --wm: #C79BEA;
+    --hl: rgba(226, 195, 90, .16); --hl-strong: rgba(226, 195, 90, .30); --flash: rgba(127, 174, 255, .28);
+    --tk-k: #C79BEA; --tk-t: #7FAEFF; --tk-s: #F2A66C; --tk-c: #8A8A8A; --tk-n: #5ED39C; --tk-a: #E2C35A;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .45);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131416; --bg-raised: #1A1B1E; --bg-sunk: #0F1012; --fg: #E7E5DF; --fg-2: #BFBDB6; --dim: #8D8C88; --faint: #5E5E5C;
+  --border: #2F3034; --border-strong: #46474C; --link: #8DB4FF; --focus: #8DB4FF;
+  --accent: #3FC1B5; --accent-ink: #6ED8CD; --accent-soft: rgba(63, 193, 181, .16);
+  --add: #4FD38A; --add-soft: rgba(79, 211, 138, .14); --del: #FF7D76; --del-soft: rgba(255, 125, 118, .13);
+  --mod: #F0B85A; --mod-soft: rgba(240, 184, 90, .15); --wm: #C79BEA;
+  --hl: rgba(226, 195, 90, .16); --hl-strong: rgba(226, 195, 90, .30); --flash: rgba(127, 174, 255, .28);
+  --tk-k: #C79BEA; --tk-t: #7FAEFF; --tk-s: #F2A66C; --tk-c: #8A8A8A; --tk-n: #5ED39C; --tk-a: #E2C35A;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .45);
+}

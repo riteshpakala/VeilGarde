@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What do the specialist heads add? · VeilGarde</title>
+<meta name="description" content="On the specialist stack: linear heads on DINOv2's embedding for the families the base misses, the noiseprint's camera evidence, and the asymmetric combiner that pools them.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-groups="Sources-VeilGardeCore,Sources-VeilGardeLens,Sources-VeilGardeInference">
+<a class="skip" href="#main">Skip to the chapter</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 4 of 10</span><a href="code.html#trail-specialist-inference-3">Walk the stack in the explorer</a></header>
+
+<h1 id="ch-specialists">What do the specialist heads add?</h1>
+<p class="lede"><em>On the families the base misses, the camera evidence the noiseprint adds, and the pooling that keeps both honest.</em></p>
+
+<p>The fusion base is strong where it was trained. It is weaker on AI art against human art, on generative blur against a camera's, on photoreal people against real portraits. Each of those families gets a specialist: a head that knows one question well.</p>
+<p>A head never replaces the base. It adds evidence in one direction, and a combiner weighs that evidence against the base under caps it cannot exceed.</p>
+
+<h2 id="head">A head is a line in DINOv2's space</h2>
+<p>Every specialist is the same primitive: a standardized linear probe on a 384-value DINOv2 embedding. It subtracts each value's mean, divides by its spread, takes a weighted sum and a sigmoid. A new specialist is a new head file, not new code.</p>
+<div class="code" data-excerpt="Sources/VeilGardeCore/Heads/LinearHead.swift:LinearHead.pAI(_:)"></div>
+<p>The heads read a different embedding from the fusion's. The image is force-resized to 360 by 640 before DINOv2 sees it, so a portrait and a landscape are read at the same shape. Every head was trained on that embedding, and the store keeps it as its own column.</p>
+
+<h2 id="heads">The heads the bundle ships</h2>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Head</th><th>Asks</th><th>Where the router uses it</th></tr></thead>
+<tbody>
+<tr><td class="mono">art v2</td><td>AI art against museum and human art</td><td>the combiner's art prior</td></tr>
+<tr><td class="mono">blur v1</td><td>generative blur against optical blur</td><td>the combiner's blur prior</td></tr>
+<tr><td class="mono">human v4</td><td>photoreal AI people against real portraits</td><td>the combiner's human prior</td></tr>
+<tr><td class="mono">cgi v1</td><td>renders against photographs</td><td>the render arbiter in the semantic chain</td></tr>
+<tr><td class="mono">preview v1</td><td>small previews of generated against real images</td><td>the preview tail</td></tr>
+<tr><td class="mono">screenshot v1.10</td><td>generated against real screenshots</td><td>the screenshot domain's content head</td></tr>
+<tr><td class="mono">semtile v1</td><td>generated against real, per patch token</td><td>the semantic-tile map: 256 token votes, the semantic majority</td></tr>
+</tbody>
+</table>
+</div>
+<p>The bundle's manifest lists the heads, and the registry loads exactly those. A head that is not in the bundle is inert, and a bundle with a head that fails its hash does not load.</p>
+
+<h2 id="noiseprint">The noiseprint's camera evidence</h2>
+<p>The capture signature reads the sensor at native resolution, and a single recompression destroys it. The noiseprint was built for that zone. It is a small CNN whose first layer is constrained to predict each pixel from its neighbours, so it reads the residual of the content rather than the content.</p>
+<p>It scores a 4×4 grid of 128-pixel gray patches, and the mean sigmoid is P(camera). The v202 research measured it on held-out images at 0.941 AUC at native quality and 0.906 at WebP 75. Its low side includes laundered web reals, so it only ever subtracts generated evidence; it never adds any.</p>
+<div class="code" data-excerpt="Sources/VeilGardeLens/Noiseprint/NoiseprintLens.swift:NoiseprintNet.score(_:)"></div>
+
+<h2 id="combiner">The combiner's arithmetic</h2>
+<p>For an image with no capture signature, the combiner pools the base, the three atlas priors and the noiseprint into one probability. It is asymmetric: generated evidence adds, and real evidence subtracts only while the base is unsure.</p>
+<p>The base's logit is capped at <span data-fact="combiner.cap_base" data-round="1">4.0</span> and each head's at <span data-fact="combiner.cap_head" data-round="1">2.0</span>. Each head adds its weight times its logit, only when that logit is positive.</p>
+<p>Garde's combiner first let an art-pair head pull the art logit down whenever it read the image as real art. The pruning study found that adjudicator broke 19 of the store's calls to fix 10, with every battery call held without it, so the shipped combiner no longer asks for it, and its head left the bundle. A combiner file that asks for the adjudication still gets it.</p>
+<p>While the base sits under <span data-fact="combiner.gate_ceiling" data-round="2">0.75</span>, two real-side terms subtract. When every head reads real, the rescue pulls by <span data-fact="combiner.w_rescue" data-round="1">0.5</span> times the weakest of their real logits, so it is only as strong as the least sure head. The noiseprint subtracts <span data-fact="combiner.w_np" data-round="1">0.8</span> times its camera logit.</p>
+<div class="code" data-excerpt="Sources/VeilGardeCore/Heads/StackCombiner.swift:StackCombiner.pool(base:heads:pairAI:np:)"></div>
+<p>The shipped weights make the base dominant. It enters at <span data-fact="combiner.w_base" data-round="4">3.8205</span>, the intercept is <span data-fact="combiner.w0" data-round="4">−0.6755</span>, and of the three priors only human carries generated weight, <span data-fact="combiner.w_gen.2" data-round="4">0.1967</span>. Art and blur still count: they decide whether the rescue fires.</p>
+
+<h2 id="why">Why a head cannot flip a confident base</h2>
+<p>Stacking with caps is a measured choice. The research tried a monolithic combiner that blended every signal, and real false positives rose from 8% to between 50% and 92%. The stack holds them at 0%.</p>
+<p>The caps are the reason. A head at its cap adds at most twice its weight to the logit, and the base enters at almost four times its own. When a user's own image slips past the base, the fix the research found is denser data for both, not a stronger override.</p>
+
+<h2 id="admission">Admission</h2>
+<p>A head that blocks real images is worse than no head. Before an atlas head is promoted, it is scored on the golden reals outside Bluesky, and it must block at most 10% of them at 0.8.</p>
+<p>Retrained from the seed store on 2026-10-19, every atlas head was admitted. The art head blocked 1.6% against the shipped head's 4.7%, blur 6.2% against 9.4%, human and cgi none.</p>
+
+<h2 id="sources">Where the numbers come from</h2>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>The head's arithmetic</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Heads/LinearHead.swift">LinearHead.swift</a> PIN: Garde's pAI in Float, in index order</td><td>Every build</td></tr>
+<tr><td>The 360 by 640 force-resize</td><td class="mono"><a href="code.html#Sources/VeilGardeLens/Semantic/SemanticLens.swift">SemanticLens.swift</a>, normalizedEmbedding</td><td>Ported in phase 4, 2026-10-19</td></tr>
+<tr><td>0.941 and 0.906 AUC</td><td class="mono"><a href="code.html#Sources/VeilGardeLens/Noiseprint/NoiseprintLens.swift">NoiseprintLens.swift</a> PIN, quoting v202</td><td>The v202 run</td></tr>
+<tr><td>The caps, the gate, the weights</td><td class="mono">stack_combiner_v2.json, read by the build; the self-check compares the page</td><td>Shipped in Garde with combiner v3, 2026-07-03; without the art-pair since 2026-10-19</td></tr>
+<tr><td>The art-pair broke 19 calls to fix 10</td><td><a href="index.html#command-56">Ledger command-56</a>, the battery without it <a href="index.html#command-54">command-54</a></td><td>2026-10-19</td></tr>
+<tr><td>8% to 50–92% under a monolithic combiner; 0% stacked</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Route/Detector.swift">Detector.swift</a> PIN, quoting the research</td><td>Not recorded</td></tr>
+<tr><td>Denser data, not an override</td><td>The ATLAS laws, quoted</td><td>The research's parts 13 to 17b</td></tr>
+<tr><td>Admission at block@0.8 ≤ 0.10 outside Bluesky</td><td class="mono"><a href="code.html#Sources/VeilGardeTraining/Heads/HeadTrainer.swift">HeadTrainer.swift</a></td><td>atlas_heads_store.py</td></tr>
+<tr><td>1.6% against 4.7%, 6.2% against 9.4%</td><td>Ledger command-18</td><td>2026-10-19</td></tr>
+</tbody>
+</table>
+</div>
+
+<details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
+<ul class="plain">
+<li>HeadRegistry loads the heads the manifest names, AtlasPriors evaluates art, blur and human, SemanticTiles builds the token map, ScreenshotSpecialist runs the screenshot head.</li>
+<li>CapturePriors in Route/Mechanisms decides whether the combiner runs at all: a valid, present capture suppresses every generated-side head.</li>
+<li>HeadTrainer and CombinerTrainer in Training retrain both; chapter 6 shows how.</li>
+</ul>
+</div></details>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/index.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount();</script>
+</body>
+</html>

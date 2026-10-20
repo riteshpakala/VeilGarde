@@ -1,0 +1,51 @@
+{
+ "user_real": {
+  "acc": 1.0,
+  "n": 9,
+  "sem_acc": 0.8888888888888888,
+  "mode": "HARD",
+  "want": "real"
+ },
+ "native_12yrs": {
+  "acc": 1.0,
+  "n": 1,
+  "sem_acc": 1.0,
+  "mode": "HARD",
+  "want": "real"
+ },
+ "flux_anchor": {
+  "acc": 1.0,
+  "n": 2,
+  "sem_acc": 1.0,
+  "mode": "HARD_SEM",
+  "want": "generated"
+ },
+ "user_gen": {
+  "acc": 1.0,
+  "n": 9,
+  "sem_acc": 0.5555555555555556,
+  "mode": "HARD",
+  "want": "generated"
+ },
+ "native_cam": {
+  "acc": 1.0,
+  "n": 24,
+  "sem_acc": 0.7916666666666666,
+  "mode": "HARD",
+  "want": "real"
+ },
+ "gen_semantic": {
+  "acc": 1.0,
+  "n": 24,
+  "sem_acc": 1.0,
+  "mode": "RATCHET_SEM",
+  "want": "generated"
+ },
+ "wildlife_real": {
+  "acc": 1.0,
+  "n": 26,
+  "sem_acc": 0.9230769230769231,
+  "mode": "RATCHET",
+  "want": "real"
+ }
+}

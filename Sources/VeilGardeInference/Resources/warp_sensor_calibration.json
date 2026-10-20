@@ -1,0 +1,28 @@
+{
+  "calibration": "cuts",
+  "cuts": {
+    "generated_at_or_above": 0.8365380167961121,
+    "real_at_or_below": 0.7168718576431274
+  },
+  "decision_threshold": 0.7767049372196198,
+  "derived_from": {
+    "calibration": "platt",
+    "decision_threshold": 0.6298664647384551,
+    "platt_payload": {
+      "coef": 0.48908749922126266,
+      "intercept": -0.09094760943132153
+    },
+    "uncertain_band": 0.04
+  },
+  "generated_comparison": "at_or_above_generated_cut",
+  "native_routes": [
+    "camera"
+  ],
+  "platt_payload": null,
+  "schema_version": 2,
+  "score_semantics": "image_majority_fraction",
+  "sensor_model_sha256": "516119c92d364dda3dba41dcfc42e06edf0f42e45efd3b54c44ab620f7eefe3d",
+  "sensor_variant": "warp19",
+  "trust_law": "v1_decisive_native_capture_present_valid_and_governing_agreement",
+  "uncertain_band": 0.05983307957649231
+}

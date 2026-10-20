@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "doc": "flywheel_gap.py's TARGET_MAP and flywheel_scrape.py's DEFAULT_JOBS, verbatim: the collector jobs that fill a (domain, category, label) blind spot. flux-local jobs are generated on this Mac by hand (mflux) and are listed, never run. test_jobs are keyless, for a smoke run.",
+  "default_jobs": [
+    {"source": "wikimedia", "category": "photo", "label": "real", "query": "Featured_pictures_on_Wikimedia_Commons"},
+    {"source": "civitaipr", "category": "human", "label": "generated", "query": "photorealistic|RAW photo"},
+    {"source": "bsky", "category": "photo", "label": "real", "query": ""}
+  ],
+  "test_jobs": [
+    {"source": "wikimedia", "category": "photo", "label": "real", "query": "Featured_pictures_on_Wikimedia_Commons"},
+    {"source": "met", "category": "art", "label": "real", "query": "painting"}
+  ],
+  "target_map": [
+    {"domain": "processed", "category": "photo", "label": 1, "jobs": [
+      {"source": "civitaipr", "category": "human", "label": "generated", "query": "photorealistic|photo of|portrait photography|RAW photo"},
+      {"source": "flux-local", "category": "human", "label": "generated", "query": "photoreal-scenes"}]},
+    {"domain": "camera", "category": "photo", "label": 1, "jobs": [
+      {"source": "civitaipr", "category": "human", "label": "generated", "query": "photorealistic|RAW photo"},
+      {"source": "flux-local", "category": "human", "label": "generated", "query": "photoreal-scenes"}]},
+    {"domain": "processed", "category": "photo", "label": 0, "jobs": [
+      {"source": "wikimedia", "category": "photo", "label": "real", "query": "Featured_pictures_on_Wikimedia_Commons,Quality_images"}]},
+    {"domain": "processed", "category": "human", "label": 0, "jobs": [
+      {"source": "wikimedia", "category": "human", "label": "real", "query": "Portrait_photographs,Studio_portrait_photographs"}]},
+    {"domain": "processed", "category": "human", "label": 1, "jobs": [
+      {"source": "civitaipr", "category": "human", "label": "generated", "query": "photorealistic"},
+      {"source": "tpdn", "category": "human", "label": "generated", "query": ""}]},
+    {"domain": "processed", "category": "art", "label": 1, "jobs": [
+      {"source": "civitai", "category": "art", "label": "generated", "query": "Newest"}]},
+    {"domain": "processed", "category": "art", "label": 0, "jobs": [
+      {"source": "safebooru", "category": "art", "label": "real", "query": "scenery,1girl solo,original"}]},
+    {"domain": "processed", "category": "blur", "label": 0, "jobs": [
+      {"source": "wikimedia", "category": "blur", "label": "real", "query": "Bokeh,Motion_blur,Long-exposure_photography"}]},
+    {"domain": "processed", "category": "cgi", "label": 0, "jobs": [
+      {"source": "wikimedia", "category": "cgi", "label": "real", "query": "Video_game_screenshots,Blender_renders,3D_rendering"}]},
+    {"domain": "camera", "category": "photo", "label": 0, "jobs": [
+      {"source": "bsky", "category": "photo", "label": "real", "query": ""}]}
+  ]
+}

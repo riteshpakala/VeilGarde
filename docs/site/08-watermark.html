@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How does a warp signature survive a crop? · VeilGarde</title>
+<meta name="description" content="On VeilWatermark: a signature read off the per-tile fragility pattern, with nothing added to the pixels, matched by a crop at any offset, and the acceptance run that decided whether v1 lives.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-groups="Sources-VeilGardeLens,Sources-VeilWatermark">
+<a class="skip" href="#main">Skip to the chapter</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 8 of 10</span><a href="code.html#trail-watermark-signing-1">Walk the watermark in the explorer</a></header>
+
+<h1 id="ch-watermark">How does a warp signature survive a crop?</h1>
+<p class="lede"><em>On a signature read off the same residual the detector starts from, with nothing added to the pixels.</em></p>
+
+<p>A watermark usually hides a pattern in the pixels, and an attacker can find it and strip it. VeilWatermark adds nothing. Its signature is what the warp lens already reads: how fragile each tile is under the round trip, and how that compares with its neighbours.</p>
+<p>The pattern belongs to the pixels themselves, real or generated. A crop of the image carries part of it, at the same positions, and the matcher finds where.</p>
+
+<h2 id="tiles">Four bits a tile</h2>
+<p>The lens measures each 32-pixel tile's fragility rate at native resolution, from the image's top-left corner. Native means no cap: a crop must land on the same tiles as its source, and a resize would move every one.</p>
+<div class="code" data-excerpt="Sources/VeilGardeLens/Warp/FragilityGrid.swift:NativePlane.fragility(originX:originY:quantizeLikeCV2:)"></div>
+<p>Each tile then gets four bits. Is its fragility above its east neighbour's, its south's, its south-east's, its north-east's? A comparison that would leave the image is masked out instead of guessed.</p>
+<div class="code" data-excerpt="Sources/VeilWatermark/Signature/TileCodes.swift:TileCodeGrid.init(_:)"></div>
+<p>Ordinal bits are the point of the design. A JPEG or an exposure change moves every tile's fragility, but mostly in the same direction, so the comparisons survive where the values do not.</p>
+
+<h2 id="sections">Sections and the signature</h2>
+<p>Sixteen tiles, four by four, pack into one 64-bit word, with a second word for the masks. The signature is the grid's size, its words, and a content id: the SHA-256 of its bytes, so two signatures of the same pixels are the same id.</p>
+<p>It travels as JSON, as a compact binary, or as one line of text that starts with <code>vw1:</code>. A 24-megapixel photograph is 178 by 133 tiles, close to 94,000 measured bits.</p>
+
+<h2 id="match">Finding a crop</h2>
+<p>A crop starts at an arbitrary pixel, so its tiles straddle the signature's. The matcher computes the crop's codes at 16 grid phases, every 8 pixels in each direction, which puts one of them within 4 pixels of alignment.</p>
+<p>For each phase it slides the crop's codes over the signature's at every whole-tile offset, and counts the bits that disagree among those both sides measured. The score is the share that agree, and the best offset and phase win.</p>
+<div class="code" data-excerpt="Sources/VeilWatermark/Match/Matcher.swift:Matcher.best(crop:stored:margin:minimumBits:)"></div>
+<p>A stranger's codes agree with a signature about half the time, so the z-score says how far a score sits above chance for the bits compared. A match needs a score of at least 0.75 over at least 256 bits.</p>
+
+<h2 id="rule">The test it had to pass</h2>
+<p>v1 was a design under measurement, and its kill criterion was fixed in code before the run. On a seeded sample of final_mixed, each image is signed, then a crop of half its area at a random offset, a JPEG at quality 0.75 and a cross match against another image's signature are scored.</p>
+<p>v1 dies if the crop matches with its offset in fewer than 60% of images, if the median JPEG score falls under 0.75, or if no threshold reaches 80% crop recall with at most 5% false matches.</p>
+
+<h2 id="result">What the run showed</h2>
+<p>v1 passed. On 198 images of final_mixed, every image matched itself exactly, and no image's crop matched another image's signature.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Measure</th><th class="n">Result</th><th>Bar</th></tr></thead>
+<tbody>
+<tr><td>A half-area crop, matched with its offset</td><td class="n">73.2%</td><td>at least 60%</td></tr>
+<tr><td>A JPEG at quality 0.75, median score</td><td class="n">0.958</td><td>at least 0.75</td></tr>
+<tr><td>Crop recall at the best threshold, 0.73</td><td class="n">81.3%</td><td>at least 80%</td></tr>
+<tr><td>False matches at that threshold</td><td class="n">0.0%</td><td>at most 5%</td></tr>
+<tr><td>The highest score of a stranger</td><td class="n">0.698</td><td>under 0.75</td></tr>
+<tr><td>Each bit's share of ones</td><td class="n">0.496 to 0.498</td><td>near one half</td></tr>
+</tbody>
+</table>
+</div>
+<p>The JPEG barely moves the code: the median re-encode keeps 96% of its bits. That is the ordinal design at work, since a recompression shifts neighbouring tiles' fragility together.</p>
+
+<h2 id="weak">Where it is weak</h2>
+<p>Large camera photographs are v1's weak case. Images under 2 megapixels matched 81.6% of the time, images of 2 or more 45.7%. Generated images matched 83.8%, real ones 62.6%.</p>
+<p>The misses are scores, not places. Of the 53 crops that missed, 50 found their true offset and scored under 0.75. The score falls with the misalignment the 8-pixel phase grid leaves. Within 3 pixels in total, 88% to 100% of crops matched; at 5 to 8 pixels, 50% to 62%.</p>
+<p>A finer phase step is the obvious next experiment, at four times the matching cost. The z-score will not replace the floor. Every crop sat at least 9.2 above chance, but strangers reached 11.9, because the matcher keeps the best of thousands of placements and the codes are spatially structured.</p>
+
+<h2 id="resize">What it cannot do</h2>
+<p>A resize moves every tile, so the signature does not survive it, and v1 does not claim to. On every fourth image the crop was also resized to 0.9 and 0.75 of its size, and none of them matched.</p>
+
+
+<h2 id="sources">Where the numbers come from</h2>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>32-pixel tiles at native resolution; four ordinal bits against E, S, SE, NE</td><td class="mono"><a href="code.html#Sources/VeilWatermark/Signature/TileCodes.swift">TileCodes.swift</a>; test “tile codes: four ordinal bits against E, S, SE, NE, masked at the edges”</td><td>The plan's v1 design, fixed before any measurement</td></tr>
+<tr><td>4×4 sections in 64-bit words; the binary layout and the content id</td><td class="mono"><a href="code.html#Sources/VeilWatermark/Signature/WatermarkSignature.swift">WatermarkSignature.swift</a> PIN</td><td>Phase 8, 2026-10-19</td></tr>
+<tr><td>178 by 133 tiles, close to 94,000 bits</td><td>The signature of iphone_real_00011.jpeg, 5712 by 4284</td><td>2026-10-19</td></tr>
+<tr><td>16 phases; 0.75 over 256 bits</td><td class="mono"><a href="code.html#Sources/VeilWatermark/Match/Matcher.swift">Matcher.swift</a>, MatchOptions; ledger decision-51</td><td>Fixed before the acceptance run</td></tr>
+<tr><td>The kill criterion</td><td class="mono"><a href="code.html#Sources/VeilWatermark/Acceptance/WatermarkAcceptance.swift">WatermarkAcceptance.swift</a> PIN</td><td>Fixed before the acceptance run</td></tr>
+<tr><td>73.2%, 0.958, 81.3% at 0.73 with 0.0%, 0.698, 0.496 to 0.498</td><td>Ledger command for <code>watermark accept --n 200</code>; the report at &lt;work area&gt;/watermark/accept_v1_n200.json</td><td>2026-10-19, 198 images</td></tr>
+<tr><td>By size, by label, by misalignment; 50 of 53 misses at their offset; z 9.2 and 11.9</td><td>The same report's rows, broken down</td><td>2026-10-19</td></tr>
+<tr><td>Resizes on every fourth image, none matched</td><td>The same report; ledger decision on the resizes</td><td>2026-10-19</td></tr>
+</tbody>
+</table>
+</div>
+
+<details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
+<ul class="plain">
+<li>Two trails walk it: <a href="code.html#trail-watermark-signing-1">signing</a>, from an image to its signature, and <a href="code.html#trail-watermark-matching-1">matching</a>, from a crop to its place and score, with the acceptance run as its last step.</li>
+<li><code>veilgarde watermark sign</code>, <code>match</code>, <code>verify</code> and <code>accept</code> run it; Playground step 9 signs and matches one image.</li>
+<li>The fragility code is the lens's own: WarpResidual.batch and WarpResidual.fragility, never a fork.</li>
+</ul>
+</div></details>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/index.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount();</script>
+</body>
+</html>

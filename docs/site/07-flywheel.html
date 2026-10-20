@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How does the flywheel grow the heads? · VeilGarde</title>
+<meta name="description" content="On the specialist-head regime: a store of features with no images, acquisition aimed at the base's blind spots, weekly candidates, the battery, and promote as the only writer of live.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-groups="Sources-VeilGardeCore,Sources-VeilGardeFlywheel">
+<a class="skip" href="#main">Skip to the chapter</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 7 of 10</span><a href="code.html#Sources/VeilGardeFlywheel/Promote/Promoter.swift">Open promote in the explorer</a></header>
+
+<h1 id="ch-flywheel">How does the flywheel grow the heads?</h1>
+<p class="lede"><em>On the regime that keeps the detector current as generators change, without ever keeping an image.</em></p>
+
+<p>Generators change every month, and a detector trained once falls behind. The answer is a flywheel. Find where the base is wrong, fetch images of that kind, and train candidates on them. Promote only what passes a battery of images the detector must never get wrong.</p>
+<p>VeilGarde runs the same loop with one change at its centre. It stores the features a head needs, never the images they came from.</p>
+
+<h2 id="store">A store of features</h2>
+<p>Every image becomes one row of six columns: the two DINOv2 embeddings, the nine capture values, the warp score, the three sharpness values and the noiseprint. That is everything a head, the fusion head or the combiner trains on. The image is read, measured in memory and dropped.</p>
+<p>The format is the research store's, so its 138,247 rows in 59 shards read as they are. VeilGarde's own rows add provenance: the source and its URL, the licence, the native size, a difference hash, the router's scores and the warp model that measured them.</p>
+<div class="code" data-excerpt="Sources/VeilGardeCore/Store/FeatureRow.swift:FeatureRow"></div>
+
+<h2 id="gap">Aiming at the blind spots</h2>
+<p>The gap miner reads the store and scores the live models on it, bucket by bucket: by domain, camera or processed, by category and by label. A bucket's gap is how often the base is wrong plus how often it disagrees with the pooled verdict.</p>
+<p>On the July cache it found the research's two worst buckets, in the research's order: processed generated photographs at a gap of 0.33 and camera-domain ones at 0.27. Photoreal generated images are still the blind spot, and the miner writes the jobs that fill it.</p>
+<div class="code" data-excerpt="Sources/VeilGardeFlywheel/Acquire/GapMiner.swift:GapMiner.mine(_:store:shards:targets:)"></div>
+
+<h2 id="acquire">Fetching without keeping</h2>
+<p>Sixteen sources answer the jobs, from Wikimedia and the Met to Civitai and Bluesky's firehose, each with the Python collectors' retry rules and a cursor that resumes. Every fetched image passes a gate before it is measured. It must decode, measure at least 512 pixels on its short side and weigh at least 20 KB. It must also be new: not the same bytes as a stored row, and not a near copy by its difference hash.</p>
+<p>Generated images are then routed by CLIP, the argmax of their embedding against a fixed matrix of category prompts. A row lands in the shard, and the bytes are gone.</p>
+<div class="code" data-excerpt="Sources/VeilGardeFlywheel/Acquire/Acquirer.swift:Acquirer.run(_:perJob:extractor:router:shard:)"></div>
+<p>On its first run against two keyless sources it fetched 29 images, refused 9 that the seed store already held, and kept 20 rows in 62 seconds. No image was written.</p>
+
+<h2 id="candidates">Weekly candidates</h2>
+<p>Once a week the flywheel trains on top of live: the four atlas heads, and the base warm-started with 80 trees. Each candidate is a complete bundle, measured beside live, with a review file that says which slots to promote and why. On 2026-10-19 the candidate raised the store's base-and-pooled agreement from 0.9857 to 0.9894.</p>
+
+<h2 id="battery">The battery</h2>
+<p>The battery is a set of images grouped by what the detector must do with them. Six groups are hard: every image in them must keep its verdict. Two more are ratchets that must not fall below their recorded floors.</p>
+<p>Version 2 holds eight groups over 100 images, copied into the work area and checked byte for byte. Version 1 had twelve more, built on atlas anchor images that no longer exist; they found nothing and failed every full gate, so the owner retired them. A new atlas will be built later. The eight groups kept v1's floors, unchanged.</p>
+<p>The full gate now passes on live: 100 images, every group at its floor, in 50 seconds. On v1's promote gate the verdicts equalled the Python runner's on 50 of 50 images, in 20 seconds against its 4 minutes 3 seconds.</p>
+
+<h2 id="promote">Promote is the only writer of live</h2>
+<p>Promote takes one slot from a candidate into live. It refuses a frozen slot outright. It refuses a base that does not keep live's trees byte for byte, a calibration not bound to live's sensor model, and an atlas head that fails admission.</p>
+<p>Then it snapshots live, writes the slot, re-pins the manifest and runs the battery. On a failure it restores the snapshot.</p>
+<div class="code" data-excerpt="Sources/VeilGardeFlywheel/Promote/Promoter.swift:Promoter.promote(_:from:store:)"></div>
+<p>It earned its place on the first day. The weekly base's 80 trees flipped IMG_0291.JPG, a knife-edge image the battery holds, from 0.757 to 0.184, and promote refused it and restored live. So did a 60-tree start. A 20-tree start kept the image at 0.613 and promoted.</p>
+
+<h2 id="open">What is still open</h2>
+<p>The atlas groups are retired, not replaced. Until a new atlas is built, the art, blur, human and CGI heads are gated only by the eight groups that remain and by admission.</p>
+
+<h2 id="sources">Where the numbers come from</h2>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>138,247 rows in 59 shards</td><td>Ledger command-25, <code>flywheel seed</code> from the research's feature store</td><td>2026-10-19</td></tr>
+<tr><td>Gaps 0.33 and 0.27 in the research's order</td><td>Ledger command-36; the research's gap_report.txt</td><td>The research's of 2026-07-07; VeilGarde's 2026-10-19</td></tr>
+<tr><td>The gate's 512 pixels and 20 KB; the difference-hash distances</td><td class="mono"><a href="code.html#Sources/VeilGardeFlywheel/Acquire/Gate.swift">Gate.swift</a> PIN, the Python collectors</td><td>Ported in phase 7</td></tr>
+<tr><td>29 fetched, 9 refused, 20 kept in 62 s</td><td>Ledger command-38</td><td>2026-10-19</td></tr>
+<tr><td>Agreement 0.9857 to 0.9894</td><td>Ledger command-28; the live models were trained on store rows</td><td>2026-10-19</td></tr>
+<tr><td>8 groups, 6 hard and 2 ratchet; 100 images; the full gate in 50 s</td><td>Ledger decision-65 and command-49; battery_spec_v2.json</td><td>2026-10-19</td></tr>
+<tr><td>50 of 50 equal; 20 s against 4 min 3 s</td><td>Ledger command-26, under battery v1</td><td>2026-10-19</td></tr>
+<tr><td>IMG_0291 from 0.757 to 0.184; 0.613 under 20 trees</td><td>Ledger command-29 and command-30</td><td>2026-10-19</td></tr>
+<tr><td>The atlas anchors missing; the groups retired</td><td>Ledger question-1, command-27 and answer-5</td><td>2026-10-19</td></tr>
+</tbody>
+</table>
+</div>
+
+<details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
+<ul class="plain">
+<li>The work area's layout is in FlywheelArea; every stage but promote and rollback opens live read-only, and a test checks it.</li>
+<li><code>veilgarde flywheel gap</code>, <code>acquire</code>, <code>candidates</code>, <code>battery</code>, <code>promote</code> and <code>rollback</code> are the loop, one command each.</li>
+<li>Playground step 8 runs the loop in miniature: ingest, a promote behind a small battery, and a rollback back to the shipped bytes.</li>
+</ul>
+</div></details>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/index.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount();</script>
+</body>
+</html>
