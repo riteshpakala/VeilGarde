@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The ML explorer · VeilGarde</title>
+<meta name="description" content="Every model VeilGarde ships, told as machine learning: what it learns from, the features, the algorithm and why, the fit, the calibration, what it adds to the verdict, and how the models together reach the majority and the weighted verdicts.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/explorer.css">
+</head>
+<body class="explorer" data-groups="all" data-trails="ml">
+<a class="skip" href="#explorer">Skip to the explorer</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · appendix</span><a href="code.html">The change explorer</a></header>
+
+<h1 id="ch-ml">The ML explorer</h1>
+<p class="lede"><em>On how each shipped model learns and decides, and how the models together reach the two verdicts.</em></p>
+<p>Every model VeilGarde ships is here, told as machine learning: what it learns from, the features it reads, the algorithm and why it was chosen, the fit, the calibration, and what it adds to the verdict. Six trails follow one model each.</p>
+<p>The seventh follows the two verdicts the result keeps, the majority and the weighted. Each of its steps says which path it is on, so the place where the trail crosses from one to the other is plain. It ends with the evidence that each part is needed, and the commands that test it again.</p>
+<p>Each step opens with a primer for a reader new to the idea, then the note on the code, then a deeper line for a practitioner with the trade-off and the measured numbers. The depth control shows the first two, the last two, or all three, and remembers the choice.</p>
+<p>Every number on a card is read from the shipped bundle when the page opens, or names the ledger entry, the test or the chapter it came from. Each step links to its twin on the change explorer, which walks the same flow in the order the code runs. What the marks mean is one click away, under the trail grid.</p>
+
+<div id="explorer" class="xp" data-app="explorer"></div>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/run.js"></script>
+<script src="data/index.js"></script>
+<script src="js/explorer.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount(function () { VeilGarde.explorer.mount(document.getElementById("explorer")); });</script>
+</body>
+</html>

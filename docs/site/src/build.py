@@ -9,7 +9,9 @@
     python3 -I docs/site/src/build.py --stats       # unresolved and likely call names, id collisions
 
 Inputs: git, from the base commit to the working tree; every changed file; docs/site/src/ledger.json, the run's
-ledger; docs/site/src/trails.json, the trails. It writes only under docs/site/data/.
+ledger; docs/site/src/trails.json, the trails through the code; docs/site/src/mltrails.json, the ML explorer's
+trails through the models; the shipped bundle's manifest, calibration, combiner and boosters, read as facts. It
+writes only under docs/site/data/.
 
 The change set is `git diff --name-status -M <base>` plus the untracked files git does not ignore. Left out, and
 listed by name and size in the index: the shipped bundle under Sources/VeilGardeInference/Resources/, test
@@ -34,6 +36,7 @@ import string
 import subprocess
 import sys
 from collections import Counter, defaultdict
+from html import unescape
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
@@ -41,6 +44,8 @@ SITE = REPO / "docs" / "site"
 DATA = SITE / "data"
 LEDGER = SITE / "src" / "ledger.json"
 TRAILS = SITE / "src" / "trails.json"
+# The ML explorer's trails (ml.html): the same resolver, kinds declared in the file, and the ML fields.
+ML_TRAILS = SITE / "src" / "mltrails.json"
 TRAIL_KINDS = ("training", "inference", "signing", "matching", "research")
 # A kind's column heading in the picker; a study needs none, its section title says it.
 KIND_LABELS = {"training": "Training", "inference": "Inference", "signing": "Signing", "matching": "Matching", "research": ""}
@@ -1433,6 +1438,13 @@ def resolve_cite(cite, where, f, changes, graph, ids, tests, ledger_ids):
         if not hit:
             fail(f"{where}: no comment in {path} says {fragment!r}")
         return f"code.html#{path}:{hit[0]}", None
+    if cite.startswith("chapter:"):
+        m = re.fullmatch(r"chapter:(\d\d-[a-z-]+\.html)#([\w-]+)", cite)
+        if not m:
+            fail(f"{where}: a chapter cite is chapter:<NN-slug.html>#<id>, not {cite!r}")
+        if chapter_heading(m.group(1), m.group(2)) is None:
+            fail(f"{where}: {m.group(1)} has no element with the id {m.group(2)}")
+        return f"{m.group(1)}#{m.group(2)}", None
     if re.fullmatch(r"[\w./-]+\.md#[\w-]+", cite):
         path, anchor_slug = cite.split("#", 1)
         doc = next((c for c in changes if c.path == path), None)
@@ -1443,72 +1455,160 @@ def resolve_cite(cite, where, f, changes, graph, ids, tests, ledger_ids):
             fail(f"{where}: {path} has no heading #{anchor_slug}")
         return f"code.html#{path}:{hit[0]}", None
     fail(f"{where}: the cite must be ledger#<id>, PIN or WHAT (optionally :<path>), test:<name>, doc:<declaration>, "
-         "comment:<path>#<words in a comment> or <file>.md#<heading>")
+         "comment:<path>#<words in a comment>, chapter:<NN-slug.html>#<id> or <file>.md#<heading>")
 
 
-def resolve_trails(changes, graph, ids, edges, ledger_ids):
-    """src/trails.json, resolved: every trail's steps and entries checked as one trail is, the trails' ids and marks
-    unique, every chapter a step names a page of the site."""
-    if not TRAILS.is_file():
-        fail("docs/site/src/trails.json is missing")
+def chapter_heading(page, anchor_id):
+    """The words a chapter cite names: the heading with that id, or a details block's summary; None when the page
+    or the id is not there."""
+    p = SITE / page
+    if not re.fullmatch(r"\d\d-[a-z-]+\.html", page) or not p.is_file():
+        return None
+    text = p.read_text(encoding="utf-8")
+    m = re.search(r'<(\w+)\b[^>]*\bid="' + re.escape(anchor_id) + r'"[^>]*>', text)
+    if not m:
+        return None
+    rest = text[m.end():]
+    if re.fullmatch(r"h[1-6]", m.group(1)):
+        inner = rest.split(f"</{m.group(1)}>", 1)[0]
+    elif m.group(1) == "details" and "<summary>" in rest:
+        inner = rest.split("<summary>", 1)[1].split("</summary>", 1)[0]
+    else:
+        inner = ""
+    words = re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", "", inner))).strip()
+    return words or anchor_id
+
+
+def cite_fields(cite, where, f, changes, graph, ids, tests, ledger_ids):
+    """A cite as the data carries it: the cite, its href, the declaration it names, and for a chapter its words."""
+    href, cite_scope = resolve_cite(cite, where, f, changes, graph, ids, tests, ledger_ids)
+    out = {"cite": cite}
+    if href:
+        out["href"] = href
+    if cite_scope is not None:
+        out["citeScope"] = cite_scope
+    if cite.startswith("chapter:"):
+        page, anchor_id = cite[8:].split("#", 1)
+        out["citeLabel"] = f"chapter {int(page[:2])}, {chapter_heading(page, anchor_id)}"
+    return out
+
+
+SENTENCE_WORDS = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+
+
+def prose(text, where, what, max_sentences):
+    """The site's prose rules on one note, primer or deeper line: a banned phrase or a parenthesis that is not a
+    call fails the build; more than max_sentences sentences is a warning."""
+    for phrase in BANNED:
+        if re.search(r"\b" + re.escape(phrase) + r"\b", text.lower()):
+            fail(f"{where}: the {what} says “{phrase}”")
+    if re.search(r"\([^)]*[a-z][^)]*\)", text) and not re.search(r"\b[A-Za-z_.]+\([^)]*\)", text):
+        fail(f"{where}: a parenthesis inside the {what}")
+    if len([s for s in re.split(r"(?<=[.!?])\s+(?=[A-Z])", text) if s]) > max_sentences:
+        return [f"{where}: the {what} runs past {SENTENCE_WORDS.get(max_sentences, max_sentences)} sentences"]
+    return []
+
+
+def fact_at(facts, path):
+    """The value at a dotted path into the facts, as the pages' V.factValue reads it; None when it is not there."""
+    v = facts
+    for k in path.split("."):
+        if isinstance(v, list) and k.isdigit():
+            v = v[int(k)] if int(k) < len(v) else None
+        elif isinstance(v, dict):
+            v = v.get(k)
+        else:
+            return None
+        if v is None:
+            return None
+    return v
+
+
+def resolve_trails(path, changes, graph, ids, edges, ledger_ids, ml=None):
+    """A trail file, resolved: every trail's steps and entries checked as one trail is, the trails' ids and marks
+    unique, every chapter a step names a page of the site. With `ml`, it is the ML explorer's file: its kinds are
+    declared in it, its ids and marks are unique across both files, and its steps and entries carry the ML fields."""
+    name = path.name
+    if not path.is_file():
+        fail(f"docs/site/src/{name} is missing")
     try:
-        spec = json.loads(TRAILS.read_text(encoding="utf-8"))
+        spec = json.loads(path.read_text(encoding="utf-8"))
     except ValueError as e:
-        fail(f"trails.json: {e}")
-    trails, warnings, seen_ids, seen_marks = [], [], set(), set()
+        fail(f"{name}: {e}")
+    if ml is None:
+        kinds, labels = TRAIL_KINDS, KIND_LABELS
+    else:
+        declared = spec.get("kinds")
+        if not isinstance(declared, list) or not declared or any(not isinstance(k, dict) or not re.fullmatch(r"[a-z]+", k.get("id", "")) or "label" not in k for k in declared):
+            fail(f"{name}: kinds must list {{id, label}}, each id one lowercase word")
+        kinds = tuple(k["id"] for k in declared)
+        if len(set(kinds)) != len(kinds):
+            fail(f"{name}: a kind is declared twice")
+        labels = {k["id"]: k["label"] for k in declared}
+    both = " across both trail files" if ml is not None else ""
+    trails, warnings = [], []
+    seen_ids, seen_marks = set(ml["ids"]) if ml else set(), set(ml["marks"]) if ml else set()
     for t in spec.get("trails", []):
         tid = t.get("id", "")
         if not re.fullmatch(r"[a-z]+(?:-[a-z]+)*", tid) or tid in seen_ids:
-            fail(f"trails.json: the trail id {tid!r} is not lowercase words joined by hyphens, or is used twice")
+            fail(f"{name}: the trail id {tid!r} is not lowercase words joined by hyphens, or is used twice{both}")
         if not t.get("mark") or t["mark"] in seen_marks:
-            fail(f"trails.json: trail {tid} needs a mark of its own")
-        if t.get("kind") not in TRAIL_KINDS:
-            fail(f"trails.json: trail {tid} is of kind {t.get('kind')!r}, not one of {', '.join(TRAIL_KINDS)}")
+            fail(f"{name}: trail {tid} needs a mark of its own{both}")
+        if t.get("kind") not in kinds:
+            fail(f"{name}: trail {tid} is of kind {t.get('kind')!r}, not one of {', '.join(kinds)}")
         for key in ("title", "subtitle", "say"):
             if not t.get(key):
-                fail(f"trails.json: trail {tid} has no {key}")
+                fail(f"{name}: trail {tid} has no {key}")
         seen_ids.add(tid)
         seen_marks.add(t["mark"])
-        steps, trail_warnings = resolve_trail(t, changes, graph, ids, edges, ledger_ids)
+        steps, trail_warnings = resolve_trail(t, changes, graph, ids, edges, ledger_ids, ml)
         warnings += trail_warnings
-        trails.append({"id": tid, "kind": t["kind"], "title": t["title"], "mark": t["mark"], "subtitle": t["subtitle"], "say": t["say"], "steps": steps})
+        out = {"id": tid, "kind": t["kind"], "title": t["title"], "mark": t["mark"], "subtitle": t["subtitle"], "say": t["say"], "steps": steps}
+        if t.get("lanes"):
+            out["lanes"] = [{"id": lane["id"], "label": lane["label"]} for lane in t["lanes"]]
+        trails.append(out)
     if not trails:
-        fail("trails.json holds no trail")
-    return {"trails": trails, "picker": resolve_picker(spec.get("picker"), {t["id"]: t for t in trails})}, warnings
+        fail(f"{name} holds no trail")
+    result = {"trails": trails, "picker": resolve_picker(spec.get("picker"), {t["id"]: t for t in trails}, kinds, labels, name)}
+    if ml is not None:
+        result["kinds"] = [{"id": k, "label": labels[k]} for k in kinds]
+    return result, warnings
 
 
-def resolve_picker(spec, by_id):
-    """trails.json's picker: sections of rows, a row one flow, its trails in the order of the section's kinds, so each
-    sits in its kind's column. Every trail once, each in the column of its own kind."""
+def resolve_picker(spec, by_id, kinds, labels, name):
+    """A trail file's picker: sections of rows, a row one flow, its trails in the order of the section's kinds, so
+    each sits in its kind's column. Every trail once, each in the column of its own kind."""
     if not isinstance(spec, list) or not spec:
-        fail("trails.json: the picker must list its sections")
+        fail(f"{name}: the picker must list its sections")
     placed, sections = [], []
     for sec in spec:
-        kinds = sec.get("kinds") or []
-        if not sec.get("title") or not kinds or any(k not in TRAIL_KINDS for k in kinds) or not sec.get("rows"):
-            fail(f"trails.json: the picker section {sec.get('title')!r} needs a title, kinds from {', '.join(TRAIL_KINDS)} and rows")
+        sec_kinds = sec.get("kinds") or []
+        if not sec.get("title") or not sec_kinds or any(k not in kinds for k in sec_kinds) or not sec.get("rows"):
+            fail(f"{name}: the picker section {sec.get('title')!r} needs a title, kinds from {', '.join(kinds)} and rows")
         rows = []
         for row in sec["rows"]:
-            ids = row.get("trails") or []
-            if not row.get("label") or len(ids) != len(kinds):
-                fail(f"trails.json: the picker row {row.get('label')!r} needs a label and one trail for each of {', '.join(kinds)}")
-            for tid, kind in zip(ids, kinds):
+            row_ids = row.get("trails") or []
+            if not row.get("label") or len(row_ids) != len(sec_kinds):
+                fail(f"{name}: the picker row {row.get('label')!r} needs a label and one trail for each of {', '.join(sec_kinds)}")
+            for tid, kind in zip(row_ids, sec_kinds):
                 if tid not in by_id:
-                    fail(f"trails.json: the picker names {tid!r}, which is no trail")
+                    fail(f"{name}: the picker names {tid!r}, which is no trail")
                 if by_id[tid]["kind"] != kind:
-                    fail(f"trails.json: the picker puts {tid} ({by_id[tid]['kind']}) in the {kind} column")
-            placed += ids
-            rows.append({"label": row["label"], "trails": ids})
-        sections.append({"title": sec["title"], "columns": [{"kind": k, "label": KIND_LABELS[k]} for k in kinds], "rows": rows})
+                    fail(f"{name}: the picker puts {tid} ({by_id[tid]['kind']}) in the {kind} column")
+            placed += row_ids
+            rows.append({"label": row["label"], "trails": row_ids})
+        sections.append({"title": sec["title"], "columns": [{"kind": k, "label": labels[k]} for k in sec_kinds], "rows": rows})
     if sorted(placed) != sorted(by_id) or len(placed) != len(set(placed)):
         missing, twice = sorted(set(by_id) - set(placed)), sorted({x for x in placed if placed.count(x) > 1})
-        fail(f"trails.json: the picker must hold every trail once (missing {missing}, twice {twice})")
+        fail(f"{name}: the picker must hold every trail once (missing {missing}, twice {twice})")
     return sections
 
 
-def resolve_trail(spec, changes, graph, ids, edges, ledger_ids):
+def resolve_trail(spec, changes, graph, ids, edges, ledger_ids, ml=None):
     """One trail's steps: 3 to 9, numbered from 1, each a title, the chapters it follows and its entries, a
-    declaration at most once on the trail."""
+    declaration at most once on the trail. An ML trail's step also has a primer and, when the trail declares lanes,
+    the lane it is on; its entries may carry a deeper line with its own cite, facts read from the shipped bundle,
+    and the code-trail steps that are its twins."""
     tid = spec["id"]
     by_file = {c.swift.path: c for c in changes if c.swift}
     tests = test_names(changes, graph, ids)
@@ -1517,12 +1617,34 @@ def resolve_trail(spec, changes, graph, ids, edges, ledger_ids):
     numbers = [s.get("n") for s in spec.get("steps", [])]
     if not 3 <= len(numbers) <= 9 or numbers != list(range(1, len(numbers) + 1)):
         fail(f"trail {tid} must hold 3 to 9 steps numbered from 1 in order, not {numbers}")
+    lane_ids = []
+    if spec.get("lanes") is not None:
+        lanes = spec["lanes"]
+        if ml is None:
+            fail(f"trail {tid}: lanes belong to the ML explorer's trails")
+        if not isinstance(lanes, list) or not lanes or any(not isinstance(x, dict) or not re.fullmatch(r"[a-z]+", x.get("id", "")) or not x.get("label") for x in lanes):
+            fail(f"trail {tid}: lanes must list {{id, label}}, each id one lowercase word")
+        lane_ids = [x["id"] for x in lanes]
     for step in spec["steps"]:
         if not step.get("title") or not step.get("entries"):
             fail(f"trail {tid} step {step['n']}: it needs a title and at least one entry")
         for page in step.get("chapters", []):
             if not re.fullmatch(r"\d\d-[a-z-]+\.html", page) or not (SITE / page).is_file():
                 fail(f"trail {tid} step {step['n']}: the chapter {page} is not a page of the site")
+        out_step = {"n": step["n"], "title": step["title"], "chapters": step.get("chapters", [])}
+        if ml is not None:
+            here = f"trail {tid} step {step['n']}"
+            primer = (step.get("primer") or "").strip()
+            if not primer:
+                fail(f"{here}: an ML step needs a primer, a few plain sentences for a reader new to the idea")
+            warnings += prose(primer, here, "primer", 6)
+            out_step["primer"] = primer
+            if lane_ids:
+                if step.get("lane") not in lane_ids:
+                    fail(f"{here}: the step's lane is {step.get('lane')!r}, not one of the trail's lanes {', '.join(lane_ids)}")
+                out_step["lane"] = step["lane"]
+            elif step.get("lane") is not None:
+                fail(f"{here}: the step names a lane, and the trail declares none")
         entries = []
         for entry in step["entries"]:
             want = entry["scope"]
@@ -1549,36 +1671,67 @@ def resolve_trail(spec, changes, graph, ids, edges, ledger_ids):
             note = entry.get("note", "").strip()
             if not note:
                 fail(f"{where}: the entry has no note")
-            for phrase in BANNED:
-                if re.search(r"\b" + re.escape(phrase) + r"\b", note.lower()):
-                    fail(f"{where}: the note says “{phrase}”")
-            if re.search(r"\([^)]*[a-z][^)]*\)", note) and not re.search(r"\b[A-Za-z_.]+\([^)]*\)", note):
-                fail(f"{where}: a parenthesis inside the note")
-            if len([s for s in re.split(r"(?<=[.!?])\s+(?=[A-Z])", note) if s]) > 2:
-                warnings.append(f"{where}: the note runs past two sentences")
+            warnings += prose(note, where, "note", 2)
             cite = entry.get("cite", "")
-            href, cite_scope = resolve_cite(cite, where, f, changes, graph, ids, tests, ledger_ids)
             item = {"scope": g, "id": ids[g], "anchor": anchor, "line": f.text.count("\n", 0, f.text.index(anchor, f.starts[first - 1])) + 1,
                     "status": status, "note": note, "cite": cite}
-            if href:
-                item["href"] = href
-            if cite_scope is not None:
-                item["citeScope"] = cite_scope
+            if cite:
+                item.update(cite_fields(cite, where, f, changes, graph, ids, tests, ledger_ids))
             if entry.get("link") == "none":
                 item["link"] = "none"
+            if ml is not None:
+                item.update(ml_fields(entry, where, f, changes, graph, ids, tests, ledger_ids, ml))
+            elif any(key in entry for key in ("deeper", "facts", "code")):
+                fail(f"{where}: deeper, facts and code belong to the ML explorer's trails")
             entries.append(item)
             order.append((g, entry.get("link") == "none", where))
-        steps.append({"n": step["n"], "title": step["title"], "chapters": step.get("chapters", []), "entries": entries})
+        out_step["entries"] = entries
+        steps.append(out_step)
     # A gap: an entry with no call to or from the entry before it, and no call from any earlier entry, unless it says
-    # "link": "none" because the hand-off is through data.
+    # "link": "none" because the hand-off is through data. An ML trail follows the ideas, not the calls, so it has none.
     for i, (b, quiet, where) in enumerate(order):
-        if i == 0 or quiet:
+        if ml is not None or i == 0 or quiet:
             continue
         a = order[i - 1][0]
         if a == b or (a, b) in linked or (b, a) in linked or any((e, b) in linked for e, _, _ in order[:i]):
             continue
         warnings.append(f"{where}: no call between it and the entries before")
     return steps, warnings
+
+
+def ml_fields(entry, where, f, changes, graph, ids, tests, ledger_ids, ml):
+    """An ML entry's own fields, checked: `deeper`, a line for a practitioner with its own cite; `facts`, numbers
+    the card reads live from the shipped bundle; `code`, the code-trail steps that are this entry's twins."""
+    out = {}
+    if "deeper" in entry:
+        d = entry["deeper"]
+        if not isinstance(d, dict) or not (d.get("text") or "").strip() or not d.get("cite"):
+            fail(f"{where}: deeper is {{text, cite}}, and a deeper line always names its source")
+        text = d["text"].strip()
+        prose(text, where, "deeper line", 3)
+        out["deeper"] = dict(cite_fields(d["cite"], where + " (deeper)", f, changes, graph, ids, tests, ledger_ids), text=text)
+    if "facts" in entry:
+        facts = entry["facts"]
+        if not isinstance(facts, list) or not facts:
+            fail(f"{where}: facts is a list of {{label, path}}")
+        for x in facts:
+            if not isinstance(x, dict) or not x.get("label") or not x.get("path"):
+                fail(f"{where}: a fact needs a label and a path into the facts")
+            value = fact_at(ml["facts"], x["path"])
+            if value is None or isinstance(value, (dict, list)):
+                fail(f"{where}: the fact {x['path']} is not a number or a word in the shipped bundle's facts")
+            if "round" in x and (not isinstance(x["round"], int) or not 0 <= x["round"] <= 8 or isinstance(value, (str, bool))):
+                fail(f"{where}: the fact {x['path']} rounds to {x['round']!r}; round is 0 to 8 decimals, for a number")
+        out["facts"] = [{k: x[k] for k in ("label", "path", "round") if k in x} for x in facts]
+    if "code" in entry:
+        twins = entry["code"]
+        if not isinstance(twins, list) or not twins:
+            fail(f"{where}: code is a list of code-trail steps, such as warp-training-3")
+        for c in twins:
+            if c not in ml["code_steps"]:
+                fail(f"{where}: {c!r} is not a step of a trail in trails.json")
+        out["code"] = list(twins)
+    return out
 
 
 # MARK: Facts the chapters read
@@ -1684,9 +1837,19 @@ def build(stats=False):
         if (c.lang == "swift" and c.path.startswith(("Sources/", "Tests/", "Playground/")) and Path(c.path).name != "Package.swift"
                 and c.swift and not (c.swift.header and c.swift.header.get("what"))):
             warnings.append(f"{c.path}: no //  WHAT: header")
-    trails, trail_warnings = resolve_trails(changes, graph, ids, edges, ledger_ids)
+    facts = bundle_facts()
+    trails, trail_warnings = resolve_trails(TRAILS, changes, graph, ids, edges, ledger_ids)
     warnings += trail_warnings
     on_trail = {e["scope"] for t in trails["trails"] for s in t["steps"] for e in s["entries"]}
+    ml = None
+    if ML_TRAILS.is_file():
+        ml, ml_warnings = resolve_trails(ML_TRAILS, changes, graph, ids, edges, ledger_ids, ml={
+            "facts": facts, "ids": {t["id"] for t in trails["trails"]}, "marks": {t["mark"] for t in trails["trails"]},
+            "code_steps": {f"{t['id']}-{s['n']}" for t in trails["trails"] for s in t["steps"]}})
+        warnings += ml_warnings
+    else:
+        warnings.append("docs/site/src/mltrails.json is missing, so the ML explorer has no trails")
+    ml_on = {e["scope"] for t in (ml["trails"] if ml else []) for s in t["steps"] for e in s["entries"]}
     statuses = Counter(s for c in changes for s in c.statuses)
     removed = [r for c in changes for r in c.removed]
     kinds = Counter(sc["kind"] for c in swift for sc in c.swift.scopes)
@@ -1704,6 +1867,9 @@ def build(stats=False):
         "trails": len(trails["trails"]),
         "onTrail": len(on_trail),
     }
+    if ml:
+        counts["ml"] = {"trails": len(ml["trails"]), "steps": sum(len(t["steps"]) for t in ml["trails"]),
+                        "trail": sum(len(s["entries"]) for t in ml["trails"] for s in t["steps"]), "onTrail": len(ml_on)}
     groups = []
     for c in changes:
         if c.group not in groups:
@@ -1721,14 +1887,16 @@ def build(stats=False):
         "excluded": excluded,
         "counts": counts,
         "tiers": TIERS,
-        "sample": [[g, ids[g]] for g in range(len(ids)) if g in on_trail or g % 25 == 0],
+        "sample": [[g, ids[g]] for g in range(len(ids)) if g in on_trail or g in ml_on or g % 25 == 0],
         "edges": edges,
         "removed": removed,
         "trails": trails["trails"],
         "picker": trails["picker"],
-        "facts": bundle_facts(),
+        "facts": facts,
         "warnings": warnings,
     }
+    if ml:
+        index["ml"] = ml
     keep_old = {c.path: True for c in changes}
     outputs = assemble(changes, groups, keep_old, index, ledger)
     size = sum(len(t.encode("utf-8")) for t in outputs.values())
@@ -1758,6 +1926,9 @@ def build(stats=False):
           f"ambiguous {counts['edges']['ambiguous']:,} · {counts['unresolved']:,} sites unresolved")
     print(f"  trails: {len(trails['trails'])} trails, {counts['trail']} entries over {sum(len(t['steps']) for t in trails['trails'])} steps "
           f"({counts['onTrail']} declarations), every anchor found")
+    if ml:
+        print(f"  ml trails: {counts['ml']['trails']} trails, {counts['ml']['trail']} entries over {counts['ml']['steps']} steps "
+              f"({counts['ml']['onTrail']} declarations), every anchor, fact, twin and cite found")
     for w in warnings:
         print("  warning:", w)
     print(f"  data: {size / 1048576:.2f} MB of {CAP_MB:.0f} MB in {len(outputs)} files")

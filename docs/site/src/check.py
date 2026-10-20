@@ -17,9 +17,10 @@ In Chrome, every page in light and dark, at 1360 px and at 390 px, and once with
 page error or failed request,
 with api.mistral.ai blocked in every run and every other network request refused; no sideways scroll; exactly the two
 globals; every self-check passes. On code.html: find, a trail with [ and ], a switch between trails, the trail grid by the arrow keys, every deep-link form, a reindented
-pasted body, the diff and old views. On index.html, code.html and a chapter: the ask orb's stand-in test, and on
-index.html the key dialog another engineer meets (?ask-key=none). No check
-ever calls Mistral or spends the key.
+pasted body, the diff and old views. On ml.html: its first trail with ], the depth control and its memory, a card's
+facts against the data, a twin link and a chapter cite, the lanes, the legend, and a code trail's link leading to
+code.html. On index.html, code.html, ml.html and a chapter: the ask orb's stand-in test, and on index.html the key
+dialog another engineer meets (?ask-key=none). No check ever calls Mistral or spends the key.
 """
 
 import argparse
@@ -138,15 +139,33 @@ def check_data(data, problems):
         if ledger != data.get("run"):
             problems.append("docs/site/src/ledger.json has changed since the build; run docs/site/src/build.sh")
         trails = json.loads((SITE / "src" / "trails.json").read_text(encoding="utf-8"))
-        spec = [(t["id"], t["say"], s.get("chapters", []), e["anchor"], e["note"], e.get("cite", "")) for t in trails["trails"] for s in t["steps"] for e in s["entries"]]
-        built = [(t["id"], t["say"], s["chapters"], e["anchor"], e["note"], e["cite"]) for t in index["trails"] for s in t["steps"] for e in s["entries"]]
-        spec.append([(s["title"], s["kinds"], [(r["label"], r["trails"]) for r in s["rows"]]) for s in trails.get("picker", [])])
-        built.append([(s["title"], [c["kind"] for c in s["columns"]], [(r["label"], r["trails"]) for r in s["rows"]]) for s in index.get("picker", [])])
-        if spec != built:
+        if trail_tuples(trails) != trail_tuples(index, built=True):
             problems.append("docs/site/src/trails.json has changed since the build; run docs/site/src/build.sh")
+        ml_file = SITE / "src" / "mltrails.json"
+        if ml_file.is_file() != bool(index.get("ml")):
+            problems.append("docs/site/src/mltrails.json and the data disagree on whether the ML explorer has trails; run docs/site/src/build.sh")
+        elif ml_file.is_file() and trail_tuples(json.loads(ml_file.read_text(encoding="utf-8"))) != trail_tuples(index["ml"], built=True):
+            problems.append("docs/site/src/mltrails.json has changed since the build; run docs/site/src/build.sh")
     except (OSError, ValueError, KeyError) as e:
         problems.append(f"the ledger or the trails cannot be read: {e}")
     print(f"  data: {len(records)} embedded files, {stale} changed since the build, {len(index['excluded'])} left out and listed")
+
+
+def trail_tuples(spec, built=False):
+    """A trail file, or the data built from it, as the fields a reader sees: each entry's trail, say, chapters, anchor,
+    note and cite, an ML step's primer and lane, an ML entry's deeper line, facts and twins, each trail's lanes, the
+    picker and the declared kinds. The two must be equal, or the data is stale."""
+    out = []
+    for t in spec.get("trails", []):
+        out.append((t["id"], [(x["id"], x["label"]) for x in t.get("lanes") or []]))
+        for s in t["steps"]:
+            for e in s["entries"]:
+                d = e.get("deeper") or {}
+                out.append((t["id"], t["say"], s.get("chapters", []), e["anchor"], e["note"].strip(), e.get("cite", ""), (s.get("primer") or "").strip() or None,
+                            s.get("lane"), (d.get("text") or "").strip() or None, d.get("cite"), e.get("facts"), e.get("code")))
+    out.append([(s["title"], [c["kind"] for c in s["columns"]] if built else s["kinds"], [(r["label"], r["trails"]) for r in s["rows"]]) for s in spec.get("picker", [])])
+    out.append([(k["id"], k["label"]) for k in spec.get("kinds") or []])
+    return out
 
 
 # MARK: Links, lint, local, the key
@@ -208,7 +227,10 @@ def check_links(data, problems):
     paths = {f["path"] for f in index.get("files", [])}
     ledger = data.get("run") or {}
     ledger_ids = {x["id"] for k in ("amendments", "answers", "decisions", "commands", "tests", "assumptions", "questions") for x in ledger.get(k, []) or []}
-    trail_steps = {t["id"]: len(t["steps"]) for t in index.get("trails", [])}
+    # The trail steps each explorer answers: the code's on code.html, the models' on ml.html.
+    trail_steps = {"code.html": {t["id"]: len(t["steps"]) for t in index.get("trails", [])},
+                   "ml.html": {t["id"]: len(t["steps"]) for t in (index.get("ml") or {}).get("trails", [])}}
+    first_steps = len(index["trails"][0]["steps"]) if index.get("trails") else 0
     ids = {p: collect(p).ids for p in site_files("*.html")}
     for page in site_files("*.html"):
         info, rel = collect(page), page.relative_to(SITE).as_posix()
@@ -227,11 +249,11 @@ def check_links(data, problems):
             if not frag or dest.suffix != ".html":
                 continue
             frag = frag.split(";")[0] if not frag.startswith("trail-") else frag
-            if dest.name == "code.html" and frag not in ids.get(dest, set()):
+            if dest.name in trail_steps and frag not in ids.get(dest, set()):
                 m = re.match(r"^trail-([a-z]+(?:-[a-z]+)*)-(\d+)(?:;n=(\d+))?$", frag)
                 if m:
-                    if not 1 <= int(m.group(2)) <= trail_steps.get(m.group(1), 0):
-                        problems.append(f"{rel}: #{frag} is not a step of a trail")
+                    if not 1 <= int(m.group(2)) <= trail_steps[dest.name].get(m.group(1), 0):
+                        problems.append(f"{rel}: #{frag} is not a step of a trail on {dest.name}")
                     continue
                 if re.match(r"^trail-\d+", frag):
                     problems.append(f"{rel}: #{frag} is the one trail's old link form; name the trail")
@@ -251,7 +273,7 @@ def check_links(data, problems):
                     if rec is not None and not any(sc[1] == at.split(".")[-1].split("(")[0] for sc in rec["scopes"]):
                         problems.append(f"{rel}: #{frag} names no declaration in {path}")
                 continue
-            if dest.name == "index.html" and (LEDGER_IDS.match(frag) and frag in ledger_ids or re.match(r"^step-\d+$", frag) and 1 <= int(frag[5:]) <= steps):
+            if dest.name == "index.html" and (LEDGER_IDS.match(frag) and frag in ledger_ids or re.match(r"^step-\d+$", frag) and 1 <= int(frag[5:]) <= first_steps):
                 continue
             if frag not in ids.get(dest, set()):
                 problems.append(f"{rel}: #{frag} is not an id in {dest.name}")
@@ -500,6 +522,138 @@ def explore(page):
     return errors
 
 
+def explore_ml(page, path):
+    """The ML explorer, used: its first trail walked with ] from the first entry to the last; the depth control, which
+    hides the primer or the deeper line by CSS and is remembered over a reload; a card's facts against the data; a
+    twin link and a chapter cite; the laned trail's lane on every step and on the card; the legend and its links; and
+    a link to a step of the code's trails, which leads to the change explorer."""
+    errors = []
+    root = page.query_selector("#explorer")
+    if not root or not page.query_selector("#explorer .xp-trail"):
+        return ["the ML explorer did not mount its trails"]
+    info = page.evaluate("""() => { const m = VeilGarde.model(), at = test => { for (const t of m.trails) for (const s of t.steps) for (let k = 0; k < s.entries.length; k++)
+            if (test(s.entries[k], s, t)) return { trail: t.id, n: s.n, k: k, lanes: t.lanes || null, step: s }; return null; };
+        return { set: m.set.name, first: m.trails[0].id, steps: m.trails[0].steps.map(s => s.entries.length), marks: m.trails.length + m.sets.code.trails.length,
+                 deeper: at((e, s) => e.deeper && s.primer), facts: at(e => e.facts), twin: at(e => e.code),
+                 chapter: at(e => /^chapter:/.test(e.cite || '') || (e.deeper && /^chapter:/.test(e.deeper.cite))), laned: at((e, s, t) => !!t.lanes),
+                 code: m.sets.code.trails[0].id }; }""")
+    if info["set"] != "ml":
+        return [f"ml.html walks the {info['set']} trails"]
+    def go(target):
+        page.evaluate("t => { location.hash = t; }", target)
+        page.wait_for_timeout(250)
+    def at(place):
+        go(f"trail-{place['trail']}-{place['n']};n={place['k'] + 1}")
+    # The first trail, walked with ] from its first entry to its last, each once, in order.
+    go(f"trail-{info['first']}-1;n=1")
+    page.focus("#explorer pre")
+    walked = [(root.get_attribute("data-step"), root.get_attribute("data-pos"))]
+    total = sum(info["steps"])
+    for _ in range(total):
+        page.keyboard.press("]")
+        page.wait_for_timeout(40)
+        walked.append((root.get_attribute("data-step"), root.get_attribute("data-pos")))
+    expected = [(str(s + 1), str(k)) for s, n in enumerate(info["steps"]) for k in range(n)]
+    if walked[:total] != expected or walked[total] != walked[total - 1]:
+        errors.append(f"walking {info['first']} with ] visited {len(set(walked))} places, not the {total} entries once each, in order")
+    # The depth control hides the primer or the deeper line, and the choice outlives a reload.
+    if not info["deeper"]:
+        errors.append("no ML entry carries a deeper line on a step with a primer")
+    else:
+        at(info["deeper"])
+        seen = {}
+        for depth in ("newcomer", "practitioner", "everything"):
+            page.click(f'#explorer .xp-depth button[data-depth="{depth}"], #explorer .xp-depth-row button[data-depth="{depth}"]')
+            page.wait_for_timeout(120)
+            seen[depth] = page.evaluate("""() => ({ depth: document.getElementById('explorer').getAttribute('data-depth'),
+                primer: !!document.querySelector('.xp-card .xp-primer') && getComputedStyle(document.querySelector('.xp-card .xp-primer')).display !== 'none',
+                deeper: !!document.querySelector('.xp-card .xp-deeper') && getComputedStyle(document.querySelector('.xp-card .xp-deeper')).display !== 'none' })""")
+        want = {"newcomer": {"depth": "newcomer", "primer": True, "deeper": False}, "practitioner": {"depth": "practitioner", "primer": False, "deeper": True},
+                "everything": {"depth": "everything", "primer": True, "deeper": True}}
+        if seen != want:
+            errors.append(f"the depth control showed {seen}")
+        page.click('#explorer .xp-depth-row button[data-depth="newcomer"]')
+        page.goto(path.as_uri())
+        page.wait_for_function("document.documentElement.getAttribute('data-mounted') === '1'", timeout=20000)
+        root = page.query_selector("#explorer")
+        if root.get_attribute("data-depth") != "newcomer":
+            errors.append(f"after a reload the depth is {root.get_attribute('data-depth')!r}, not the newcomer the reader chose")
+        page.click('#explorer .xp-depth-row button[data-depth="everything"]')
+    # A card's facts read the shipped bundle's numbers, as the data holds them.
+    if not info["facts"]:
+        errors.append("no ML entry shows a fact")
+    else:
+        at(info["facts"])
+        rows = page.evaluate("""() => [...document.querySelectorAll('.xp-card .xp-facts dd[data-fact-path]')].map(d => ({ path: d.getAttribute('data-fact-path'), text: d.textContent,
+            value: VeilGarde.factValue(d.getAttribute('data-fact-path')) }))""")
+        if not rows:
+            errors.append("the card of an entry with facts shows none")
+        for r in rows:
+            shown = r["text"].replace("−", "-").replace(",", "")
+            ok = shown == str(r["value"]) if isinstance(r["value"], str) else re.fullmatch(r"-?\d+(\.\d+)?", shown) and abs(float(shown) - float(r["value"])) <= 0.5 * 10 ** -(len(shown.split(".")[1]) if "." in shown else 0) + 1e-12
+            if not ok:
+                errors.append(f"the card shows {r['path']} as {r['text']!r}, and the data holds {r['value']!r}")
+    # A twin leads to its step on the change explorer; a chapter cite to a heading that is there.
+    if not info["twin"]:
+        errors.append("no ML entry names a twin on the code trails")
+    else:
+        at(info["twin"])
+        hrefs = page.evaluate("() => [...document.querySelectorAll('.xp-card .xp-code-twin')].map(a => a.getAttribute('href'))")
+        steps = page.evaluate("() => Object.fromEntries(VeilGarde.model().sets.code.trails.map(t => [t.id, t.steps.length]))")
+        for href in hrefs or [None]:
+            m = re.fullmatch(r"code\.html#trail-([a-z]+(?:-[a-z]+)*)-(\d+)", href or "")
+            if not m or not 1 <= int(m.group(2)) <= steps.get(m.group(1), 0):
+                errors.append(f"a twin link reads {href!r}, not a step of the code's trails")
+    if not info["chapter"]:
+        errors.append("no ML entry cites a chapter")
+    else:
+        at(info["chapter"])
+        hrefs = page.evaluate("() => [...document.querySelectorAll('.xp-card a')].map(a => a.getAttribute('href')).filter(h => /^\\d\\d-[a-z-]+\\.html#/.test(h || ''))")
+        for href in hrefs or [None]:
+            target, _, frag = (href or "#").partition("#")
+            if not href or not (SITE / target).is_file() or frag not in collect(SITE / target).ids:
+                errors.append(f"a chapter cite reads {href!r}, which is not a heading of a chapter")
+    # The laned trail: every step button carries its lane, and the card names it.
+    if not info["laned"]:
+        errors.append("no ML trail declares lanes")
+    else:
+        go(f"trail-{info['laned']['trail']}-1")
+        lanes = page.evaluate("""() => { const t = VeilGarde.model().trailById[document.getElementById('explorer').getAttribute('data-trail')];
+            return { want: t.steps.map(s => s.lane), shown: [...document.querySelectorAll('#explorer .xp-steps button')].map(b => (b.querySelector('.xp-lane') || {}).textContent || null),
+                     card: (document.querySelector('.xp-card .xp-step-line .xp-lane') || {}).textContent || '', label: t.lanes.find(l => l.id === t.steps[0].lane).label,
+                     key: !document.querySelector('#explorer .xp-lanes').hidden }; }""")
+        if lanes["want"] != lanes["shown"] or lanes["card"] != "on " + lanes["label"] or not lanes["key"]:
+            errors.append(f"the laned trail shows {lanes}")
+    # The legend: every mark of both explorers once, and its first link walks that trail from step 1.
+    page.click("#explorer .xp-legend > summary")
+    page.wait_for_timeout(120)
+    legend = page.evaluate("() => ({ marks: document.querySelectorAll('#explorer .xp-legend [data-mark]').length, first: document.querySelector('#explorer .xp-legend a').getAttribute('href') })")
+    if legend["marks"] != info["marks"] or legend["first"] != f"#trail-{info['first']}-1":
+        errors.append(f"the legend holds {legend}, not {info['marks']} marks starting at #trail-{info['first']}-1")
+    page.click("#explorer .xp-legend a")
+    page.wait_for_timeout(250)
+    if (root.get_attribute("data-trail"), root.get_attribute("data-step")) != (info["first"], "1"):
+        errors.append(f"the legend's first link left the trail at {root.get_attribute('data-trail')!r}, step {root.get_attribute('data-step')!r}")
+    page.click("#explorer .xp-legend > summary")
+    # A step of the code's trails, linked on this page, leads to the change explorer at that step.
+    go(f"trail-{info['code']}-2")
+    try:
+        page.wait_for_url(re.compile(r"code\.html#trail-"), timeout=5000)
+        page.wait_for_function("document.documentElement.getAttribute('data-mounted') === '1'", timeout=20000)
+        there = page.evaluate("() => [document.getElementById('explorer').getAttribute('data-trail'), document.getElementById('explorer').getAttribute('data-step')]")
+        if there != [info["code"], "2"]:
+            errors.append(f"#trail-{info['code']}-2 on ml.html led to {there} on code.html")
+    except Exception:
+        errors.append(f"#trail-{info['code']}-2 on ml.html did not lead to the change explorer")
+    page.goto(path.as_uri())
+    page.wait_for_function("document.documentElement.getAttribute('data-mounted') === '1'", timeout=20000)
+    return errors
+
+
+# What each explorer's ask orb carries: its map's heading and how many tools.
+ASK = {"code.html": ("The codebase at a glance", 4), "ml.html": ("The models at a glance", 5)}
+
+
 def ask(page, rel):
     """The orb, used: half seen, whole under the pointer, open into a chat, answer through a stand-in, read one
     declaration on the explorer, start a new chat, close back. No request leaves the browser."""
@@ -546,10 +700,18 @@ def ask(page, rel):
     first = bodies[0]
     if first.get("stream") is not True or first.get("model") != "mistral-large-4" or first.get("reasoning_effort") != "none":
         errors.append(f"the request is not a streamed mistral-large-4 request with reasoning off: {[first.get(k) for k in ('stream', 'model', 'reasoning_effort')]}")
-    if rel == "code.html":
+    if rel in ASK:
+        heading, count = ASK[rel]
         label = page.evaluate("document.getElementById('explorer').getAttribute('data-scope')").split(":", 1)[1].split("(")[0]
-        if label not in sent[0]["content"] or "The codebase at a glance" not in sent[0]["content"] or len(first.get("tools") or []) != 4:
-            errors.append(f"the first request lacks the selected {label}, the codebase map or the four tools")
+        if label not in sent[0]["content"] or heading not in sent[0]["content"] or len(first.get("tools") or []) != count:
+            errors.append(f"the first request lacks the selected {label}, the map headed {heading!r} or the {count} tools")
+        if rel == "ml.html":
+            names = [t["function"]["name"] for t in first.get("tools") or []]
+            if "read_step" not in names:
+                errors.append(f"the ML explorer's chat offers {names}, without read_step")
+            leaves = page.evaluate("() => [...document.querySelectorAll('.ask-msg.bot a')].map(a => a.getAttribute('href')).filter(h => /code\\.html/.test(h || ''))")
+            if leaves:
+                errors.append(f"on the ML explorer the answer's links leave the page: {leaves}")
         if label not in opened["about"]:
             errors.append(f"the panel's header reads {opened['about']!r}, not the selection {label}")
         tool = [m for m in bodies[-1]["messages"] if m["role"] == "tool"] if len(bodies) == 2 else []
@@ -660,10 +822,13 @@ def ask_without_key(page, path):
 
 
 def keyboard(page, rel):
-    """Tab reaches the page's controls and the orb; nothing hidden takes focus."""
+    """Tab reaches the page's controls and the orb; nothing hidden takes focus. An explorer's tree keeps the folders a
+    walk opened, so there Tab may take longer to come round to every control; the walk stops once it has."""
     errors, stops = [], []
+    explorer = rel in ("code.html", "ml.html")
+    wanted = ["ask-orb"] + (["step"] if rel == "index.html" else []) + (["xp-walk"] if explorer else [])
     page.evaluate("() => { document.activeElement && document.activeElement.blur(); window.scrollTo(0, 0); }")
-    for _ in range(260):
+    for _ in range(900 if explorer else 260):
         page.keyboard.press("Tab")
         d = page.evaluate("""() => { const e = document.activeElement; if (!e || e === document.body) return null;
             const r = e.getBoundingClientRect(), s = getComputedStyle(e);
@@ -673,11 +838,14 @@ def keyboard(page, rel):
             if not d["visible"]:
                 errors.append(f"Tab reached a hidden {d['tag'].lower()}.{d['cls']}")
                 break
+            seen = " ".join(s["cls"] or "" for s in stops)
+            if all(w in seen for w in wanted) and (not explorer or any(s["tag"] == "TEXTAREA" for s in stops)):
+                break
     classes = " ".join(s["cls"] or "" for s in stops)
-    for want in (["ask-orb"] + (["step"] if rel == "index.html" else []) + (["xp-walk"] if rel == "code.html" else [])):
+    for want in wanted:
         if want not in classes:
             errors.append(f"Tab never reached .{want}")
-    if rel == "code.html" and not any(s["tag"] == "TEXTAREA" for s in stops):
+    if explorer and not any(s["tag"] == "TEXTAREA" for s in stops):
         errors.append("Tab never reached the find box")
     return errors
 
@@ -732,15 +900,17 @@ def browse(paths, problems, shots, results):
                 if name == "light":
                     if rel == "code.html":
                         errors += explore(page)
-                    if rel in ("index.html", "code.html"):
+                    if rel == "ml.html":
+                        errors += explore_ml(page, path)
+                    if rel in ("index.html", "code.html", "ml.html"):
                         errors += keyboard(page, rel)
-                    if rel in ("index.html", "code.html", "01-warp.html"):
+                    if rel in ("index.html", "code.html", "ml.html", "01-warp.html"):
                         page.goto(path.as_uri())
                         page.wait_for_function("document.documentElement.getAttribute('data-mounted') === '1'", timeout=20000)
                         errors += ask(page, rel)
                         if rel == "index.html":
                             errors += ask_without_key(page, path)
-                if name == "phone" and rel == "code.html":
+                if name == "phone" and rel in ("code.html", "ml.html"):
                     tree = page.evaluate("() => { const d = document.querySelector('.xp-files'); return d ? { open: d.open, cols: getComputedStyle(document.getElementById('explorer')).gridTemplateColumns.split(' ').length } : null; }")
                     if not tree or tree["open"] or tree["cols"] != 1:
                         errors.append(f"at 390 px the explorer is not one column with its tree folded: {tree}")

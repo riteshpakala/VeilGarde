@@ -1,0 +1,2064 @@
+{
+ "kinds": [
+  {
+   "id": "model",
+   "label": "One model each"
+  },
+  {
+   "id": "system",
+   "label": ""
+  },
+  {
+   "id": "signal",
+   "label": ""
+  },
+  {
+   "id": "method",
+   "label": ""
+  }
+ ],
+ "picker": [
+  {
+   "title": "The verdict",
+   "kinds": [
+    "model"
+   ],
+   "rows": [
+    {
+     "label": "Warp model",
+     "trails": [
+      "warp-model"
+     ]
+    },
+    {
+     "label": "Fusion head",
+     "trails": [
+      "fusion-model"
+     ]
+    },
+    {
+     "label": "Specialist heads",
+     "trails": [
+      "specialist-model"
+     ]
+    },
+    {
+     "label": "Noiseprint",
+     "trails": [
+      "noiseprint-model"
+     ]
+    }
+   ]
+  },
+  {
+   "title": "The system",
+   "kinds": [
+    "system"
+   ],
+   "rows": [
+    {
+     "label": "Majority and weighted",
+     "trails": [
+      "two-verdicts"
+     ]
+    }
+   ]
+  },
+  {
+   "title": "The watermark",
+   "kinds": [
+    "signal"
+   ],
+   "rows": [
+    {
+     "label": "Watermark",
+     "trails": [
+      "watermark-signal"
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Research",
+   "kinds": [
+    "method"
+   ],
+   "rows": [
+    {
+     "label": "Pruning study",
+     "trails": [
+      "pruning-method"
+     ]
+    }
+   ]
+  }
+ ],
+ "trails": [
+  {
+   "id": "warp-model",
+   "kind": "model",
+   "title": "The warp model",
+   "mark": "MW",
+   "subtitle": "a boosted tile classifier on a physical residual, and its calibrated call",
+   "say": "How the warp tile model learns to tell a camera's pixels from a generator's: labelled images cut into tiles, nineteen numbers measured from a warp round trip, a gradient-boosted ensemble fitted on them, tile scores pooled into one image score, and a calibration that turns the tile vote into the camera-sensor call.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "What it learns from",
+     "chapters": [
+      "06-training.html"
+     ],
+     "primer": "This is supervised binary classification: every training image carries a label, 1 for generated and 0 for real, and the model learns to predict it. The model never sees a whole image. It sees 32-pixel tiles, and every tile takes its image's label. The split into training, validation and test is made by image, by the stem that groups an image's variants, so no picture is trained on and then scored as if it were new.",
+     "entries": [
+      {
+       "scope": "ImageManifest",
+       "anchor": "public static let splitSalt = \"split:v1\"",
+       "note": "A manifest lists the labelled images, 1 generated and 0 real, and puts each in a partition by hashing its stem: 70% train, 15% validation, 15% test. A clean image and its screenshot share a stem, so they land in the same partition and never straddle the split.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "11,999 of final_mixed's 12,000 images decode and become 2,511,615 tiles in 24 shards, cut once in 1,604 seconds. One image does not decode and is skipped.",
+        "cite": "ledger#command-21"
+       },
+       "code": [
+        "warp-training-2"
+       ]
+      },
+      {
+       "scope": "TileSet.gather(_:partitions:include:)",
+       "anchor": "y.append(contentsOf: [Float](repeating: Float(image.label), count: image.count))",
+       "note": "Gathers the tiles of every image in the partitions asked for, and gives every tile its image's label. The model trains on tiles and is judged per image, from the same cache, without reopening an image.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "Training reads 8,414 images and their 1,828,099 tiles; 1,847 validation images later fit the calibration.",
+        "cite": "ledger#command-22"
+       },
+       "code": [
+        "warp-training-3"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The feature: a round trip a sensor does not survive",
+     "chapters": [
+      "01-warp.html"
+     ],
+     "primer": "Many detectors learn their features from pixels. This one measures a physical effect and hands the numbers to the model. A camera sees through a mosaic of colour filters and adds noise of its own to every pixel. Warp a tile a fraction of a pixel out of place and back, and that fine structure does not come back as it was, while a generator's smoother output survives better. What the round trip loses is the residual.",
+     "entries": [
+      {
+       "scope": "WarpDisplacements",
+       "anchor": "static let table: [[[Double]]] = [",
+       "note": "The sixteen warps are fixed corner moves, drawn once from a seeded generator and kept as a literal table. They are never regenerated, because the trained model saw these warps and no others.",
+       "cite": "PIN",
+       "code": [
+        "warp-inference-3"
+       ]
+      },
+      {
+       "scope": "WarpResidual.batch(_:forward:back:)",
+       "anchor": "return R - batchedGaussianBlur(R, kernelSize: WarpConstants.highPassKernel, sigma: WarpConstants.highPassSigma)",
+       "note": "Warps each tile through the sixteen homographies and back, averages the round-trip error over the colour channels and the trials, and keeps only its high frequencies. A camera tile's noise and mosaic do not survive the round trip the way a generator's smooth output does, and that loss is the residual.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "The high-pass subtracts a 9×9 Gaussian blur at σ 1.5, the one parameter that won the v29 ablation, quoted from the research.",
+        "cite": "chapter:01-warp.html#warps"
+       }
+      },
+      {
+       "scope": "WarpResidual.fragility(low:high:)",
+       "anchor": "(high.mean(axes: [1, 2]) - low.mean(axes: [1, 2])) / (WarpConstants.highStrength - WarpConstants.lowStrength)",
+       "note": "Each warp runs at two strengths, 0.025 and 0.05, and fragility is how fast the tile's residual grows from the weaker to the stronger. A camera tile's residual grows faster under the stronger warp than a generated tile's.",
+       "cite": "comment:Sources/VeilGardeCore/Features/WarpFeatures.swift#A camera tile's"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Nineteen numbers per tile",
+     "chapters": [
+      "01-warp.html"
+     ],
+     "primer": "The model reads a table, one row per tile and nineteen columns. Ten columns describe the residual: how fragile the tile is, how the residual's texture and direction behave, and how it meets its mirrored tile and its neighbours. Nine read the raw pixels instead. A Bayer mosaic's interpolation leaves correlated colour channels, a variance that changes with the mosaic's phase and energy at the Nyquist frequency, and a generator does not reproduce them.",
+     "entries": [
+      {
+       "scope": "WarpFeatures",
+       "anchor": "\"xcorr_RG\", \"cfa_G\", \"xcorr_BG\", \"xcorr_RB\", \"cfa_R\", \"cfa_B\", \"noise_ratio\", \"diag_axial\", \"nyq_R\",",
+       "note": "Names the nineteen columns in the order the model was trained on: ten from the residual, six from the demosaic structure, three spectral. The order is the deployed model's, version 2.5 optimal_8, and a row in any other order would feed it the wrong numbers.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "Shuffled one group at a time on held-out images, the shipped model loses AUC: demosaic −0.139, noise −0.098, residual −0.052, and the CFA, seam and mirror groups under 0.01 each.",
+        "cite": "ledger#command-53"
+       },
+       "facts": [
+        {
+         "label": "features",
+         "path": "boosters.warpTile.features"
+        }
+       ]
+      },
+      {
+       "scope": "FullGridExtractor.features(img:padH:padW:tables:signature:sigPlane:sigH:sigW:progress:)",
+       "anchor": "// Pass B: cross-tile features over the whole grid, one graph.",
+       "note": "Measures every tile of the padded image in two passes: the residual and the tile-local features in chunks, then the features that compare a tile with its mirrored tile and its neighbours over the whole grid at once. Training takes its rows from this same function, so the model learns from the rows the detector scores.",
+       "cite": "PIN",
+       "code": [
+        "warp-inference-3",
+        "warp-training-2"
+       ]
+      },
+      {
+       "scope": "DemosaicFeatures.tileCfa(_:)",
+       "anchor": "return (ph.max(axis: 1) - ph.min(axis: 1)) / (ph.mean(axis: 1) + Float(1e-6))",
+       "note": "One of the demosaic features: how much a tile's high-pass variance differs across the four phases of the 2×2 colour mosaic. A real sensor's Bayer interpolation leaves a phase-dependent variance that a generator does not reproduce.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "Shuffled, the demosaic group costs the model 0.139 AUC; refit without it, 0.003, and 0.024 on the tile vote. The study calls the first number reliance and the second redundancy: other groups can learn much of what a dropped group carried.",
+        "cite": "ledger#command-53"
+       }
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The algorithm: gradient-boosted trees",
+     "chapters": [
+      "06-training.html"
+     ],
+     "primer": "A gradient-boosted ensemble adds small decision trees one at a time. Each new tree is fitted to the errors the trees before it still make, measured as the gradient of the loss, and its output is shrunk by a learning rate before it joins the sum. A tree splits on thresholds of single features, so features of very different ranges need no scaling. The sum of the trees is a score per tile, which a sigmoid turns into a probability.",
+     "entries": [
+      {
+       "scope": "WarpShape.params",
+       "anchor": "return BoostParams(trees: 200, maxDepth: 8, eta: 0.1, subsample: 0.8, colsampleByTree: 0.8, metric: .auc, seed: 0)",
+       "note": "The deployed shape: 200 trees of depth 8 at a learning rate of 0.1, each tree seeing four fifths of the rows and four fifths of the features. These are the shipped model's own recorded settings, so nothing was guessed and no learning rate was swept.",
+       "cite": "ledger#decision-25",
+       "deeper": {
+        "text": "Refit smaller on the same rows, the model loses held-out AUC: 150 trees −0.0031, 100 trees −0.0075, depth 6 −0.0104, depth 4 −0.0313. The shape is not over-provisioned.",
+        "cite": "ledger#command-53"
+       },
+       "facts": [
+        {
+         "label": "trees",
+         "path": "boosters.warpTile.trees"
+        },
+        {
+         "label": "deepest tree",
+         "path": "boosters.warpTile.depth"
+        }
+       ],
+       "code": [
+        "warp-training-3"
+       ]
+      },
+      {
+       "scope": "BinMatrix.cuts(for:maxBin:seed:)",
+       "anchor": "let v = values[min(values.count - 1, Int(Double(k) * Double(values.count) / Double(maxBin)))]",
+       "note": "Cuts every feature into at most 256 bins at quantiles of a seeded sample, stored one byte per value. A tree level is then one pass of histogram adds over bytes, instead of a sort of every value.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "TreeGrower.grow(id:rows:gradients:hessians:)",
+       "anchor": "return Float(s.g * s.g / (s.h + lambda))",
+       "note": "Grows one tree level by level: it sums each node's gradients G and hessians H per bin, scores a split by the gain G²/(H+λ) on each side against the parent's, and keeps the best. A leaf's value is −G/(H+λ), shrunk by the learning rate.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "VeilGarde grows these trees itself with XGBoost 3.2's arithmetic, not with an MLX trainer or a call out to Python: building histograms is a data-dependent scatter-add that MLX does not speed up, and the package must train without Python. On integer features its trees equal XGBoost's node for node.",
+        "cite": "ledger#decision-23"
+       }
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The objective, and how the fit is judged",
+     "chapters": [
+      "06-training.html"
+     ],
+     "primer": "The loss is the logistic loss: how unlikely the true labels are under the predicted probabilities. Training starts every tile at one constant, the base score, and each tree corrects the running margin. The fit is judged by AUC, the chance that a random generated example scores above a random real one, where 0.5 is a coin and 1 is perfect. Validation data informs choices during the work; test data is scored once, at the end.",
+     "entries": [
+      {
+       "scope": "BoostTrainer.baseScore(_:scalePosWeight:)",
+       "anchor": "if scalePosWeight == 1 { return swy / sw }",
+       "note": "The constant every tile starts from: the weighted label mean when the positive class is not reweighted, one Newton step from zero otherwise. It is XGBoost 3.2's own rule, measured against it, because the two rules differ once the positive class is reweighted.",
+       "cite": "ledger#decision-24"
+      },
+      {
+       "scope": "BoostTrainer.train(_:validation:params:warmStart:featureNames:progress:)",
+       "anchor": "let p: Float = 1 / (1 + Foundation.exp(-margins[i]))",
+       "note": "Boosts round by round: every sampled row's logistic gradient p − y and hessian p(1 − p) go to the tree grower, and the new tree's leaves are added to every row's margin. Margins stay in single precision, as XGBoost keeps them.",
+       "cite": "PIN",
+       "code": [
+        "warp-training-3"
+       ]
+      },
+      {
+       "scope": "WarpTrainer.train(shards:params:include:note:)",
+       "anchor": "let test = TileSet.gather(shards, partitions: [.test], include: include)",
+       "note": "Gathers the train, validation and test tiles by their stable partition and fits on the training tiles, reporting validation AUC as the trees grow. The test tiles are scored only by the evaluation at the end.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "WarpTrainer.metrics(_:_:)",
+       "anchor": "imageMajorityAUC: Metrics.auc(s.majority, s.labels),",
+       "note": "Judges a model three ways on a partition: per tile, per image by the weighted score, and per image by the vote the sensor call calibrates. The per-image numbers are the ones the detector reports.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "The deployed shape retrained on today's final_mixed scores test AUC 0.6685 per tile, 0.8092 weighted and 0.7693 by the vote, against the shipped model's 0.6169, 0.7684 and 0.6983 on the same images. The shipped model's training set was not recorded, so this says the trainer works, not that the shipped model was worse.",
+        "cite": "ledger#command-22"
+       },
+       "code": [
+        "warp-training-4"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "From tiles to one image",
+     "chapters": [
+      "01-warp.html"
+     ],
+     "primer": "One image yields hundreds of tile scores, and a verdict needs one number. A plain average would let flat sky count as much as the subject. The weighted score multiplies each tile's probability by a weight that favours the subject, textured tiles and decisive tiles, then moves partway toward the confident tiles. A second number, the vote, is the share of tiles the model reads as generated.",
+     "entries": [
+      {
+       "scope": "WarpTrainer.imageScores(_:_:)",
+       "anchor": "majority.append(Float(tiles.filter { $0 > 0.5 }.count) / Float(max(1, tiles.count)))",
+       "note": "Rebuilds the detector's per-image arithmetic from the cached tiles: the weight map, the weighted score with the default hotspot rule, and the strict above-0.5 vote. Training judges a model by the numbers the detector will report.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "One tile is weak evidence and an image's tiles together are strong: the retrained model's test AUC is 0.6685 per tile and 0.8092 per image.",
+        "cite": "ledger#command-22"
+       }
+      },
+      {
+       "scope": "WeightMap.build(patchGrid:texWeights:parameters:)",
+       "anchor": "let sigma = Float(max(Pr, Pc)) / parameters.centerSharpness",
+       "note": "Weights each patch by a Gaussian around the texture centroid, where the subject is, times its texture, so flat sky counts little, times a boost for decisive patches. The weights sum to 1.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "Against simpler pools on held-out images the weight map wins: +0.0213 AUC over the plain mean, +0.0297 over the median, +0.0399 over the tile vote.",
+        "cite": "ledger#command-53"
+       },
+       "code": [
+        "warp-inference-4"
+       ]
+      },
+      {
+       "scope": "WeightedVerdict.score(patchGrid:weightMap:hotspot:)",
+       "anchor": "score = (1 - hotspot.blend) * score + hotspot.blend * m",
+       "note": "Sums probability times weight, then blends 35% of the way toward the mean of the confident patches, on both sides. The blend is symmetric because the one-sided blend inflated real images' scores by 0.03 and flipped about a third of real verdicts.",
+       "cite": "chapter:01-warp.html#weighted"
+      },
+      {
+       "scope": "DecisionRule",
+       "anchor": "public static let warpWeighted = DecisionRule(threshold: 0.56, band: 0.04)",
+       "note": "The weighted score alone is called at 0.56, inconclusive within 0.04 of it. That operating point stays apart from the fusion's 0.5 on purpose: the two models were calibrated on different data, and unifying them would move one off its own curve.",
+       "cite": "chapter:03-fusion.html#booster"
+      }
+     ]
+    },
+    {
+     "n": 7,
+     "title": "Calibration: from a vote to a call",
+     "chapters": [
+      "01-warp.html",
+      "06-training.html"
+     ],
+     "primer": "A raw score is not yet a decision. A call needs an operating point, a line drawn where the errors it makes are the ones you can afford. Platt scaling fits a two-parameter logistic curve from the score to the label on held-out data, and a threshold on that curve is chosen for the best recall of generated images while at most one real image in ten is called generated. A monotone curve with a threshold is the same as cutting the raw score at fixed points, and that is how the shipped call is written.",
+     "entries": [
+      {
+       "scope": "Platt.fit(labels:probabilities:)",
+       "anchor": "let fit = LogisticNewton.fit(x: x, y: labels.map(Double.init), d: 1, C: 1e6, tolerance: 1e-10)",
+       "note": "Fits the logistic curve on the logit of the vote over 65% of the validation images, solved exactly by Newton's method at sklearn's C of 1e6. The curve ships only when its cross-fitted Brier score and log loss are no worse than leaving the vote as it is.",
+       "cite": "PIN",
+       "code": [
+        "warp-training-5"
+       ]
+      },
+      {
+       "scope": "OperatingThreshold.choose(labels:probabilities:maxRealFPR:)",
+       "anchor": "guard fpr <= maxRealFPR else { continue }",
+       "note": "Tries every distinct probability on the other 35% as a threshold and keeps the one with the best generated recall whose real false-positive rate is at most 0.10. The rule is the reference's choose_operating_threshold, ported exactly.",
+       "cite": "test:the operating threshold is choose_operating_threshold's",
+       "deeper": {
+        "text": "On the model trained here the rule gave a coefficient of 0.9921, an intercept of −0.0577 and a threshold of 0.6448, at a generated recall of 0.517.",
+        "cite": "ledger#command-22"
+       }
+      },
+      {
+       "scope": "SensorCalibrationContract.equivalentCuts()",
+       "anchor": "while hi - lo > 1 { let mid = lo + (hi - lo) / 2; if call(mid) == \"real\" { lo = mid } else { hi = mid } }",
+       "note": "Finds, by bisection over every float32 vote, the two cuts where a Platt contract's call changes. Platt is monotone, so its call was only ever two cuts on the vote, and the shipped contract states them exactly.",
+       "cite": "ledger#decision-74",
+       "deeper": {
+        "text": "On 1,738 of 1,738 held-out test images the calibrated call equals a cut on the raw vote.",
+        "cite": "ledger#command-53"
+       },
+       "facts": [
+        {
+         "label": "real at or below",
+         "path": "calibration.cuts.real_at_or_below",
+         "round": 4
+        },
+        {
+         "label": "generated at or above",
+         "path": "calibration.cuts.generated_at_or_above",
+         "round": 4
+        },
+        {
+         "label": "Platt threshold it equals",
+         "path": "calibration.derived_from.decision_threshold",
+         "round": 5
+        }
+       ]
+      },
+      {
+       "scope": "SensorCuts.call(_:)",
+       "anchor": "return v <= realAtOrBelow ? \"real\" : v >= generatedAtOrAbove ? \"generated\" : \"inconclusive\"",
+       "note": "The shipped call: real at or below the first cut, generated at or above the second, inconclusive between. The cuts are bound to the sensor model's exact bytes, and a contract that does not match fails closed.",
+       "cite": "PIN",
+       "facts": [
+        {
+         "label": "sensor variant",
+         "path": "calibration.sensor_variant"
+        },
+        {
+         "label": "score",
+         "path": "calibration.score_semantics"
+        }
+       ],
+       "code": [
+        "warp-inference-5"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 8,
+     "title": "What it adds to the verdict",
+     "chapters": [
+      "01-warp.html",
+      "03-fusion.html"
+     ],
+     "primer": "The warp model plays two roles. Its tile vote, through the two cuts, is the camera-sensor call: did a real camera make these pixels. Its weighted score is the first input of the fusion head, which weighs it with what the image depicts. One file serves both roles under two names, and each role keeps its own operating point.",
+     "entries": [
+      {
+       "scope": "WarpInference.run(cgImage:config:progress:)",
+       "anchor": "// The dual-warp law.",
+       "note": "Runs the lens once and reads two answers from it: the base model owns the weighted score and the fusion, and the sensor model owns only the public camera-sensor score. When the two files hold the same bytes, the sensor reads the base grid instead of scoring the image twice.",
+       "cite": "PIN",
+       "code": [
+        "warp-inference-2"
+       ]
+      },
+      {
+       "scope": "XGBoostScorer.scoreBatch(_:)",
+       "anchor": "public func scoreBatch(_ rows: [[Float]]) -> [Float] { model.predictBatch(rows) }",
+       "note": "Scores the tile rows with Frigate's tree evaluator, the one the detector runs. The trainer's own model agrees with it bit for bit, so a model is judged in training by the arithmetic it will run with.",
+       "cite": "test:Frigate's evaluator and GBDTModel agree bit for bit",
+       "code": [
+        "warp-inference-4"
+       ]
+      },
+      {
+       "scope": "Fusion.vector(warp:cgImage:variant:)",
+       "anchor": "return [warp.weightedScore] + emb + cap + sharp",
+       "note": "The weighted score is the first of the fusion head's inputs, beside DINOv2's embedding, the capture signature and sharpness. Inside the fusion it is one axis among several, and the fusion head's trail follows it from here.",
+       "cite": "doc:Fusion.vector(warp:cgImage:variant:)",
+       "deeper": {
+        "text": "Measured alone, the warp vote's ceiling is near 0.78 AUC, against 0.94 to 0.97 when the same signal feeds the fusion, quoted from a layer-by-layer study in the research.",
+        "cite": "chapter:01-warp.html#limits"
+       },
+       "facts": [
+        {
+         "label": "fusion inputs",
+         "path": "boosters.fusionHead.features"
+        }
+       ],
+       "code": [
+        "fusion-inference-3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fusion-model",
+   "kind": "model",
+   "title": "The fusion head",
+   "mark": "MF",
+   "subtitle": "DINOv2's frozen embedding beside the warp score, read by a warm-started booster",
+   "say": "How the fusion head learns the base verdict for a camera image: the warp score, a frozen DINOv2 embedding of what the image depicts, the capture signature and sharpness in one row; a features-only store of such rows; a booster that grows by adding trees; a frozen reference that keeps a shortcut in check; and the base's weight in the final verdict.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "Why a second model",
+     "chapters": [
+      "03-fusion.html"
+     ],
+     "primer": "The warp model asks one narrow question, whether a camera made the pixels, and a resized photograph or a render loses the sensor's trace. The fusion head asks a wider question and takes the warp model's answer as one of its inputs. It reads four kinds of evidence in one row, so each covers a blind spot of another. Joining different evidence as columns of one model is called feature-level fusion.",
+     "entries": [
+      {
+       "scope": "FusionVector",
+       "anchor": "public var asVector: [Float] { [warp] + dino + capture.asVector + sharpness.asVector }",
+       "note": "The fusion head's row: the warp model's weighted score, DINOv2's 384-value embedding, the nine capture values and the three sharpness values, 397 columns in the head's own order. A model trained on one column order and run on another would read the capture peak where it expects a sharpness value.",
+       "cite": "chapter:03-fusion.html#vector",
+       "facts": [
+        {
+         "label": "columns",
+         "path": "boosters.fusionHead.features"
+        }
+       ],
+       "code": [
+        "fusion-inference-3"
+       ]
+      },
+      {
+       "scope": "SharpnessFeatures.measure(texWeights:weightMap:)",
+       "anchor": "return SharpnessFeatures(salientSharp: salient, globalSharp: global, sharpRatio: salient / (global + 1e-6))",
+       "note": "Measures how sharp the subject region is, how sharp the whole frame is, and their ratio: the row's last three columns. They let the fusion discount the warp signal when the subject is blurry, in reels, bokeh or screenshots, rather than synthetic.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "Refit from scratch without these three inputs, the head gains 0.0002 AUC and moves 603 calls, against 589 for a re-seed alone: at the noise floor.",
+        "cite": "ledger#command-55"
+       }
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "DINOv2: a frozen, self-supervised backbone",
+     "chapters": [
+      "03-fusion.html",
+      "06-training.html"
+     ],
+     "primer": "DINOv2 is a vision transformer trained without labels to describe images, so that similar images land near each other in its embedding space. VeilGarde reads its small model as a frozen feature extractor: the CLS token, a 384-value summary of the whole image, is read out, and the network is never fine-tuned. Its embedding places a portrait near other portraits and a watercolour near other watercolours, the axis the warp lens cannot see. Alone it is no detector; beside the physical evidence it is.",
+     "entries": [
+      {
+       "scope": "Dinov2ViT.callAsFunction(_:)",
+       "anchor": "tokens(pixels)[0..., 0..<1, 0...].squeezed(axis: 1).asType(.float32)",
+       "note": "Runs DINOv2-small's twelve transformer blocks over the 16×16 patches of a 224-pixel input and returns the CLS token, the 384-value embedding of the whole image. The same pass also yields the patch tokens the semantic-tile head reads.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "The v2.0 probe found every semantic and physical feature tied to the data it was trained on, with no feature that holds across unseen generators; the fusion works because each axis covers another's blind spot. Quoted from the research.",
+        "cite": "chapter:03-fusion.html#depicts"
+       },
+       "code": [
+        "fusion-inference-3"
+       ]
+      },
+      {
+       "scope": "Dinov2Import.bake(_:shape:to:)",
+       "anchor": "let resized = TorchBicubic.resize(planes, planes: dim, input: side, output: target)",
+       "note": "DINOv2 is imported, not trained here: the import renames Hugging Face's tensors and resizes the 37×37 position grid to 16×16 for a 224-pixel input. That resize must be PyTorch's bicubic, bit for bit, or the file would differ from the shipped export.",
+       "cite": "chapter:06-training.html#backbones",
+       "deeper": {
+        "text": "The imported small file is byte-identical to the shipped export, and the F16 variant's tensors equal Garde's.",
+        "cite": "test:small is byte-identical to the shipped export; xsmall's tensors are Garde's"
+       }
+      },
+      {
+       "scope": "ArtifactRole.isFrozen",
+       "anchor": "case .warpTile, .warpMajoritySensor, .fusionReference, .noiseprint, .dinov2Small, .dinov2XSmall, .dinov2XXSmall, .clipVision: return true",
+       "note": "The DINOv2 weights are a frozen role, with the warp models, the fusion reference, the noiseprint and CLIP: the flywheel may never promote over them. Every head and the fusion were trained on this embedding, and only frozen weights keep it the one they read.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "One backbone, several readings",
+     "chapters": [
+      "03-fusion.html",
+      "04-specialists.html"
+     ],
+     "primer": "Preprocessing is part of a model. A network that learned from images resized one way gives a different embedding of the same image resized another way, so each model on top must be fed the way it was trained. VeilGarde reads DINOv2 three ways: the fusion reads the CLS of a plain crop, every specialist head reads the CLS after a forced 360 by 640 resize, and the semantic-tile head reads the patch tokens. The store keeps both CLS embeddings as separate columns.",
+     "entries": [
+      {
+       "scope": "SemanticLens.fusionEmbedding(_:variant:)",
+       "anchor": "try shared.vit(variant)(Dinov2Preprocess.input(cg)).reshaped(-1).asArray(Float.self)",
+       "note": "The fusion head's embedding: the CLS after the plain preprocessing, the short edge to 256 and a centre crop of 224. The fusion head reads this path and every linear head the force-resized one, two embeddings of one image that the store keeps apart.",
+       "cite": "PIN:Sources/VeilGardeLens/Semantic/Dinov2Preprocess.swift",
+       "code": [
+        "fusion-inference-3"
+       ]
+      },
+      {
+       "scope": "Dinov2Preprocess.input(_:target:shortEdge:)",
+       "anchor": "ctx.draw(cg, in: CGRect(x: -cropX, y: -cropY, width: sw, height: sh))",
+       "note": "Scales the short edge to 256, crops the centre 224 square, and normalizes by ImageNet's mean and standard deviation, as Hugging Face's processor does. The heads' path force-resizes first, so a phone screenshot's resolution cannot leak into their embedding.",
+       "cite": "WHAT"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The data: a store of features, weighted",
+     "chapters": [
+      "03-fusion.html",
+      "07-flywheel.html"
+     ],
+     "primer": "The fusion head trains on stored features, not images. Each row holds what the head reads, already measured, so a retrain reads the store and never an image. Rows are weighted, so the kinds of image the head must learn hardest count more. A share of the newest generators' rows is held out, so the recall reported on them is on rows the head never trained on.",
+     "entries": [
+      {
+       "scope": "FusionDataset.assemble(_:settings:)",
+       "anchor": "if histogram.count > 1 && !settings.allowMixedWarp {",
+       "note": "Takes every store row that is not golden, not NSFW and carries the fusion embedding, ordered by id, and refuses rows whose warp column came from different warp models. The head would otherwise learn two warp scales as one.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "On the seed store that is 113,176 rows, all scored by one warp model, with 1,569 of 5,263 new-generator rows held out.",
+        "cite": "ledger#command-19"
+       },
+       "code": [
+        "fusion-training-1"
+       ]
+      },
+      {
+       "scope": "FusionSettings",
+       "anchor": "public var holdoutFraction = 0.3",
+       "note": "The row weights and the holdout: new-generator rows, the flux family at 0.7, preview rows and emphasized ids each carry a weight, and 30% of the new-generator rows stay out of training. The research's trainer reported recall on rows it also trained on, and a recall on training rows cannot show a regression.",
+       "cite": "ledger#decision-28"
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The algorithm: trees again, grown by warm start",
+     "chapters": [
+      "03-fusion.html",
+      "06-training.html"
+     ],
+     "primer": "The fusion head is a gradient-boosted ensemble like the warp model, over 397 columns. A booster retrained from scratch on new data does not reproduce the old one's decision boundary, so it can lose cases the old one got right. A warm start keeps every existing tree and adds a few new ones fitted to the remaining errors at a small learning rate, so the boundary moves a little at a time.",
+     "entries": [
+      {
+       "scope": "FusionMode",
+       "anchor": "public static let flywheel = FusionMode.warmStart(add: 80, eta: 0.03)",
+       "note": "Two ways to train: a warm start that adds 80 trees at a learning rate of 0.03, the flywheel's only way to move the base, or 500 trees from scratch at 0.04. The warm start is the default because every from-scratch store retrain failed the battery, five times over, in the research.",
+       "cite": "chapter:03-fusion.html#moves",
+       "deeper": {
+        "text": "Scratch refits scored on held-out store rows, input by input: without DINOv2 −0.0211 AUC, without capture −0.0238, DINOv2 alone −0.0276, without the warp score −0.0012, with 400 trees −0.0016.",
+        "cite": "ledger#command-53"
+       },
+       "facts": [
+        {
+         "label": "trees",
+         "path": "boosters.fusionHead.trees"
+        },
+        {
+         "label": "deepest tree",
+         "path": "boosters.fusionHead.depth"
+        }
+       ],
+       "code": [
+        "fusion-training-2"
+       ]
+      },
+      {
+       "scope": "FusionTrainer.train(_:settings:parent:note:)",
+       "anchor": "guard let parent else { throw VeilGardeFailure.missing(\"a warm start needs the parent fusion head\") }",
+       "note": "Trains on every row not held out and, for a warm start, hands the parent head to the booster, which keeps its trees byte for byte. It reports recall on the held-out new-generator rows for the parent and the candidate, and how often the two agree at 0.5.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "Adding 80 trees took 38 seconds and raised held-out recall from 0.9955 to 0.9975, and the battery still refused them: they flipped IMG_0291, a knife-edge image, from 0.757 to 0.184. A 20-tree start kept it at 0.613 and passed.",
+        "cite": "chapter:03-fusion.html#moves"
+       },
+       "code": [
+        "fusion-training-2",
+        "fusion-training-3"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "The frozen reference, and the shortcut it was taught",
+     "chapters": [
+      "03-fusion.html"
+     ],
+     "primer": "A model learns whatever separates its labels in the training data, including accidents of how the data was gathered. Small images have no valid capture signature, and most such rows were generated, so the base learned that small means generated: a shortcut. The frozen reference is the original head, kept unchanged, and a mechanism asks it a counterfactual question: what would the base say if the capture signature were valid?",
+     "entries": [
+      {
+       "scope": "FusionReference.neutralizedBaseP(_:)",
+       "anchor": "if cap.count >= 4 { cap[1] = 1.0; cap[3] = max(cap[3], 576.0) }",
+       "note": "Asks the frozen reference about an image with its capture shortcut neutralized: the signature marked valid, its native size at least 576. In the data of 2026-07-17, 85.5% of invalid-capture rows were generated, and the base learned that small means generated.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "FusionReference.modelURL(_:)",
+       "anchor": "config.bundle.url(.fusionReference) ?? config.bundle.url(.fusionHead)",
+       "note": "The mechanisms read the reference's 900 frozen trees and fall back to the live head only when a bundle has none. A live base that moved would silently move their operating points, as was measured.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "The shipped head is the reference's 900 trees plus 40 added by a warm start.",
+        "cite": "test:the fusion head is the frozen reference plus 40 warm-start trees"
+       },
+       "facts": [
+        {
+         "label": "reference trees",
+         "path": "boosters.fusionRef.trees"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "n": 7,
+     "title": "What it adds to the verdict",
+     "chapters": [
+      "03-fusion.html",
+      "04-specialists.html"
+     ],
+     "primer": "The fusion head's probability is the base, where the weighted verdict starts for every camera image, called at 0.5. On an image with no capture signature, a combiner then weighs the base against the specialist heads, and the base enters with by far the largest weight under a cap no head can outweigh. The fusion head moves the weighted verdict and never the camera-sensor call.",
+     "entries": [
+      {
+       "scope": "Fusion.verdict(warp:cgImage:config:)",
+       "anchor": "let verdict = shot.isScreenshot ? \"real\" : (abs(p - t) < config.decision.band ? \"inconclusive\" : (p > t ? \"generated\" : \"real\"))",
+       "note": "Calls the head's probability at 0.5 with the open band, and passes the warp model's camera-sensor fields on untouched. When the flat-UI gate fires, the screenshot head takes the verdict instead, because the camera-anchored base would read a screenshot as generated.",
+       "cite": "chapter:03-fusion.html#booster",
+       "code": [
+        "fusion-inference-4"
+       ]
+      },
+      {
+       "scope": "CameraFusionHead.verdict(_:)",
+       "anchor": "try Fusion.run(cgImage: s.cgImage, config: s.config)",
+       "note": "The camera domain's base expert: the warp lens, then the fusion head, the spine the specialist stack compounds onto. It is also the fallback for any domain without its own head.",
+       "cite": "WHAT",
+       "code": [
+        "fusion-inference-2"
+       ]
+      },
+      {
+       "scope": "StackCombiner.lg(_:_:)",
+       "anchor": "return min(max(log(r / (1 - r)), -cap), cap)",
+       "note": "The bounded logit every input enters the combiner through. The base's is capped at 4 and weighted 3.82, a head's is capped at 2, so a saturated head can never overturn a confident base.",
+       "cite": "PIN",
+       "facts": [
+        {
+         "label": "w_base",
+         "path": "combiner.w_base",
+         "round": 4
+        },
+        {
+         "label": "cap on the base",
+         "path": "combiner.cap_base"
+        },
+        {
+         "label": "cap on a head",
+         "path": "combiner.cap_head"
+        }
+       ],
+       "code": [
+        "specialist-inference-3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "specialist-model",
+   "kind": "model",
+   "title": "The specialist heads",
+   "mark": "MS",
+   "subtitle": "linear probes on DINOv2's frozen embedding, stacked under a non-negative combiner",
+   "say": "How the specialist heads learn the families the base misses: each a standardized logistic probe trained on DINOv2's frozen embedding from a features-only store, split by source, admitted only if it leaves real photographs alone, pooled with the base by a small non-negative combiner, and grown every week by the flywheel.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "Why specialists, and why a stack",
+     "chapters": [
+      "04-specialists.html",
+      "05-router.html"
+     ],
+     "primer": "The fusion base is strong where it was trained and weaker on a few families: AI art against human art, generative blur against a camera's, photoreal people against real portraits. A specialist is a small model that knows one of those questions well. The specialists are stacked, not blended: each adds evidence in one direction, and a combiner weighs it against the base under caps it cannot exceed.",
+     "entries": [
+      {
+       "scope": "HeadKind",
+       "anchor": "public static let combinerOrder: [HeadKind] = [.art, .blur, .human]",
+       "note": "Names every head by its role: the screenshot domain's expert, the three atlas priors the combiner pools, and the arbiters the semantic chain asks. The three priors enter the combiner in a fixed order, art, blur, human, the order its weights are written in.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "AtlasPriors.evaluate(_:)",
+       "anchor": "kinds.compactMap { prior($0.name, $0.kind, s) }",
+       "note": "Scores the art, blur and human heads on the image and records each in the stack, at full weight when it fires at 0.80 and at a quarter when only consulted. A head that is not in the bundle is inert, so a head is added or removed by a file, not by code.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "The research tried a monolithic combiner that blended every signal, and real false positives rose from 8% to between 50% and 92%; the stack holds them at 0%. Quoted from the research.",
+        "cite": "chapter:04-specialists.html#why"
+       },
+       "code": [
+        "specialist-inference-2"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The embedding they read",
+     "chapters": [
+      "04-specialists.html",
+      "07-flywheel.html"
+     ],
+     "primer": "Every head reads the same frozen DINOv2 network as the fusion head, through another door: the image is first forced to 360 by 640 pixels. A portrait and a landscape are then read at the same shape, and a source's resolution cannot leak into the embedding. Nothing here fine-tunes DINOv2. Each head is a small linear model trained on top of the frozen embedding, which is called a linear probe.",
+     "entries": [
+      {
+       "scope": "SemanticLens.normalizedEmbedding(_:variant:normW:normH:)",
+       "anchor": "try shared.vit(variant)(Dinov2Preprocess.inputNormalized(cg, normW: normW, normH: normH)).reshaped(-1).asArray(Float.self)",
+       "note": "The heads' embedding: the CLS token after the image is force-resized to 360 by 640. Every head was trained on this embedding, and the store keeps it as its own column, dino_norm, apart from the fusion's.",
+       "cite": "chapter:04-specialists.html#head",
+       "code": [
+        "specialist-inference-2"
+       ]
+      },
+      {
+       "scope": "FeatureExtractor.extract(_:)",
+       "anchor": "let dinoNorm = columns.contains(.dinoNorm) ? try SemanticLens.normalizedEmbedding(cg, variant: variant) : nan384",
+       "note": "Measures one image into the store's six columns with the detector's own calls, in the detector's order, so a stored row is what inference would compute for that image. The image is read, measured and dropped.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "The seed store holds 138,247 rows in 59 shards; the heads, the fusion head and the combiner all train on such rows.",
+        "cite": "ledger#command-25"
+       }
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "The algorithm: a standardized logistic probe",
+     "chapters": [
+      "04-specialists.html",
+      "06-training.html"
+     ],
+     "primer": "Each head is logistic regression: a weighted sum of the 384 embedding values plus an intercept, through a sigmoid. Each value is standardized first, its mean subtracted and divided by its spread, so no dimension dominates by its scale. L2 regularization at C 0.5 keeps the weights small, and class weights balance generated against real. A new head is a new file of numbers, not new code.",
+     "entries": [
+      {
+       "scope": "LinearHead.pAI(_:)",
+       "anchor": "z += ((embedding[i] - mean[i]) / s) * coef[i]",
+       "note": "Computes P(AI) as the sigmoid of the coefficients times the standardized embedding plus the intercept, in Float and in index order, as Garde does. Every specialist is this one primitive with its own numbers.",
+       "cite": "WHAT",
+       "code": [
+        "specialist-inference-2"
+       ]
+      },
+      {
+       "scope": "StandardScaler.fit(_:d:rows:)",
+       "anchor": "return s < 10 * Double.ulpOfOne ? 1 : s",
+       "note": "Each column's mean and population standard deviation over the training rows. A constant column scales by 1 and passes through centred, as sklearn's scaler does.",
+       "cite": "PIN",
+       "code": [
+        "specialist-training-2"
+       ]
+      },
+      {
+       "scope": "LogisticNewton.fit(x:y:d:C:classWeight:sampleWeight:maxIterations:tolerance:)",
+       "anchor": "if classWeight == .balanced {",
+       "note": "Solves sklearn's L2-regularized logistic objective exactly by Newton's method, with balanced class weights when asked. The problem is strictly convex, so the exact optimum is the target sklearn's own solver approaches, and there was no reason to port that solver.",
+       "cite": "ledger#decision-29",
+       "deeper": {
+        "text": "The head recipes reach sklearn's optimum within 1e-5.",
+        "cite": "chapter:06-training.html#heads"
+       }
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The data, and a split by source",
+     "chapters": [
+      "06-training.html"
+     ],
+     "primer": "Each head learns its own positives against its own negatives, chosen from the store: AI art against museum and human art, for one. Its test rows come from sources it never trained on. A source-disjoint split tests whether a head learned the generator rather than the look of one website, which a random split cannot.",
+     "entries": [
+      {
+       "scope": "HeadTrainer.train(_:positives:negatives:settings:store:parent:note:)",
+       "anchor": "let fit = LogisticNewton.fit(x: scaler.transform(x, d: d, rows: train), y: train.map(label), d: d, C: settings.C, classWeight: settings.classWeight)",
+       "note": "Takes the usable store rows, splits them by source, fits the scaler and the regression at C 0.5 with balanced classes, and measures the head on the held-out sources and on golden reals. A head needs at least 50 training rows and 10 test rows.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "Retrained from the seed store, test AUC against the shipped head on the same rows: art 0.9774 against 0.9439 on the id split, blur 0.9629 against 0.9177, cgi 0.9847 against 0.9668, and human 0.6713 against 0.6955 on the source-disjoint split.",
+        "cite": "ledger#command-18"
+       },
+       "code": [
+        "specialist-training-1"
+       ]
+      },
+      {
+       "scope": "HeadSplit.heads(ids:sources:labels:)",
+       "anchor": "fallback.basis = .idsAfterOneClassSources",
+       "note": "Holds out a quarter of the sources, shuffled as the research's script shuffled them. When that leaves a class out of the test rows, where AUC is undefined, it falls back to an id split and records that it did.",
+       "cite": "ledger#decision-35"
+      },
+      {
+       "scope": "HeadTrainer.refusal(_:categories:)",
+       "anchor": "case .semtile: return \"the semantic-tile head trains on DINOv2 patch tokens, which the store does not keep\"",
+       "note": "Refuses the screenshot and semantic-tile heads before any work, with the reason: the store holds no screenshot rows and keeps no patch tokens. Training them on proxies was rejected.",
+       "cite": "ledger#decision-32"
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "Admission: a rule at the operating point",
+     "chapters": [
+      "04-specialists.html",
+      "07-flywheel.html"
+     ],
+     "primer": "A good AUC does not make a head safe to ship. What matters is what it does at the threshold where it fires, and a head that blocks real photographs is worse than no head. So a head is admitted only if, at 0.8, it flags at most one in ten of a set of golden real images, whatever its AUC.",
+     "entries": [
+      {
+       "scope": "FlywheelPolicy.admission(_:store:)",
+       "anchor": "return Admission(anchors: anchors, block: block, admitted: block <= admissionCeiling)",
+       "note": "Scores a candidate head on the store's golden reals outside Bluesky and admits it only if it blocks at most 10% of them at 0.8. A head that blocks real images is worse than no head.",
+       "cite": "chapter:04-specialists.html#admission",
+       "deeper": {
+        "text": "Retrained from the seed store, every atlas head was admitted: art blocked 1.6% against the shipped head's 4.7%, blur 6.2% against 9.4%, human and cgi none.",
+        "cite": "ledger#command-18"
+       },
+       "code": [
+        "specialist-training-3"
+       ]
+      },
+      {
+       "scope": "Promoter.check(_:data:live:current:store:)",
+       "anchor": "guard c.wBase >= 0, c.wRescue >= 0, c.wGen.allSatisfy({ $0 >= 0 }), (c.wNp ?? 0) >= 0 else {",
+       "note": "Every promote check runs before live is touched: an atlas head must pass admission, a base must keep live's trees byte for byte, a combiner's weights must all be at least zero. A refusal leaves live as it was.",
+       "cite": "ledger#decision-40",
+       "code": [
+        "specialist-training-5"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "The combiner: pooling with signs and caps",
+     "chapters": [
+      "04-specialists.html"
+     ],
+     "primer": "The combiner is a second, tiny model on top: logistic regression over the base and the heads, which is called stacking. Its weights are held at zero or above, so a head that reads real can never push toward generated. Generated evidence adds; real evidence subtracts only while the base is unsure, under 0.75. When every head reads real, a rescue pulls toward real by the weakest of their real readings.",
+     "entries": [
+      {
+       "scope": "StackCombiner.pool(base:heads:pairAI:np:)",
+       "anchor": "z -= wRescue * max(0, -maxHeadLogit)",
+       "note": "Pools the capped base logit and each head's positive logit times its weight, then, while the base is under the gate, subtracts the rescue and the noiseprint's camera evidence. A saturated head can never overturn a confident base.",
+       "cite": "WHAT",
+       "facts": [
+        {
+         "label": "w0",
+         "path": "combiner.w0",
+         "round": 4
+        },
+        {
+         "label": "w_gen for human",
+         "path": "combiner.w_gen.2",
+         "round": 4
+        },
+        {
+         "label": "w_rescue",
+         "path": "combiner.w_rescue"
+        },
+        {
+         "label": "gate ceiling",
+         "path": "combiner.gate_ceiling"
+        }
+       ],
+       "code": [
+        "specialist-inference-3"
+       ]
+      },
+      {
+       "scope": "CombinerTrainer.fitWeights(features:labels:realsWeight:)",
+       "anchor": "for row in features { var r = row; r[4] = 0; flat.append(contentsOf: r) }",
+       "note": "Fits the weights as a logistic regression held at zero or above, real rows counted three times, with the rescue column zeroed because the corpus cannot teach it.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "Refit on 97,166 capture-absent store rows, the pooled test AUC is 0.9901 against the base's 0.9896 and the real false-positive rate falls from 3.1% to 1.2%. It is a new fit, not a reproduction of the shipped weights, which were fitted on another cache.",
+        "cite": "ledger#command-20"
+       },
+       "code": [
+        "specialist-training-4"
+       ]
+      },
+      {
+       "scope": "CombinerTrainer.chooseRescue(w0:w:settings:)",
+       "anchor": "if real == settings.probes.count && top <= settings.maxProbe && chosen == 0 { chosen = candidate }",
+       "note": "Chooses the rescue weight by a sweep that must keep every protect-real probe real, taking the first of 0.5, 0.8, 1.0 and 1.3 that does. The loop never keeps 0, as the reference's never did, and on the shipped weights it picks the shipped 0.5.",
+       "cite": "ledger#decision-31"
+      }
+     ]
+    },
+    {
+     "n": 7,
+     "title": "How the heads grow: the flywheel",
+     "chapters": [
+      "07-flywheel.html"
+     ],
+     "primer": "A detector trained once falls behind as generators change. The flywheel finds where the base is wrong, fetches images of that kind, keeps only their features, and every week trains candidate heads and a warm-started base on top of the live bundle. A candidate reaches live only through promote, behind admission and a battery of images the detector must never get wrong. The backbones and the warp models never move.",
+     "entries": [
+      {
+       "scope": "WeeklyCandidates.recipe(id:allowMixedWarp:)",
+       "anchor": "for kind in HeadKind.flywheelCategories { DinoHead(kind).version(\"weekcand\") }",
+       "note": "The weekly recipe: the four atlas heads from the whole store, and the base warm-started by 80 trees at 0.03, trained on top of live into a candidate bundle. Nothing here writes live.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "Agreement.measure(_:store:label:)",
+       "anchor": "w[k] = combiner.pool(base: p, heads: heads.map { $0.pAI(norm) }, pairAI: pair?.pAI(norm), np: np.isFinite ? np : nil)",
+       "note": "The flywheel's north-star number: how often the base alone reaches the same call as the pooled verdict. The flywheel's job is to make the base trustworthy on more images, so the agreement should climb.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "The first weekly candidate raised it from 0.9857 to 0.9894 on the store. The live models were trained on store rows, so these are not held-out numbers.",
+        "cite": "ledger#command-28"
+       }
+      },
+      {
+       "scope": "Promoter.promote(_:from:store:)",
+       "anchor": "// Back up, then write beside and rename in.",
+       "note": "Promote is the only writer of live: it snapshots live, writes the slot, re-pins the manifest and runs the battery the slot needs, and restores the snapshot on a failure.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "On its first day it refused the weekly base: the 80 new trees flipped IMG_0291 from 0.757 to 0.184, and live was restored.",
+        "cite": "ledger#command-29"
+       },
+       "code": [
+        "specialist-training-5",
+        "fusion-training-3"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "noiseprint-model",
+   "kind": "model",
+   "title": "The noiseprint",
+   "mark": "MN",
+   "subtitle": "a constrained residual CNN, the learned camera signal where the capture peak is gone",
+   "say": "How the noiseprint learns camera evidence: beside the measured capture signature, a tiny Bayar-constrained convolutional network trained on camera originals against everything that is not a direct capture, recompressed alike in both classes, judged by rules fixed before its numbers, and allowed only to pull a verdict toward real.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "Two camera signals, one measured and one learned",
+     "chapters": [
+      "04-specialists.html",
+      "01-warp.html"
+     ],
+     "primer": "A camera's sensor leaves traces a generator does not reproduce. The capture signature measures one of them directly: the Bayer mosaic's peak near the Nyquist frequency, read at native resolution, which a single halving of the image destroys. The noiseprint is a learned model for the zone where that peak is gone, a recompressed or resized photograph. It is a tiny convolutional network that reads the noise left after the picture's content is predicted away.",
+     "entries": [
+      {
+       "scope": "CaptureSignature",
+       "anchor": "/// valid and peak ≥ 30: a real-sensor signature is present.",
+       "note": "The four values the verdict reads from the capture signature: the peak, whether the native short side reaches 512, the native size, and present, a valid image with a peak of at least 30. Nothing here is learned: it is a threshold on a measured spectrum.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "The threshold has been 30 since 2026-07-11. The Python reference used 20, and the band from 20 to 30 held only AI-video re-encodes.",
+        "cite": "PIN"
+       }
+      },
+      {
+       "scope": "CaptureLens.signature(_:)",
+       "anchor": "return features.signature",
+       "note": "Computes the signature on a centre crop at native resolution, before any downscale, from the luma residual's power spectrum: the outer half's peak over its median is the peak a Bayer mosaic leaves.",
+       "cite": "WHAT",
+       "code": [
+        "warp-inference-2"
+       ]
+      },
+      {
+       "scope": "NoiseprintLens.score(_:)",
+       "anchor": "guard let net = shared.get(), let (g, w, h) = grayPlane(cg), let patches = gridPatches(g, w, h) else { return nil }",
+       "note": "Scores a 4×4 grid of 128-pixel gray patches with the noiseprint net and returns the mean sigmoid as P(camera), or nothing when the net is absent or the image is too small. It is the learned camera signal for the recompressed zone where the capture peak reads absent.",
+       "cite": "WHAT",
+       "code": [
+        "noiseprint-inference-2"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The net: a constrained residual CNN",
+     "chapters": [
+      "04-specialists.html",
+      "06-training.html"
+     ],
+     "primer": "A convolutional network slides small learned filters over an image. Left free, its first layer would learn to read content: faces, skies, styles. The Bayar constraint forces every first-layer filter to predict a pixel from its neighbours and pass on only the error, so the network reads the noise residual instead of the picture. Three more convolutions, a global average and one linear unit turn that residual into a logit, about 33 thousand parameters in all.",
+     "entries": [
+      {
+       "scope": "NoiseprintTrainNet.projectBayar()",
+       "anchor": "let projected = off / (off.sum(axes: [1, 2], keepDims: true) + 1e-8) - m",
+       "note": "Projects the first layer's filters back onto the constraint after every optimizer step: centre −1, the other taps summing to 1. Each filter then predicts a pixel from its neighbours and passes on the error, which suppresses content.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "The constraint is a projection after each step, as the reference applied it, not a reparameterisation of the weights.",
+        "cite": "PIN"
+       },
+       "code": [
+        "noiseprint-training-3"
+       ]
+      },
+      {
+       "scope": "NoiseprintNet.score(_:)",
+       "anchor": "for i in 0..<4 { h = relu(conv2d(h, w[i], stride: IntOrPair(strides[i]), padding: IntOrPair(pads[i])) + b[i]) }",
+       "note": "The inference form: four convolutions with ReLU, a global average over each patch, one linear unit and a sigmoid, averaged over the patches. The BatchNorms are already folded into the convolutions' weights.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "The shipped net's weights are 133,580 bytes and ship inside the package, bound by the manifest's hash, so anyone's detector has its camera evidence.",
+        "cite": "ledger#decision-79"
+       },
+       "code": [
+        "noiseprint-inference-3"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "The data: camera originals against everything else",
+     "chapters": [
+      "06-training.html"
+     ],
+     "primer": "The positives are camera originals. The negatives are everything that is not a direct capture: AI photographs, AI art, web reals, screenshots, AI-video frames and photoreal forgeries. Web reals matter most: they began in a camera and were laundered, and a net that cannot beat them is not reading a camera. Every image is recompressed at one of five levels, in both classes alike, so compression cannot become the label.",
+     "entries": [
+      {
+       "scope": "NoiseprintSources.split(excluding:)",
+       "anchor": "let trainShare = perFamily * 3 / 4",
+       "note": "Splits image-disjoint, three to one: 350 of 438 iPhone originals for training, and 90 training and 30 test images from each negative family. An image named for exclusion, the adversarial anchor, leaves every folder by path and by content, so the image the test scores never trains the net.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "The pools behind three of the reference's six families were deleted in the features-only cleanup, so ai_art reads Midjourney v6 images, shot renders and CGI have none, and AI-video frames were added.",
+        "cite": "ledger#decision-61"
+       },
+       "code": [
+        "noiseprint-training-1"
+       ]
+      },
+      {
+       "scope": "PatchSampler.patches(_:count:settings:rng:)",
+       "anchor": "let level = settings.levels[rng.randbelow(settings.levels.count)]",
+       "note": "Draws a recompression level at random, from the same five in both classes, sometimes downscales, then cuts random 128-pixel gray patches and drops blank ones. With both classes compressed alike, the net cannot read compression as the label.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "HEIC at 0.75 stands in for the reference's WebP 75, because macOS ImageIO has no WebP encoder; the five-level design, both classes alike, is what keeps compression from becoming the label.",
+        "cite": "ledger#decision-62"
+       },
+       "code": [
+        "noiseprint-training-2"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The objective and the fit",
+     "chapters": [
+      "06-training.html"
+     ],
+     "primer": "The net learns by binary cross-entropy, the logistic loss on its camera logit, minimized by Adam, an optimizer that adapts each weight's step from running averages of its gradients. It trains for six epochs, six passes over the patches in shuffled batches of 256. BatchNorm normalizes each layer's activations during training; once training ends, its fixed statistics can be folded into the convolution weights, leaving a simpler network to run.",
+     "entries": [
+      {
+       "scope": "NoiseprintTrainer.train(_:settings:note:)",
+       "anchor": "let optimizer = Adam(learningRate: Float(settings.learningRate), biasCorrection: true)",
+       "note": "Six epochs of Adam at 2e-3 on binary cross-entropy in batches of 256, with the Bayar projection once before training and after every step. Adam corrects its moments' bias here, as PyTorch's did for the reference, where MLX's default does not.",
+       "cite": "ledger#decision-59",
+       "deeper": {
+        "text": "On the patch cache the six epochs took 19 seconds, the loss falling from 0.554 to 0.384.",
+        "cite": "ledger#command-46"
+       },
+       "code": [
+        "noiseprint-training-3"
+       ]
+      },
+      {
+       "scope": "NoiseprintTrainNet.folded()",
+       "anchor": "let s = gamma[c] / (variance[c] + eps).squareRoot()",
+       "note": "Folds each BatchNorm into the convolution before it, scaling by γ/√(σ²+ε), so the file holds the four biased convolutions the detector runs. The folded file computes what the trained form computes.",
+       "cite": "test:the folded file computes what the trained form computes",
+       "code": [
+        "noiseprint-training-4"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "Judging and adopting: rules before numbers",
+     "chapters": [
+      "06-training.html"
+     ],
+     "primer": "A held-out AUC can rise while the one case that matters gets worse. So the noiseprint is tested image by image, as inference scores it, at three recompression levels, beside the shipped net on the same images. One adversarial image is mandatory: a photoreal AI picture that forged a capture peak of 568, which a camera detector must not read as a camera. The adoption rules were written before the retrain ran, so the numbers could not choose their own bar.",
+     "entries": [
+      {
+       "scope": "NoiseprintTrainer.evaluate(_:split:settings:note:)",
+       "anchor": "let camera = scores(split.cameraTest)",
+       "note": "Scores the held-out camera originals against each family's test images, each image as inference scores it, at native, JPEG 0.75 and HEIC 0.75, beside the parent net on the same images. The parent's numbers are measured, not trusted, because its own split may have trained on some of these images.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "The first retrain reached 0.955 pooled AUC against the shipped net's 0.942 and still read the forged anchor as a camera, at 0.578.",
+        "cite": "ledger#command-46"
+       },
+       "code": [
+        "noiseprint-training-5"
+       ]
+      },
+      {
+       "scope": "NoiseprintAdoption.judge(candidate:parent:family:)",
+       "anchor": "Rule(rule: \"the anchor reads P(camera) below 0.5\", value: candidate.anchor, bar: 0.5, passed: candidate.anchor.map { $0 < 0.5 } ?? false),",
+       "note": "Three rules fixed before the photoreal retrain ran: the anchor under 0.5, the pooled AUC within 0.005 of the parent's, the photoreal family's AUC at least the parent's. The first retrain had beaten the parent's AUC and still read the anchor as a camera.",
+       "cite": "ledger#decision-67",
+       "deeper": {
+        "text": "The photoreal retrain met all three: the anchor at 0.386, the pooled AUC 0.963 against 0.947, the photoreal family 0.989 against 0.978.",
+        "cite": "ledger#command-50"
+       }
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "What it adds to the verdict",
+     "chapters": [
+      "04-specialists.html"
+     ],
+     "primer": "The noiseprint does not feed the fusion head. It acts only in the combiner, only on an image with no capture signature and a base under 0.75, and only toward real. Its low side includes laundered web reals, so a low reading is no evidence of generation, and the combiner never treats it as such. A better camera detector therefore need not move a verdict.",
+     "entries": [
+      {
+       "scope": "CapturePriors.apply(_:_:domain:capture:)",
+       "anchor": "let np: Float? = comb.wNp != nil ? NoiseprintLens.score(s.cgImage) : nil",
+       "note": "Asks for the noiseprint only when the combiner carries its weight, and records it as the sensor row, 1 − P(camera), at full weight when its camera evidence is active: P(camera) above 0.5 with the base under the gate.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "The photoreal retrain, the better camera detector on its own test, changed no call in the full detector, so the owner kept the shipped net.",
+        "cite": "ledger#decision-80"
+       },
+       "facts": [
+        {
+         "label": "w_np",
+         "path": "combiner.w_np"
+        },
+        {
+         "label": "gate ceiling",
+         "path": "combiner.gate_ceiling"
+        }
+       ],
+       "code": [
+        "noiseprint-inference-4"
+       ]
+      },
+      {
+       "scope": "CombinerSettings",
+       "anchor": "public var noiseprintFloor = 0.05",
+       "note": "When the combiner is refit, a noiseprint weight that fits below 0.05 is set to 0.8, as the reference trainer sets it, line for line. Its reason is not recorded.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "Taken out of the combiner, the noiseprint moves 3 store calls, and on all 3 the shipped stack was the right one.",
+        "cite": "ledger#command-56"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "two-verdicts",
+   "kind": "system",
+   "title": "The two verdicts",
+   "mark": "MV",
+   "subtitle": "the majority path and the weighted path, from one lens to two numbers",
+   "say": "How the models work together on one image, and why: one lens pass forks into the majority, the camera-sensor call that one model owns, and the weighted verdict, which the domain, the fusion base, the capture signature, the specialist stack and the gated mechanisms build in turn. Every step names its path, and the last step shows the evidence that each part is needed and the commands that test it again.",
+   "lanes": [
+    {
+     "id": "majority",
+     "label": "the majority path"
+    },
+    {
+     "id": "weighted",
+     "label": "the weighted path"
+    },
+    {
+     "id": "both",
+     "label": "both paths"
+    }
+   ],
+   "steps": [
+    {
+     "n": 1,
+     "title": "One image, two questions, two numbers",
+     "lane": "both",
+     "chapters": [
+      "05-router.html",
+      "01-warp.html"
+     ],
+     "primer": "VeilGarde's result keeps two verdicts, and they answer different questions. The majority asks whether a camera made these pixels, and only the warp model's tile vote answers it. The weighted verdict asks for the detector's whole judgement, and every other model feeds it. This trail walks the majority's path first, then crosses to the weighted path.",
+     "entries": [
+      {
+       "scope": "Detector.detect(cgImage:config:hint:)",
+       "anchor": "let preSemanticP = state.p",
+       "note": "The full detector's one entry: it picks the domain, runs that domain's base expert, then lets capture and the pooled specialists, the frame seam and the semantic chain revise the weighted score in a fixed order. The result keeps two numbers: the majority, the camera-sensor anchor, and the weighted, the compounded score.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "Stacking, not blending: a monolithic combiner raised real false positives from 8% to as much as 92% in the research's measurement, and the stack holds them at 0%.",
+        "cite": "PIN"
+       },
+       "code": [
+        "fusion-inference-1"
+       ]
+      },
+      {
+       "scope": "InferenceResult",
+       "anchor": "public let weightedScore: Float",
+       "note": "Two numbers carry every verdict. The majority is the warp lens's own vote, on a camera route the calibrated camera-sensor score, never overwritten; the weighted is the score the label is read from, compounded from warp to fusion to specialists to mechanisms.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "WarpInference.run(cgImage:config:progress:)",
+       "anchor": "let sensorRaw = Float(generated) / Float(sensorCells)",
+       "note": "The fork: one lens pass yields both numbers' raw material. The sensor model's tile vote becomes the majority, and the base model's weighted score goes on to the fusion; the sensor owns only the public sensor surface, the base the weighted score and the fusion.",
+       "cite": "PIN",
+       "code": [
+        "warp-inference-2"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The majority path: a vote and two cuts",
+     "lane": "majority",
+     "chapters": [
+      "01-warp.html"
+     ],
+     "primer": "On the majority path there is one model and no learned combination. The warp model scores every 32-pixel tile, the vote is the share of tiles it reads as generated, and two fixed cuts on that share make the call: real, generated, or inconclusive between. Nothing later in the detector changes it.",
+     "entries": [
+      {
+       "scope": "SensorSurface.score(cgImage:warp:scorer:)",
+       "anchor": "let lane = try WarpLens.sensorLane(cgImage: cgImage, parameters: warp, scorer: scorer)",
+       "note": "The camera-sensor map is always the raw 32-pixel tile grid. When the sensor model's bytes equal the base's it is the base grid itself; otherwise a second pass scores it on its own lane, so the base keeps its own geometry and keeps owning the weighted and fusion scores.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "SensorCalibrationContract.calibratedProbability(_:)",
+       "anchor": "guard transform == .platt, let payload = plattPayload else { return raw }",
+       "note": "For the shipped two-cuts contract the score is the vote itself; a Platt contract, schema 1, would map it through its curve. Either way it is one model's vote, calibrated once.",
+       "cite": "doc:SensorCalibrationContract.calibratedProbability(_:)",
+       "facts": [
+        {
+         "label": "calibration",
+         "path": "calibration.calibration"
+        },
+        {
+         "label": "score",
+         "path": "calibration.score_semantics"
+        }
+       ]
+      },
+      {
+       "scope": "SensorCuts.call(_:)",
+       "anchor": "return v <= realAtOrBelow ? \"real\" : v >= generatedAtOrAbove ? \"generated\" : \"inconclusive\"",
+       "note": "The majority's call: real at or below the first cut, generated at or above the second. The cuts are independent of the weighted path's operating points, 0.56 for the warp score and 0.5 for the base.",
+       "cite": "PIN",
+       "facts": [
+        {
+         "label": "real at or below",
+         "path": "calibration.cuts.real_at_or_below",
+         "round": 4
+        },
+        {
+         "label": "generated at or above",
+         "path": "calibration.cuts.generated_at_or_above",
+         "round": 4
+        }
+       ],
+       "code": [
+        "warp-inference-5"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "The majority path: which lane owns it, then and now",
+     "lane": "majority",
+     "chapters": [
+      "05-router.html",
+      "02-bundle.html"
+     ],
+     "primer": "In earlier versions the majority could come from another lane. The semantic tiles, DINOv2's patch tokens read as a map of generated regions, could own it, and the public label was a semantic vote. Since Stage 1 and schema v2, on a camera route the public majority is the calibrated camera-sensor call, chosen before the semantic chain runs. The earlier surface survives only to replay old results in the same binary.",
+     "entries": [
+      {
+       "scope": "PublicSurface.initial(base:domain:surface:)",
+       "anchor": "if surface == .warpSensor, domain == .camera, let sensorPrediction = base.sensorPrediction, let sensorProbability = base.sensorProbability {",
+       "note": "Chooses which lane owns the public majority before any semantic diagnostic runs. On a camera route under the production surface the majority is the calibrated sensor lane, even when the screenshot guard inside the fusion owns the weighted verdict.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "Since schema v2 the semantic majority never owns the public majority. A reader who wants to know whether a camera made the pixels reads one field, and a reader who wants the detector's whole judgement reads the other.",
+        "cite": "chapter:05-router.html#result"
+       },
+       "code": [
+        "specialist-inference-5"
+       ]
+      },
+      {
+       "scope": "ResultSurface",
+       "anchor": "case legacySemantic = \"legacy-semantic\"",
+       "note": "The two surfaces a result can show: the warp sensor, production since Stage 1, and the legacy semantic surface, kept to replay the earlier results and for ablation in the same binary.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "PublicSurface.legacySemanticPrediction(semanticVerdict:weightedVerdict:renderFires:domainGated:)",
+       "anchor": "return semanticVerdict == weightedVerdict ? semanticVerdict : \"inconclusive\"",
+       "note": "How the earlier majority was labelled: render first, then the domain gate, then coherence, the semantic vote kept only when it agreed with the weighted verdict. That is the majority the earlier pipeline reported.",
+       "cite": "doc:PublicSurface.legacySemanticPrediction(semanticVerdict:weightedVerdict:renderFires:domainGated:)"
+      },
+      {
+       "scope": "ScreenshotContentHead.verdict(_:)",
+       "anchor": "scorer: \"screenshot\", majorityPrediction: verdict, majorityScore: p, weightedPrediction: verdict, weightedScore: p,",
+       "note": "On a screenshot route the content head is the base expert and there is no warp grid, so its one probability is both the majority and the weighted score.",
+       "cite": "test:a screenshot hint routes to the content head, which has no warp grid"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The majority path: how much the call deserves",
+     "lane": "majority",
+     "chapters": [
+      "01-warp.html"
+     ],
+     "primer": "A call is not the same as confidence in it. The trust law rates the camera-sensor call high only when four things hold together: the call is real or generated, the route is native, a valid capture signature is present, and the weighted verdict agrees. On this path the capture signature rates trust; it never moves the score.",
+     "entries": [
+      {
+       "scope": "Trust.sensorVote(_:route:)",
+       "anchor": "return sensorPrediction == r.weightedPrediction ? \"high\" : \"low\"",
+       "note": "Rates the sensor call high only when it is binary, on a native route, with a valid and present capture signature, and agrees with the weighted verdict; everything else is low. Two abstentions agreeing is not evidence.",
+       "cite": "WHAT",
+       "facts": [
+        {
+         "label": "trust law",
+         "path": "calibration.trust_law"
+        }
+       ],
+       "code": [
+        "warp-inference-6"
+       ]
+      },
+      {
+       "scope": "Trust.physicsVote(_:)",
+       "anchor": "return sensorVote(r)",
+       "note": "The trust of whichever lane owns the majority: on the warp sensor it is the sensor vote's trust, and on the earlier semantic lane it was agreement with the weighted verdict.",
+       "cite": "doc:Trust.physicsVote(_:)",
+       "deeper": {
+        "text": "Matching abstentions are never high trust, and a test holds it.",
+        "cite": "test:matching abstentions are never high trust"
+       }
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The crossing: the weighted path starts at the domain and the base",
+     "lane": "weighted",
+     "chapters": [
+      "05-router.html",
+      "03-fusion.html"
+     ],
+     "primer": "Here the trail crosses to the weighted path, and from here on no step touches the majority. The weighted path starts by picking the image's domain, camera or screenshot, and its base expert. For a camera image the base is the fusion head, a learned blend of the warp score, DINOv2, the capture signature and sharpness, and every later step only revises it.",
+     "entries": [
+      {
+       "scope": "DefaultDomainDetector.detect(_:hint:)",
+       "anchor": "return s.gate.isScreenshot ? .screenshot : .camera",
+       "note": "A caller's hint wins; otherwise the flat-UI gate marks a screenshot, and every other image is a camera image. The gate misses photographic reel screenshots, so a caller with context passes the hint.",
+       "cite": "PIN",
+       "code": [
+        "fusion-inference-1"
+       ]
+      },
+      {
+       "scope": "ScreenshotGate.decide(gradZero:flatStrict:topColor:)",
+       "anchor": "ScreenshotGate(isScreenshot: gradZero >= gradZeroThreshold && flatStrict >= flatStrictThreshold && topColor >= topColorThreshold,",
+       "note": "Three tells taken together, many zero-gradient pixels, many flat blocks and one dominant colour, mark a screenshot. A screenshot is real but not a camera capture, so the camera-anchored fusion would read it as generated.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "The gate false-fires on about 2% of AI images, and only on flat graphic art.",
+        "cite": "PIN"
+       }
+      },
+      {
+       "scope": "RouteState.init(base:)",
+       "anchor": "stack = [SpecialistContribution(name: base.scorer, pAI: base.weightedScore, verdict: base.weightedPrediction, weight: 1.0)]",
+       "note": "The weighted path's working state starts as the base's score and label, the base the first row of the stack. Every later mechanism revises this state, which holds the weighted score and no majority.",
+       "cite": "WHAT",
+       "code": [
+        "fusion-inference-4"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "The weighted path: capture first, then the stack",
+     "lane": "weighted",
+     "chapters": [
+      "04-specialists.html",
+      "03-fusion.html"
+     ],
+     "primer": "The weighted path asks the capture signature first. A valid, present signature is physical evidence of a camera, so the specialist heads are switched off and the base stands. Without one, the combiner pools the base with the art, blur and human heads and the noiseprint, under caps and a gate. The same signature that rated the majority's trust here decides a branch.",
+     "entries": [
+      {
+       "scope": "CapturePriors.apply(_:_:domain:capture:)",
+       "anchor": "if cap.valid && cap.present {",
+       "note": "A valid, present capture signature suppresses every generated-side head and skips the combiner; on the screenshot domain it also pins the verdict to real at 0.10 or under. Otherwise the priors and the noiseprint are pooled into the weighted score.",
+       "cite": "WHAT",
+       "deeper": {
+        "text": "On the 300-image census the capture signature was absent on 252 images, present on 40 and invalid on 8.",
+        "cite": "ledger#command-52"
+       },
+       "code": [
+        "specialist-inference-1"
+       ]
+      },
+      {
+       "scope": "StackCombiner.pool(base:heads:pairAI:np:)",
+       "anchor": "if let wn = wNp, let pn = np { z -= wn * max(0, lg(pn, capHead)) }",
+       "note": "Pools the base and the heads into one probability: the base's logit weighted 3.82 and capped at 4, each head's generated evidence capped at 2, and the rescue and the noiseprint subtracting only while the base sits under 0.75. Above 0.5 it reads generated.",
+       "cite": "PIN",
+       "facts": [
+        {
+         "label": "w_base",
+         "path": "combiner.w_base",
+         "round": 4
+        },
+        {
+         "label": "cap on the base",
+         "path": "combiner.cap_base"
+        },
+        {
+         "label": "cap on a head",
+         "path": "combiner.cap_head"
+        },
+        {
+         "label": "gate ceiling",
+         "path": "combiner.gate_ceiling"
+        },
+        {
+         "label": "w_rescue",
+         "path": "combiner.w_rescue"
+        },
+        {
+         "label": "w_np",
+         "path": "combiner.w_np"
+        }
+       ],
+       "code": [
+        "specialist-inference-3"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 7,
+     "title": "The weighted path: revisions on decisive evidence",
+     "lane": "weighted",
+     "chapters": [
+      "05-router.html"
+     ],
+     "primer": "After the stack, a few gated mechanisms may revise the weighted verdict, always in the same order and only on decisive evidence. Each gate was measured before it went live, and each rarely fires. The verdict is frozen before the semantic chain, so a route can be replayed and the chain's revisions read against what came before.",
+     "entries": [
+      {
+       "scope": "FrameSeam.apply(_:_:capture:hint:detector:)",
+       "anchor": "let decisive = pi >= 0.70 && (pi - state.p) >= 0.20",
+       "note": "When a dark frame border drags a real verdict, reruns the whole stack once on the interior and takes it only when the interior reads at least 0.70 and at least 0.20 above. A fake film border can hide generated content inside it.",
+       "cite": "WHAT",
+       "code": [
+        "specialist-inference-4"
+       ]
+      },
+      {
+       "scope": "PublicSurface.project(profile:originalP:originalVerdict:probeP:probeVerdict:probeDecisive:)",
+       "anchor": "guard profile == .control else { return SemanticProjection(p: originalP, verdict: originalVerdict, decisive: false) }",
+       "note": "The authority seam: every semantic probe revises a shadow of the weighted state, and only the production profile commits it. The diagnostic and removed profiles observe a probe without changing either weighted field.",
+       "cite": "doc:PublicSurface.project(profile:originalP:originalVerdict:probeP:probeVerdict:probeDecisive:)",
+       "deeper": {
+        "text": "Production is the control profile on the warp-sensor surface; the other profiles and surfaces exist for replay and ablation in the same binary.",
+        "cite": "PIN:Sources/VeilGardeCore/Result/ResultSource.swift"
+       }
+      },
+      {
+       "scope": "PreviewTail.apply(_:_:_:capture:semanticMajority:canDecide:)",
+       "anchor": "let fires = phv >= 0 && phv <= 0.45 && (pn ?? 1.0) <= 0.30",
+       "note": "A sub-512 image read as generated with a clean semantic vote flips to real only when the preview head and the frozen reference, its capture shortcut neutralized, both read real. Policies that flipped on either one alone raised real false positives to 20–27% and were rejected.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "Zoom escalation and the cross-domain gate are off. Zoom's motivating image was adjudicated real, one false positive and no true positive, and it was retired on 2026-07-19.",
+        "cite": "chapter:05-router.html#order"
+       },
+       "code": [
+        "specialist-inference-5"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 8,
+     "title": "Two numbers in one result",
+     "lane": "both",
+     "chapters": [
+      "05-router.html",
+      "02-bundle.html"
+     ],
+     "primer": "The result keeps the two verdicts apart. The majority, with the sensor fields beside it, says whether a camera made the pixels; the weighted says what the whole detector concludes. Every term that moved the weighted score shows as a row of the specialists list, with its probability and its weight, so one image's path can be read off its result.",
+     "entries": [
+      {
+       "scope": "PublicSurface.routed(base:weightedPrediction:weightedScore:capture:specialists:semanticTiles:majorityPrediction:majorityScore:majoritySource:tileMapSource:routeDiagnostics:)",
+       "anchor": "weightedPrediction: weightedPrediction, weightedScore: weightedScore,",
+       "note": "Assembles the routed result: the base lane's warp patches and sensor fields, the router's weighted verdict, and whichever majority lane the surface chose. The two numbers come from different places and meet only here.",
+       "cite": "doc:PublicSurface.routed(base:weightedPrediction:weightedScore:capture:specialists:semanticTiles:majorityPrediction:majorityScore:majoritySource:tileMapSource:routeDiagnostics:)",
+       "code": [
+        "specialist-inference-6"
+       ]
+      },
+      {
+       "scope": "ResultJSON.object(_:times:device:route:)",
+       "anchor": "\"weighted\": [\"prediction\": r.weightedPrediction, \"score\": Double(r.weightedScore)],",
+       "note": "Writes verdict.majority with its trust beside verdict.weighted, the sensor lane's vote and call, the capture signature, every specialist row with its probability and weight, and the route trace with the score before the semantic chain. One image's path can be read here.",
+       "cite": "WHAT",
+       "code": [
+        "warp-inference-6"
+       ]
+      },
+      {
+       "scope": "ResultJSON.changedSinceGarde(_:)",
+       "anchor": "changedSinceGarde.contains { path == $0 || path.hasPrefix($0 + \".\") || path.hasPrefix($0 + \"[\") }",
+       "note": "Names the fields that differ from Garde's bytes on purpose, all on the majority's side: the sensor score and its calibration, since the call became two cuts. Every other field is still Garde's for the same image.",
+       "cite": "chapter:02-bundle.html#result"
+      }
+     ]
+    },
+    {
+     "n": 9,
+     "title": "Are they all necessary, and how to find out",
+     "lane": "both",
+     "chapters": [
+      "10-pruning.html"
+     ],
+     "primer": "Necessary and helpful are different questions. A part is necessary when taking it out costs accuracy or calls beyond a bar fixed in advance, and a part can help on average and still go if it breaks the cases that matter. Each part is tested by shuffling its input, refitting without it, or zeroing its weight in a candidate bundle, then running the battery and a census of real images. The rules came first, so no part could pick its own threshold.",
+     "entries": [
+      {
+       "scope": "PruningRow.judge(_:_:calls:)",
+       "anchor": "if comparisons.contains(where: { $0.delta < -s.aucTolerance }) { return \"costs AUC\" }",
+       "note": "Judges every part by the rules fixed before the study ran: a part can go when removing it costs at most 0.005 AUC and moves at most 0.5% of calls, each difference with a bootstrap interval. A finding cannot pick its own threshold.",
+       "cite": "ledger#decision-68",
+       "deeper": {
+        "text": "Seed controls set the noise floor: a refit that changes only its seed moves 61 to 68 warp calls and 589 fusion calls, so a part's moved calls are read against that.",
+        "cite": "ledger#command-55"
+       },
+       "code": [
+        "pruning-1"
+       ]
+      },
+      {
+       "scope": "PruningStudy.fusion(_:_:note:)",
+       "anchor": "let isTest = dataset.ids.map { StableSplit.isHoldout($0, salt: \"prune:v1\", fraction: s.fusionHoldout) }",
+       "note": "Measures the base's inputs and size on held-out store rows: each input shuffled in the shipped head, and the scratch recipe refit without it.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "Shuffled in the shipped head, DINOv2 costs 0.202 AUC and capture 0.164, the axes the base stands on; the warp score costs 0.010 and sharpness 0.0007.",
+        "cite": "ledger#command-53"
+       },
+       "code": [
+        "pruning-4"
+       ]
+      },
+      {
+       "scope": "PruningStudy.stack(_:_:note:)",
+       "anchor": "return c.pool(base: Float(x.base), heads: h, pairAI: x.pair.map(Float.init), np: x.noiseprint.map(Float.init))",
+       "note": "Pools the store's capture-absent rows with the shipped combiner and heads, then again with one term or head taken out, and counts the calls each change moves and who was right on them.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "Shipped stack right against variant right, of the calls each change moves: the raw base without the combiner 544 and 963, no rescue 183 and 363, no art-pair 10 and 19, no noiseprint 3 and 0, no art or blur head 470 and 86. These rows may have trained the base, so the split favours it.",
+        "cite": "ledger#command-56"
+       },
+       "code": [
+        "pruning-5"
+       ]
+      },
+      {
+       "scope": "FlywheelCommand.Battery.run()",
+       "anchor": "let root = bundle.map(datasetURL) ?? area.live",
+       "note": "Runs the battery on any bundle, live by default, which is how a variant with one part taken out is judged. Without the noiseprint, the human push or the art-pair, a bundle with that one combiner field changed passed with no call changed.",
+       "cite": "ledger#command-54",
+       "deeper": {
+        "text": "Without the rescue the battery failed: a protected wildlife real flipped from 0.354 to 0.590, so the rescue stays whatever it costs in recall.",
+        "cite": "ledger#command-57"
+       }
+      },
+      {
+       "scope": "ResearchCommand.Census.run()",
+       "anchor": "let defaults = images.isEmpty && !battery && sample == 0",
+       "note": "Runs the full detector over the battery's images and a final_mixed sample, and counts how often each mechanism runs, decides the call, or moves it. It reads held-out images, where the store's rows may have trained the models.",
+       "cite": "ledger#command-56",
+       "deeper": {
+        "text": "On 300 images the stack moved the base's call on 6 of 252 capture-absent images, 1 to the right call and 5 to the wrong one, and the semantic chain moved 1, to the right one.",
+        "cite": "ledger#command-52"
+       },
+       "code": [
+        "pruning-6"
+       ]
+      },
+      {
+       "scope": "ResearchCommand.Prune.run()",
+       "anchor": "store: store.map(datasetURL) ?? area.shards, bundle: try ShippedBundle.verified())",
+       "note": "The research prune command runs the study against the shipped bundle only, with --parts choosing warp, fusion or stack. It takes no bundle of its own, so a variant with one part taken out is judged by the battery and by route --bundle.",
+       "cite": "WHAT",
+       "code": [
+        "pruning-1"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "watermark-signal",
+   "kind": "signal",
+   "title": "The watermark",
+   "mark": "MK",
+   "subtitle": "no model trained: a measured feature, ordinal codes, Hamming similarity and a threshold",
+   "say": "How the watermark reuses the detector's measurement instead of a learned model: each tile's fragility read at native resolution, turned into four ordinal bits that survive recompression, packed so a crop keeps them in place, matched by Hamming similarity over offsets and grid phases, and judged by a kill criterion fixed before the run.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The carrier: a measured feature, not an embedded pattern",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "primer": "Most watermarks hide a pattern in the pixels, which an attacker can find and strip. This one adds nothing. Its signature is a feature the warp lens already measures, each tile's fragility, read at native resolution so that a crop lands on the same tiles as its source. No model is trained here: the machine-learning questions are about representation, similarity and choosing a threshold.",
+     "entries": [
+      {
+       "scope": "NativePlane.fragility(originX:originY:quantizeLikeCV2:)",
+       "anchor": "let fr = WarpResidual.fragility(low: low, high: high)",
+       "note": "Measures the fragility rate of every full 32-pixel tile at native resolution, from any tile origin, with the detector's own residual. Nothing is resized, so a crop of the image sees the same tiles, shifted by whole tiles.",
+       "cite": "WHAT",
+       "code": [
+        "watermark-signing-2"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The code: four ordinal bits a tile",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "primer": "A robust feature survives what an image meets on its way, such as recompression or an exposure shift. Raw fragility values move under such changes, but mostly together, so comparisons between neighbouring tiles survive where the values do not. Each tile becomes four bits, each the answer to one comparison with a neighbour. Coding by order instead of by value is a classic route to invariance under any monotone change.",
+     "entries": [
+      {
+       "scope": "TileCodeGrid.init(_:)",
+       "anchor": "if v > g[nr, nc] { bits[r * g.cols + c] |= 1 << k }",
+       "note": "Gives each tile four bits, whether its fragility exceeds its east, south, south-east and north-east neighbours', and masks a comparison that would leave the grid. Ordinal bits survive any monotone change of the residual's gain, a JPEG or an exposure shift, where quantized levels would not.",
+       "cite": "ledger#decision-50",
+       "deeper": {
+        "text": "Across 198 images each of the four bits split almost evenly, between 0.496 and 0.498, so each bit is close to a fair coin from image to image.",
+        "cite": "ledger#command-44"
+       },
+       "code": [
+        "watermark-signing-3"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Sections: keeping the bits where a crop finds them",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "primer": "A crop keeps a rectangle of the original's tiles, so the signature must keep tiles in place rather than fold them together. Sixteen tiles, four by four, pack into one 64-bit word, with a second word for the masks. No hash folds them: a tile that differs costs one bit of Hamming distance, not a different hash.",
+     "entries": [
+      {
+       "scope": "Sectioning.pack(_:)",
+       "anchor": "codes[s] |= UInt64(g.bits[r * g.cols + c] & 0xF) << k",
+       "note": "Packs each 4×4 section's sixteen nibbles into a 64-bit word in row-major order, with its masks beside it. A crop contains whole sections of the image it came from, and the concatenated words are the signature.",
+       "cite": "WHAT",
+       "code": [
+        "watermark-signing-4"
+       ]
+      },
+      {
+       "scope": "WatermarkSignature.cid",
+       "anchor": "public var cid: String { ContentHash.sha256Hex(binary) }",
+       "note": "The signature's content id is the SHA-256 of its binary bytes, so two signatures of the same pixels are the same id.",
+       "cite": "PIN",
+       "code": [
+        "watermark-signing-5"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "Matching: similarity, alignment and a score against chance",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "primer": "To match, the crop's codes are slid over the signature's at every whole-tile offset, and the score is the share of measured bits that agree. A crop starts at an arbitrary pixel, so its codes are also read at sixteen sub-tile phases, one of which lies within four pixels of the stored grid. Two unrelated images agree about half the time, so a z-score says how far a score sits above chance for the bits compared.",
+     "entries": [
+      {
+       "scope": "Watermark.phaseCodes(_:phases:)",
+       "anchor": "out.append((px, py, TileCodeGrid(plane.fragility(originX: px, originY: py))))",
+       "note": "Reads the image's codes at sixteen grid phases, every 8 pixels in each direction, so one phase sits within 4 pixels of the signed grid. The stored grid is anchored at the image's corner, and a crop at an arbitrary offset cuts tiles that straddle the stored ones.",
+       "cite": "ledger#decision-51",
+       "code": [
+        "watermark-matching-2"
+       ]
+      },
+      {
+       "scope": "Matcher.best(crop:stored:margin:minimumBits:)",
+       "anchor": "bad += ((cb[crow + j] ^ sb[srow + j]) & m).nonzeroBitCount",
+       "note": "Slides the crop's codes over the signature's at every whole-tile offset and counts the disagreeing bits among those both sides measured. The score is the share that agree, and a match needs at least 0.75 over at least 256 bits.",
+       "cite": "PIN",
+       "code": [
+        "watermark-matching-3"
+       ]
+      },
+      {
+       "scope": "Matcher.zScore(score:bits:)",
+       "anchor": "bits > 0 ? (score - 0.5) / (0.25 / Double(bits)).squareRoot() : 0",
+       "note": "The agreement's distance from chance in coin-flip units: the score minus 0.5, over the square root of 0.25 divided by the bits compared. It says how unlikely a score is by luck for that many bits.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "The z-score does not replace the floor: every crop sat at least 9.2 above chance, but strangers reached 11.9, because the matcher keeps the best of thousands of placements and the codes are spatially structured.",
+        "cite": "chapter:08-watermark.html#weak"
+       },
+       "code": [
+        "watermark-matching-4"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The acceptance: a kill criterion fixed first",
+     "chapters": [
+      "08-watermark.html"
+     ],
+     "primer": "v1 was a design under measurement, not a claim. Its kill criterion was written in code before the run: crops must match with their offset in at least 60% of images, the median JPEG score must reach 0.75, and some threshold must reach 80% crop recall with at most 5% false matches. Choosing that threshold is a classifier's operating-point question: recall on crops against false matches on strangers.",
+     "entries": [
+      {
+       "scope": "WatermarkAcceptance.summarize(_:settings:)",
+       "anchor": "if recall >= 0.80, op == nil || fpr < op!.fpr || (fpr == op!.fpr && t > op!.t) { op = (t, recall, fpr) }",
+       "note": "Summarizes the run against the criterion: the self-match rate, the crop rate with its offset, the median JPEG score, and the threshold that reaches 80% crop recall with the fewest false matches. Failing any part kills v1.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "v1 passed on 198 images: crops matched with their offset in 73.2%, the median JPEG score was 0.958, and at a threshold of 0.73 crop recall was 81.3% with no false matches.",
+        "cite": "ledger#command-44"
+       },
+       "code": [
+        "watermark-matching-5"
+       ]
+      },
+      {
+       "scope": "WatermarkAcceptance.run(_:settings:note:measured:)",
+       "anchor": "signatures.append(try Watermark.sign(cg))",
+       "note": "Signs each sampled image, then scores a self-match, a random half-area crop, a JPEG re-encode and a cross match against another image's signature, and the crop resized on every fourth image. The resizes were cut to every fourth image before any was measured: they were half of each image's cost and no part of the criterion.",
+       "cite": "ledger#decision-64",
+       "deeper": {
+        "text": "Large camera photographs are v1's weak case: images under 2 megapixels matched 81.6% of the time and images of 2 or more 45.7%, the score falling with the misalignment the 8-pixel phase grid leaves.",
+        "cite": "ledger#command-44"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pruning-method",
+   "kind": "method",
+   "title": "The pruning study",
+   "mark": "MP",
+   "subtitle": "ablation with rules fixed first, paired bootstrap intervals and seed controls",
+   "say": "How the system was asked what it could do without: rules written before any number, paired comparisons on held-out data with bootstrap intervals, shuffling against refitting, seed controls for the noise of a refit, a simplification that changes no call, and the owner's choice of what to take.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The rules, fixed before the numbers",
+     "chapters": [
+      "10-pruning.html"
+     ],
+     "primer": "An ablation study removes or disables one part at a time and measures what is lost. Its trap is choosing the bar after seeing the numbers. Here the bar was written before the study ran: a part may go when removing it costs at most 0.005 held-out AUC and moves at most 0.5% of calls. Every number is held out, and nothing shipped changes in the study's own run.",
+     "entries": [
+      {
+       "scope": "PruningStudy.run(_:settings:parts:note:)",
+       "anchor": "case .warp: report.warp = try warp(inputs, settings, note: note)",
+       "note": "Runs the study part by part, the warp model, the fusion head and the stack, and writes only its report. The bar and the data were named before any number existed, so a finding cannot pick its own threshold.",
+       "cite": "ledger#decision-68",
+       "code": [
+        "pruning-1"
+       ]
+      },
+      {
+       "scope": "PruningRow.judge(_:_:calls:)",
+       "anchor": "if calls && comparisons.contains(where: { $0.changedShare > s.callTolerance }) { return \"moves calls\" }",
+       "note": "Applies the rules to one row: a part that costs more than 0.005 AUC costs AUC, one that moves more than 0.5% of calls moves calls, anything else is within tolerance.",
+       "cite": "ledger#decision-68",
+       "code": [
+        "pruning-1"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "Paired comparison and the bootstrap",
+     "chapters": [
+      "10-pruning.html"
+     ],
+     "primer": "Two scorings of the same held-out images are compared image by image, so the images' own difficulty cancels out of the difference. The bootstrap resamples the images with replacement many times and recomputes the difference each time; the spread of those differences gives a 95% interval. A difference whose interval holds zero is no measurable difference.",
+     "entries": [
+      {
+       "scope": "PairedComparison.measure(reference:variant:labels:resamples:seed:call:)",
+       "anchor": "let w = (0..<n).map { _ in poissonOne(&rng) }",
+       "note": "Scores a reference and a variant on the same items: each one's AUC, their difference with a bootstrap 95% interval over 1,000 resamples, and how many calls the change moves. Each resample runs on its own seeded stream, so the interval does not depend on the thread count.",
+       "cite": "PIN",
+       "code": [
+        "pruning-2"
+       ]
+      },
+      {
+       "scope": "poissonOne(_:)",
+       "anchor": "while product > limit {",
+       "note": "Draws each item's weight in a resample from a Poisson distribution with mean 1. It matches resampling with replacement in the limit, and lets one sorted order serve every resample.",
+       "cite": "PIN",
+       "code": [
+        "pruning-2"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Reliance and redundancy: shuffling against refitting",
+     "chapters": [
+      "10-pruning.html"
+     ],
+     "primer": "There are two ways to ask what a part is worth. Shuffling its input across rows in a trained model measures reliance: how much the model leans on it as trained. Refitting the model without it measures redundancy: whether other inputs can learn what it carried. A part can be heavily relied on and still be redundant.",
+     "entries": [
+      {
+       "scope": "PruningStudy.permuting(_:_:seed:)",
+       "anchor": "var rng = SplitMix64(seed: seed)",
+       "note": "Shuffles the chosen columns across rows by one seeded permutation, breaking their link to the label while keeping their distribution. A model that loses accuracy on the shuffled rows relied on those columns.",
+       "cite": "doc:PruningStudy.permuting(_:_:seed:)"
+      },
+      {
+       "scope": "PruningStudy.warp(_:_:note:)",
+       "anchor": "let train = TileSet.gather(shards, partitions: [.train]), test = TileSet.gather(shards, partitions: [.test])",
+       "note": "Refits the deployed warp shape on final_mixed's train partition without each feature group, and with fewer or shallower trees, and scores the test partition. The shipped model is scored there too, but final_mixed is its own training corpus, so its rows say how much it relies on a part, not how it generalizes.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "Shuffled and refit without, in AUC: demosaic −0.139 and −0.003, noise −0.098 and −0.036, residual −0.052 and −0.010. Demosaic is the most relied on and among the most redundant.",
+        "cite": "ledger#command-53"
+       },
+       "code": [
+        "pruning-3"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "Controls: the noise floor of a refit",
+     "chapters": [
+      "10-pruning.html"
+     ],
+     "primer": "Any refit changes some calls, even on the same data, because training draws random samples. A seed control refits with only the seed changed and measures how many calls move on their own. A part's moved calls mean something only above that floor. These controls were added after the first run, under unchanged rules, and are labelled as such.",
+     "entries": [
+      {
+       "scope": "PruningSettings",
+       "anchor": "public var seedControls: [UInt64] = [1, 2]",
+       "note": "Two refits that change only the seed give the call movement a refit makes on its own, and combined drops test parts that were each within tolerance alone. Every warp refit moved 60 to 200 calls, including features that carry no measurable AUC, so the call bar could not tell a part's effect from noise.",
+       "cite": "ledger#decision-70",
+       "deeper": {
+        "text": "Re-seeded refits moved 68 and 61 warp calls and 589 fusion calls each; the seam group refit out moved 73 at +0.0018 AUC, and the fusion without sharpness 603 at +0.0002, both at the floor.",
+        "cite": "ledger#command-55"
+       }
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "Equivalence: a simpler form that changes no call",
+     "chapters": [
+      "10-pruning.html",
+      "01-warp.html"
+     ],
+     "primer": "Pruning is not only removal. Sometimes a part can be stated in a smaller form with nothing lost. Platt scaling followed by a threshold is monotone, so its call is only ever two cuts on the raw vote, and the study checked that equivalence on every held-out image. The shipped camera-sensor call became the two cuts.",
+     "entries": [
+      {
+       "scope": "PruningStudy.equivalence(_:votes:)",
+       "anchor": "let cut = Double(v) <= lo ? \"real\" : Double(v) >= hi ? \"generated\" : \"inconclusive\"",
+       "note": "Finds the raw votes where the contract's call turns and counts how many votes get the same call from those cuts as from the contract itself. A Platt contract's cuts are found over every float32 vote, so they are exact.",
+       "cite": "doc:PruningStudy.equivalence(_:votes:)",
+       "deeper": {
+        "text": "It held on 1,738 of 1,738 test images: real at or under 0.7169, generated at or over 0.8365.",
+        "cite": "ledger#command-53"
+       },
+       "code": [
+        "pruning-3"
+       ]
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "What was taken, what was kept, and why",
+     "chapters": [
+      "10-pruning.html"
+     ],
+     "primer": "The rules say what may go; the owner decides what does. A part that helps on average can hurt the class the system must protect, and the AUC rule does not price that, so the battery and a census on held-out images weigh in on each candidate. Five changes were allowed. Two were taken: the art-pair adjudicator left, and the sensor call became two cuts.",
+     "entries": [
+      {
+       "scope": "PruningStudy.stack(_:_:note:)",
+       "anchor": "let samples = CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)",
+       "note": "Takes each combiner term and head out in turn on the store's capture-absent rows, and splits the calls each change moves by who was right.",
+       "cite": "PIN",
+       "deeper": {
+        "text": "The art-pair adjudicator broke 19 calls to fix 10; the rescue protects 183 reals at the cost of 363 generated images, a protect-real trade the AUC rule does not price.",
+        "cite": "ledger#command-56"
+       },
+       "code": [
+        "pruning-5"
+       ]
+      },
+      {
+       "scope": "CombinerTrainer.train(_:settings:note:)",
+       "anchor": "file.pairAdjudicates = adjudicated",
+       "note": "The art-pair adjudicator left the shipped system: the shipped combiner does not ask for it, its head left the bundle, and the trainer writes a combiner that adjudicates only when fitted beside an art-pair head.",
+       "cite": "ledger#decision-73",
+       "deeper": {
+        "text": "The owner kept the seam features, the fusion head's inputs and the scratch fusion head, removed the art-pair adjudicator, and made the camera-sensor call two cuts on the raw tile vote.",
+        "cite": "ledger#answer-8"
+       }
+      },
+      {
+       "scope": "MechanismCensus.add(_:label:_:domain:)",
+       "anchor": "let cap = r.captureSignature.map { $0.valid ? ($0.present ? \"present\" : \"absent\") : \"invalid\" } ?? \"none\"",
+       "note": "Counts, for every census image, its route, its capture state, the base's score and the call before and after the semantic chain, and which stack rows decided. It is how the stack's effect is read on real images.",
+       "cite": "doc:MechanismCensus",
+       "deeper": {
+        "text": "On the bundle as it now ships, the stack moved the base's call on 6 capture-absent images of 300, 1 to the right call and 5 to the wrong one, as before the art-pair left.",
+        "cite": "ledger#command-66"
+       },
+       "code": [
+        "pruning-6"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

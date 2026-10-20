@@ -46,6 +46,31 @@
       "id": "amendment-9",
       "date": "2026-10-19",
       "text": "[a screenshot of the explorer's file tree: TrainingEngine.swift with its badges WT1,2,5 FT1 ST1,4 NT1, its name broken one letter a line] there is this design issue in the file explorer in the explorer"
+    },
+    {
+      "id": "amendment-10",
+      "date": "2026-10-20",
+      "text": "like code explorer I want to create a new explorer kind in the site docs called ML Explorer. That explicitly creates trail around the ML approach to the same trails in code explorer. For instance, trail 1 will be the warp model training regime, the features gathered, and the training model algo used, why it is used, and what it does to help with that particular flow's verdict/assessment. It doubles as a guide for all MLE levels.\n\nAnother trail example would be the DinoV2 usage and reasoning for the fusion head with another trail that talks about DinoV2 training and how it is trained for the specialist head.\n\nAfter doing this create a similar Explorer.md runbook called MLExplorer.md to recreate a page like that in the future for other ML projects.\n\nthe ask orb should function the same in how it routes question in focused regions of the ml side of things."
+    },
+    {
+      "id": "amendment-11",
+      "date": "2026-10-20",
+      "text": "[asked how the ML trails should map onto the code explorer's flows: one ML trail per flow, or a twin for every code trail] One ML trail per flow (Recommended)"
+    },
+    {
+      "id": "amendment-12",
+      "date": "2026-10-20",
+      "text": "Can we have a 7th trail that shows how the warp model noiseprint and fusion head and that pipeline (i may be missing some) work together? And why they work together? That can also help us debug if they are all necessary even?"
+    },
+    {
+      "id": "amendment-13",
+      "date": "2026-10-20",
+      "text": "This is what the majority vs. weighted before meant in earlier versions of this pipeline. Does the name \"verdict pipeline\" account for that disrection? the pipeline I asked for seems to be the majority path. We may need a way to discern in this trail when it leads into weighted (specialist heads)"
+    },
+    {
+      "id": "amendment-14",
+      "date": "2026-10-20",
+      "text": "we need a legend for these notation meanings: \"WI2 and WI5–WI6, FI1–FI4, SI1–SI6, NI4\" and others"
     }
   ],
   "answers": [
@@ -689,6 +714,69 @@
       "rejected": "a name that shrinks beside badges that never do",
       "reason": "amendment-9: a file on four trails had its name broken a letter a line",
       "file": "docs/site/css/explorer.css"
+    },
+    {
+      "id": "decision-84",
+      "chose": "The ML explorer is the change explorer's engine run on a second trail set: ml.html sets body[data-trails=\"ml\"], src/mltrails.json is resolved by the same resolver into index.ml beside the unchanged index.trails, and explorer.js keeps what differs between the two pages, their storage keys, old links, words and tools, in one table",
+      "rejected": "a copied page and script for the ML side",
+      "reason": "amendment-10. One engine keeps the tree, the source, find, deep links and the checks the same on both pages, and code.html keeps its storage keys, links and the orb's words as they were",
+      "file": "docs/site/js/explorer.js"
+    },
+    {
+      "id": "decision-85",
+      "chose": "One ML trail per model or flow, six, and a seventh, the two verdicts, that composes them on one image: every step of it names its lane, the majority path, the weighted path or both, and one step is named as the crossing from the first to the second",
+      "rejected": "a twin ML trail for every code trail, eleven; a seventh trail named the verdict pipeline with no lanes",
+      "reason": "amendment-11, amendment-12 and amendment-13: the public majority is the warp model's tile vote alone, while the fusion head, the heads, the noiseprint and the mechanisms revise only the weighted score, and in earlier versions the semantic tiles could own the majority",
+      "file": "docs/site/src/mltrails.json"
+    },
+    {
+      "id": "decision-86",
+      "chose": "The ask orb reads one provider, VeilGarde.explorer.provider(): its context, its map, its tools and its voice, the words each explorer uses. On the ML explorer the map opens with the shipped models' facts, then the ML trails with each step's lane and primer, then the files, and a fifth tool, read_step, reads a whole step",
+      "rejected": "checks for the code explorer hard-coded in ask.js; a second orb script",
+      "reason": "amendment-10: the orb must route questions on the ML side as it does on the code side. The code explorer's system message, its heading and its four tools stay byte for byte, so the orb's stand-in test on code.html is unchanged",
+      "file": "docs/site/js/ask.js"
+    },
+    {
+      "id": "decision-87",
+      "chose": "A cite form for the chapters, chapter:<NN-slug.html>#<id>, which the build resolves against the chapter's element ids and labels with the heading's words",
+      "rejected": "citing docs/ARCHITECTURE.md and docs/PAPER.md by heading",
+      "reason": "those files are gitignored (decision-81) and outside the change set, so their cites cannot resolve; the numbers quoted from the research live in the chapters' prose",
+      "file": "docs/site/src/build.py"
+    },
+    {
+      "id": "decision-88",
+      "chose": "Every ML step carries a primer for a reader new to the idea; an entry may carry a deeper line with its own cite, facts read live from the shipped bundle, and its twins on the code trails. A depth control shows the primer and the note, the note and the deeper line, or all three, and each browser remembers the choice",
+      "rejected": "one note for every reader",
+      "reason": "amendment-10: the explorer doubles as a guide for every ML level. A deeper line always names its source and a fact is read from the bundle, so no number on a card is copied by hand",
+      "file": "docs/site/src/mltrails.json"
+    },
+    {
+      "id": "decision-89",
+      "chose": "A legend, What the marks mean, under the trail grid of both explorers: every trail of the page's set with its mark, title and steps, and on the ML explorer the code marks its twin links name. Twin links read in words, WT3 · Warp training, step 3 and its title",
+      "rejected": "the marks explained only in the README",
+      "reason": "amendment-14",
+      "file": "docs/site/js/explorer.js"
+    },
+    {
+      "id": "decision-90",
+      "chose": "The ML trails carry no warning for neighbouring entries with no call between them",
+      "rejected": "the code trails' gap rule",
+      "reason": "an ML trail follows the ideas, from data to features to fit to verdict, not the calls",
+      "file": "docs/site/src/build.py"
+    },
+    {
+      "id": "decision-91",
+      "chose": "check.py's keyboard walk on an explorer runs up to 900 Tab presses and stops once every required control has taken focus",
+      "rejected": "260 presses on every page",
+      "reason": "a walk of an ML trail opens many folders in the tree, so Tab takes longer to come round to the orb and the find box",
+      "file": "docs/site/src/check.py"
+    },
+    {
+      "id": "decision-92",
+      "chose": "The runbook for building an ML explorer is docs/MLEXPLORER.md, kept on this Mac beside docs/EXPLORER.md; the site's README documents the ML explorer for anyone with the repository",
+      "rejected": "tracking the runbook",
+      "reason": "decision-81: everything under docs/ but the site stays local",
+      "file": "docs/site/README.md"
     }
   ],
   "commands": [
@@ -1470,6 +1558,31 @@
       "exit": 0,
       "lines": [
         "the thirteen commits before the squash, Phase 1 to the round that readied the repository, kept outside it; the history before the rewrite is veilgarde-before-open-source-2026-10-19.bundle beside it"
+      ]
+    },
+    {
+      "id": "command-69",
+      "phase": 13,
+      "date": "2026-10-20",
+      "cmd": "docs/site/src/build.sh",
+      "exit": 1,
+      "lines": [
+        "build: 11 code trails as before; 7 ML trails, 122 entries over 48 steps (116 declarations), every anchor, fact, twin and cite found; data 2.77 MB of 3 MB",
+        "check: 14 pages × light, dark, 390 px light, 390 px dark and storage blocked; every self-check passed, ml.html 26 of 26",
+        "1 problem: code.html [light]: Tab never reached the find box. The keyboard walk had been changed to stop at the orb, and from where the explore test left focus it reached the orb before coming round to the box; fixed by decision-91"
+      ]
+    },
+    {
+      "id": "command-70",
+      "phase": 13,
+      "date": "2026-10-20",
+      "cmd": "docs/site/src/build.sh",
+      "exit": 0,
+      "lines": [
+        "build: 11 code trails, 161 entries; 7 ML trails, 122 entries over 48 steps (116 declarations), every anchor, fact, twin and cite found; data 2.79 MB of 3 MB",
+        "check: ok. 14 pages × light, dark, 390 px light, 390 px dark and storage blocked, no network request attempted; self-check ml.html 26 of 26, code.html 25 of 25",
+        "on ml.html: the first trail walked with ], the depth control kept over a reload, a card's facts equal to the data, a twin link and a chapter cite resolved, the lane on every step of the two verdicts trail, the legend's 18 marks, a code trail's link landing on code.html; the orb's stand-in test with the models' map and five tools",
+        "nine broken copies of the ML trails, an anchor, a fact path, a twin, a chapter cite, a lane, a primer, a deeper cite, a mark that clashes and a banned word, each refused by the build with its reason"
       ]
     }
   ],

@@ -1,8 +1,11 @@
 /*
  * The ask orb: on every page, an orb at the bottom right that opens into a mini chat about what the reader is
- * looking at. On the change explorer it reads the selected declaration, its code, its change and its places on
- * the trails, with a map of the whole change and four tools that read the rest from the data the page already
- * holds; on any other page, the page's visible text. It calls Mistral's chat API from the browser, and only when
+ * looking at. On an explorer it reads what the page's provider gives it, VeilGarde.explorer.provider(): on the
+ * change explorer the selected declaration, its code, its change and its places on the trails, with a map of the
+ * whole change and four tools that read the rest from the data the page already holds; on the ML explorer the same
+ * declaration with its ML step, a map that opens with the shipped models' facts, and a fifth tool that reads a whole
+ * step. The provider's voice holds the words each explorer uses. On any other page, the page's visible text. It
+ * calls Mistral's chat API from the browser, and only when
  * the reader sends a message, with the key src/askkey.py copied from this Mac into local/ask.js (gitignored), or,
  * on a copy of the site with no such file (another engineer's), the reader's own key, asked for in a dialog when the
  * chat opens and kept in this browser. `?ask-key=none` on any page shows the site as that engineer sees it.
@@ -30,11 +33,13 @@
     "- Point at code as File.swift:line, with the line numbers given.",
     "- Use `backticks` for identifiers, and a fenced block only to show code."
   ].join("\n");
-  var READING = [
-    "You can read the whole change. The map below lists every file and every trail, and your tools read any declaration, file or line of text.",
-    "Start from what the reader has selected. When a question reaches past it, read what you need before you answer, and name what you read. " +
-    "Read rather than guess, and stop reading once you can answer."
-  ].join("\n");
+  /** The words the orb uses on a page that is not an explorer, or on an explorer with nothing selected. */
+  var PAGE_VOICE = {
+    reading: "", mapHeading: "", selectedHeading: "What the reader is looking at:",
+    starters: ["Explain this page in two sentences.", "What should I understand first here?"],
+    emptyNote: "Ask about this page. The answer reads what the page shows.",
+    placeholder: "Ask about this page", readTitle: "Open it in the change explorer", aboutPrefix: "this page: "
+  };
 
   var state = { messages: [], busy: null, tried: false, loading: false, pasted: "", config: null };
   var ui = {};
@@ -42,18 +47,22 @@
 
   // MARK: What the reader is looking at
 
-  function context() {
-    var x = V.explorer && V.explorer.context ? V.explorer.context() : null;
-    if (x) return x;
+  /** The explorer mounted on this page, as the orb reads it: { kind, set, page, voice, context, map, tools, tool }, or null. */
+  function explorerHere() { return V.explorer && V.explorer.provider ? V.explorer.provider() : null; }
+  function pageProvider() { return { kind: "page", set: null, page: "code.html", voice: PAGE_VOICE, context: pageContext, map: null, tools: null, tool: null }; }
+  /** What the chat reads now: the page's explorer and its selection, or, with no explorer or nothing selected, the page. */
+  function reading() {
+    var p = explorerHere(), ctx = p ? p.context() : null;
+    if (!ctx) { p = pageProvider(); ctx = p.context(); }
+    return { p: p, ctx: ctx };
+  }
+  function context() { return reading().ctx; }
+  function pageContext() {
     var main = document.querySelector("main.page") || document.body;
     var title = ((main.querySelector("h1") || {}).textContent || document.title).trim();
     var text = (main.innerText || main.textContent || "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
     if (text.length > PAGE_CAP) text = text.slice(0, PAGE_CAP) + "\n[the page goes on]";
     return { kind: "page", label: title, text: "The reader is on the page \"" + title + "\" (" + (location.pathname.split("/").pop() || "index.html") + "). What it shows:\n\n" + text };
-  }
-  function starters(kind) {
-    return kind === "code" ? ["What does this do?", "Why is it built this way?", "What calls it, and when?"]
-                           : ["Explain this page in two sentences.", "What should I understand first here?"];
   }
 
   // MARK: The key
@@ -172,19 +181,21 @@
     });
   }
 
-  function canRead() { return !!(V.explorer && V.explorer.tools && V.explorer.map && V.explorer.tool); }
-  /** The first request for a question: the house rules, then on the explorer the change's map, the tools and the selection; elsewhere the page. */
-  function request(config, ctx) {
-    var code = ctx.kind === "code" && canRead();
-    var system = code ? SYSTEM + "\n" + READING + "\n\nThe codebase at a glance:\n\n" + V.explorer.map() + "\n\nWhat the reader has selected:\n\n" + ctx.text
-                      : SYSTEM + "\n\nWhat the reader is looking at:\n\n" + ctx.text;
+  function canRead(p) { return !!(p && p.tools && p.map && p.tool); }
+  /** The first request for a question: the house rules, then on an explorer its reading rules, its map, its tools and
+   *  the selection, each in the explorer's own words; elsewhere the page. */
+  function request(config, ctx, p) {
+    p = p || reading().p;
+    var code = ctx.kind === "code" && canRead(p);
+    var system = code ? SYSTEM + "\n" + p.voice.reading + "\n\n" + p.voice.mapHeading + "\n\n" + p.map() + "\n\n" + p.voice.selectedHeading + "\n\n" + ctx.text
+                      : SYSTEM + "\n\n" + PAGE_VOICE.selectedHeading + "\n\n" + ctx.text;
     var body = {
       model: config.model, stream: true, temperature: 0.3, max_tokens: 900,
       messages: [{ role: "system", content: system }].concat(
         state.messages.filter(function (m) { return m.role === "user" || (m.role === "assistant" && m.text); }).slice(-HISTORY)
           .map(function (m) { return { role: m.role, content: m.text }; }))
     };
-    if (code) { body.tools = V.explorer.tools; body.tool_choice = "auto"; }
+    if (code) { body.tools = p.tools; body.tool_choice = "auto"; }
     if (config.reasoning) body.reasoning_effort = config.reasoning;
     return body;
   }
@@ -194,7 +205,7 @@
     if (!text || state.busy) return;
     withConfig(function (config) {
       if (!config) { renderLog(); askForKey(); return; }
-      var ctx = context();
+      var now = reading(), ctx = now.ctx, p = now.p;
       state.messages.push({ role: "user", text: text, about: ctx.label });
       var reply = { role: "assistant", text: "", draft: "", reads: [], pending: true };
       state.messages.push(reply);
@@ -206,7 +217,7 @@
       var queued = false;
       function paint() { if (!queued) { queued = true; requestAnimationFrame(function () { queued = false; paintLast(); }); } }
       function onDelta(piece) { reply.draft += piece; reply.pending = false; paint(); }
-      var body = request(config, ctx), rounds = 0, refused = false;
+      var body = request(config, ctx, p), rounds = 0, refused = false;
       // A round that asks to read runs those reads here, from the data this page holds, and asks again; its own words are dropped.
       function round() {
         return V.ask.transport(body, config.key, onDelta, controller && controller.signal).then(function (got) {
@@ -216,7 +227,7 @@
           rounds++;
           body.messages.push({ role: "assistant", content: (got && got.content) || "", tool_calls: calls });
           calls.forEach(function (call) {
-            var out = V.explorer.tool(call["function"].name, call["function"].arguments);
+            var out = p.tool(call["function"].name, call["function"].arguments);
             if (out.read && !reply.reads.some(function (r) { return r.label === out.read.label; })) reply.reads.push(out.read);
             body.messages.push({ role: "tool", name: call["function"].name, tool_call_id: call.id, content: out.text });
           });
@@ -246,11 +257,13 @@
 
   // MARK: Showing replies, as text
 
+  /** A place in the code: on an explorer, a link on this page, which holds every file; elsewhere, into the change explorer. */
+  function linkFor(hash) { return explorerHere() ? hash : V.root() + "code.html" + hash; }
+  function readTitle() { var x = explorerHere(); return x ? x.voice.readTitle : PAGE_VOICE.readTitle; }
   function codeHref(name, line) {
     var m = V.model(), hit = m ? m.files.filter(function (f) { return f.name === name; }) : [];
     if (hit.length !== 1) return null;
-    var onExplorer = !!document.getElementById("explorer");
-    return (onExplorer ? "" : V.root() + "code.html") + "#" + hit[0].path + ":" + line;
+    return linkFor("#" + hit[0].path + ":" + line);
   }
   function inline(s) {
     var out = [];
@@ -260,7 +273,7 @@
       else if (/^\*\*[^*]+\*\*$/.test(t)) out.push(h("b", null, t.slice(2, -2)));
       else if (/\.\w+:\d+$/.test(t)) {
         var href = codeHref(t.split(":")[0], t.split(":")[1]);
-        out.push(href ? h("a", { href: href, title: "Open it in the change explorer" }, t) : t);
+        out.push(href ? h("a", { href: href, title: readTitle() }, t) : t);
       } else out.push(t);
     });
     return out;
@@ -298,8 +311,8 @@
     if (m.role === "user") return h("div", { class: "ask-msg user" }, m.text);
     var div = h("div", { class: "ask-msg bot" + (m.error ? " error" : "") });
     if (m.reads && m.reads.length) div.appendChild(h("p", { class: "ask-reads" }, ["Read ", m.reads.map(function (r, i) {
-      var href = r.href ? (document.getElementById("explorer") ? r.href : V.root() + "code.html" + r.href) : null;
-      return [i ? " · " : "", href ? h("a", { href: href, title: "Open it in the change explorer" }, r.label) : h("span", null, r.label)];
+      var href = r.href ? linkFor(r.href) : null;
+      return [i ? " · " : "", href ? h("a", { href: href, title: readTitle() }, r.label) : h("span", null, r.label)];
     })]));
     var shown = (m.text || "") + (m.draft || "");
     if (m.pending && !shown) div.appendChild(h("span", { class: "ask-wait" }, m.reads && m.reads.length ? "Reading more…" : "Reading…"));
@@ -328,10 +341,10 @@
         if (after) after();
         return;
       }
-      var ctx = context(), lastAbout = null;
+      var voice = reading().p.voice, lastAbout = null;
       if (!state.messages.length) {
-        log.appendChild(h("p", { class: "ask-msg note" }, ctx.kind === "code" ? "Ask about the code you have selected. The chat starts there, and reads the rest of the change when a question reaches past it." : "Ask about this page. The answer reads what the page shows."));
-        log.appendChild(h("div", { class: "ask-starters" }, starters(ctx.kind).map(function (q) {
+        log.appendChild(h("p", { class: "ask-msg note" }, voice.emptyNote));
+        log.appendChild(h("div", { class: "ask-starters" }, voice.starters.map(function (q) {
           var b = h("button", { type: "button" }, q);
           b.addEventListener("click", function () { send(q); });
           return b;
@@ -383,9 +396,9 @@
 
   function updateAbout() {
     if (!ui.about) return;
-    var ctx = context();
-    ui.about.textContent = "About " + (ctx.kind === "code" ? ctx.label : "this page: " + ctx.label);
-    ui.input.placeholder = ctx.kind === "code" ? "Ask about this code" : "Ask about this page";
+    var now = reading();
+    ui.about.textContent = "About " + (now.p.voice.aboutPrefix || "") + now.ctx.label;
+    ui.input.placeholder = now.p.voice.placeholder;
   }
   function fitInput() { ui.input.style.height = "auto"; ui.input.style.height = Math.min(ui.input.scrollHeight + 2, 128) + "px"; }
   function open() {
@@ -437,19 +450,19 @@
   }
 
   V.ask = {
-    transport: mistral, mount: mount, context: context,
+    transport: mistral, mount: mount, context: context, provider: function () { return reading().p; },
     open: function () { if (ui.orb) open(); }, close: function () { if (ui.orb) close(); }, newChat: function () { if (ui.orb) newChat(); },
     askForKey: function (message) { if (ui.orb) askForKey(message); }, noLocalKey: NO_LOCAL,
-    request: function (ctx) { return request(DEFAULTS, ctx || context()); },
+    request: function (ctx) { var now = reading(); return request(DEFAULTS, ctx || now.ctx, now.p); },
     selfCheck: function () {
-      var ctx = context(), body = request(DEFAULTS, ctx);
+      var now = reading(), ctx = now.ctx, p = now.p, body = request(DEFAULTS, ctx, p), reads = ctx.kind === "code" && canRead(p);
       return [
         { name: "the chat reads what the reader is looking at", ok: !!(ctx && ctx.text && ctx.text.length > 40 && ctx.text.length < 40000), detail: ctx ? ctx.kind + ", " + ctx.text.length + " characters" : "" },
         { name: "a request carries the context and the house rules, and nothing calls the network until a message is sent",
           ok: body.messages[0].role === "system" && body.messages[0].content.indexOf(ctx.text.slice(0, 60)) >= 0 && !state.messages.length && body.stream === true && body.reasoning_effort === "none" },
-        { name: "on the explorer, a request also carries the change's map and the four tools that read the rest",
-          ok: ctx.kind !== "code" || (body.tools && body.tools.length === 4 && body.messages[0].content.indexOf("The codebase at a glance") >= 0),
-          detail: ctx.kind === "code" ? Math.round(body.messages[0].content.length / 1000) + " thousand characters of system message" : "not on the explorer" }
+        { name: "on an explorer, a request also carries its map and the tools that read the rest, in the explorer's own words",
+          ok: !reads || (body.tools && body.tools.length >= 4 && body.tools.length === p.tools.length && body.messages[0].content.indexOf(p.voice.mapHeading) >= 0),
+          detail: reads ? Math.round(body.messages[0].content.length / 1000) + " thousand characters of system message, " + body.tools.length + " tools" : "not on an explorer" }
       ];
     }
   };

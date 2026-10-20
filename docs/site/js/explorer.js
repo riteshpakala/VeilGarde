@@ -1,11 +1,15 @@
 /*
- * The change explorer (code.html): every file the run changed, verbatim, before and after, with each Swift file's
- * declarations, the trails that tell each flow in the order the code runs (training and inference for the warp model,
- * the fusion head, the specialists and the noiseprint, signing and matching for the watermark, and the pruning study),
- * picked from one grid with a row a flow and a column a kind, and calls matched by name and
- * argument labels when the page was built (src/build.py). A page-level app: the find box, the source pane's scroll and the tree's open
- * folders must outlive each other's updates. VeilGarde.explorer.mount(root) draws it; VeilGarde.explorer.selfCheck()
- * needs no root, so the self-check page can load the data and check it.
+ * The explorers, one engine for two trail sets. On code.html, the change explorer: every file the run changed,
+ * verbatim, before and after, with each Swift file's declarations, the trails that tell each flow in the order the
+ * code runs (training and inference for the warp model, the fusion head, the specialists and the noiseprint, signing
+ * and matching for the watermark, and the pruning study), picked from one grid with a row a flow and a column a kind,
+ * and calls matched by name and argument labels when the page was built (src/build.py). On ml.html
+ * (body[data-trails="ml"]), the ML explorer: the same files and declarations, walked by the models' trails
+ * (src/mltrails.json), with each step's primer, a deeper line, live facts from the shipped bundle, the code-trail
+ * steps that are its twins, and a depth control. SETS holds what differs between the two pages. A page-level app: the
+ * find box, the source pane's scroll and the tree's open folders must outlive each other's updates.
+ * VeilGarde.explorer.mount(root) draws it; VeilGarde.explorer.selfCheck() needs no root, so the self-check page can
+ * load the data and check it; VeilGarde.explorer.provider() is what the ask orb reads.
  *
  * SPDX-License-Identifier: GPL-3.0-only
  */
@@ -21,9 +25,65 @@
   var LEGACY = { 1: "warp-inference-1", 2: "warp-inference-2", 3: "warp-inference-3", 4: "warp-inference-4", 5: "warp-inference-5",
                  6: "warp-inference-6", 7: "specialist-inference-1", 8: "warp-training-1", 9: "watermark-signing-1" };
 
+  /** What each trail set's page does differently: its storage, its old links, its words, what the ask orb is told,
+   *  the tools it gets beyond the four, and whether it has the depth control. The trails themselves are data. */
+  var SETS = {
+    code: {
+      name: "code", page: "code.html", storage: "explorer:", legacy: true, overviewSteps: true, depth: false, unit: "function",
+      pickerLabel: "The trails through the code", lead: "The reader is on the change explorer, looking at ", told: "told in the order it runs",
+      mapTrails: "The trails through the code, each in the order it runs:", extraTools: [],
+      expect: ["warp-training", "fusion-training", "specialist-training", "noiseprint-training", "warp-inference", "fusion-inference",
+               "specialist-inference", "noiseprint-inference", "watermark-signing", "watermark-matching", "pruning"],
+      voice: {
+        reading: ["You can read the whole change. The map below lists every file and every trail, and your tools read any declaration, file or line of text.",
+                  "Start from what the reader has selected. When a question reaches past it, read what you need before you answer, and name what you read. " +
+                  "Read rather than guess, and stop reading once you can answer."].join("\n"),
+        mapHeading: "The codebase at a glance:", selectedHeading: "What the reader has selected:",
+        starters: ["What does this do?", "Why is it built this way?", "What calls it, and when?"],
+        emptyNote: "Ask about the code you have selected. The chat starts there, and reads the rest of the change when a question reaches past it.",
+        placeholder: "Ask about this code", readTitle: "Open it in the change explorer"
+      }
+    },
+    ml: {
+      name: "ml", page: "ml.html", storage: "ml:", legacy: false, overviewSteps: false, depth: true, unit: "declaration",
+      pickerLabel: "The trails through the models", lead: "The reader is on the ML explorer, looking at ", told: "told as its machine learning",
+      mapTrails: "The trails through the models, each telling how a model learns and decides, step by step, with the declarations each step reads:", extraTools: ["read_step"],
+      expect: null,
+      voice: {
+        reading: ["You are the guide on the ML explorer. Its trails tell how each shipped model learns and decides: the data, the features, the algorithm and why it was chosen, " +
+                  "the fit, the calibration, and what each model adds to the verdict. One trail follows the two verdicts the result keeps, the majority and the weighted, and " +
+                  "where the path crosses from one to the other. The map below gives the shipped models' facts, every ML trail with its steps, and every file; your tools read " +
+                  "any step, declaration, file or line of text.",
+                  "The reader may be new to machine learning or a senior engineer. Define a term the first time you use it, and match the depth of the question. " +
+                  "Every number comes from the facts, a step's notes or the code: say which.",
+                  "Start from what the reader has selected. When a question reaches past it, read what you need before you answer, and name what you read. " +
+                  "Read rather than guess, and stop reading once you can answer."].join("\n"),
+        mapHeading: "The models at a glance:", selectedHeading: "What the reader has selected:",
+        starters: ["What does this model learn, and from what?", "Why this algorithm here, and not the obvious other one?", "What does this step add to the verdict?"],
+        emptyNote: "Ask about the step you have selected: the model behind it, why it is built this way, what it adds to the verdict. The chat reads the rest of the models when a question reaches past it.",
+        placeholder: "Ask about this step", readTitle: "Open it in the ML explorer"
+      }
+    }
+  };
+  var DEPTHS = [["newcomer", "Newcomer", "Each step's primer and the note: what the idea is, and what the code does"],
+                ["practitioner", "Practitioner", "The note and the deeper line: what the code does, the trade-off and the measured numbers"],
+                ["everything", "Everything", "The primer, the note and the deeper line together"]];
+
   function model() { return V.model(); }
-  /** A trail's name inside a sentence: "the warp training trail". */
-  function trailName(t) { return t.title.charAt(0).toLowerCase() + t.title.slice(1); }
+  /** The page's trail set's policy: the ML explorer's on ml.html, the code's everywhere else. */
+  function policy() { var m = model(); return (m && m.set && SETS[m.set.name]) || SETS.code; }
+  /** A storage key of the page's set: the code explorer's keep their old names, explorer:trail and the rest. */
+  function key(k) { return policy().storage + k; }
+  /** The lane a step of a laned trail is on: { id, label }, or null. */
+  function laneOf(t, st) { return st.lane && t.lanes ? t.lanes.filter(function (l) { return l.id === st.lane; })[0] || null : null; }
+  function lanePill(t, lane, long) { return h("span", { class: "xp-lane", "data-lane": lane.id, title: "This step is on " + lane.label }, long ? "on " + lane.label : lane.id); }
+  /** The set, other than the page's, that holds a trail id, or null. */
+  function otherSet(id) {
+    var m = model(), names = Object.keys(m.sets).filter(function (n) { return n !== m.set.name && m.sets[n].trailById[id]; });
+    return names[0] || null;
+  }
+  /** A trail's name inside a sentence: "the warp training trail", and "the warp model trail" for "The warp model". */
+  function trailName(t) { var s = t.title.replace(/^The /, ""); return s.charAt(0).toLowerCase() + s.slice(1); }
   /** The trail being walked; a declaration's places on the trails; its place on the walked one, or null. */
   function current() { var m = model(); return m.trailById[state.trail] || m.trails[0]; }
   function placesOf(sc) { return sc ? model().placesOf(sc.g) : []; }
@@ -183,11 +243,12 @@
     if (!m || !raw) return null;
     if ((r = /^trail-([a-z]+(?:-[a-z]+)*)-(\d+)(?:;n=(\d+))?$/.exec(raw))) {
       var t = m.trailById[r[1]], n = +r[2];
-      if (!t && V.trailRenamed[r[1] + "-" + n]) return parseTarget("trail-" + V.trailRenamed[r[1] + "-" + n] + (r[3] ? ";n=" + r[3] : ""));
+      if (!t && policy().legacy && V.trailRenamed[r[1] + "-" + n]) return parseTarget("trail-" + V.trailRenamed[r[1] + "-" + n] + (r[3] ? ";n=" + r[3] : ""));
+      if (!t && otherSet(r[1])) return { redirect: SETS[otherSet(r[1])].page + "#" + raw };
       if (!t || n < 1 || n > t.steps.length) return null;
       return { trail: t.id, step: n, pos: r[3] ? Math.max(0, Math.min(+r[3] - 1, t.steps[n - 1].entries.length - 1)) : 0 };
     }
-    if ((r = /^trail-(\d+)(?:;n=(\d+))?$/.exec(raw))) return LEGACY[+r[1]] ? parseTarget("trail-" + LEGACY[+r[1]] + (r[2] ? ";n=" + r[2] : "")) : null;
+    if ((r = /^trail-(\d+)(?:;n=(\d+))?$/.exec(raw))) return policy().legacy && LEGACY[+r[1]] ? parseTarget("trail-" + LEGACY[+r[1]] + (r[2] ? ";n=" + r[2] : "")) : null;
     if ((r = /^q=([\s\S]*)$/.exec(raw))) return { query: r[1] };
     var file = m.byPath[raw], rest = null, cut = raw.indexOf(":");
     if (!file && cut > 0 && m.byPath[raw.slice(0, cut)]) { file = m.byPath[raw.slice(0, cut)]; rest = raw.slice(cut + 1); }
@@ -201,17 +262,21 @@
 
   // MARK: The app
 
-  var ui = null, state = { file: null, sc: null, line: 0, mode: "new", only: false, filter: "all", trail: null, step: 0, pos: -1, lastPos: 0, at: {}, results: [], active: 0 };
+  var ui = null, state = { file: null, sc: null, line: 0, mode: "new", only: false, filter: "all", trail: null, step: 0, pos: -1, lastPos: 0, at: {}, results: [], active: 0, depth: "everything" };
 
   function mount(root) {
     if (!root) return;
     var m = model();
     if (!m) { root.appendChild(h("p", { class: "fig-error" }, "The data was not built. Run docs/site/src/build.py, then reload.")); return; }
+    if (m.wanted !== m.set.name || !m.trails.length) {
+      root.appendChild(h("p", { class: "fig-error" }, "This page's trails, src/" + (m.wanted === "ml" ? "mltrails" : "trails") + ".json, were not built into the data. Run docs/site/src/build.sh, then reload."));
+      return;
+    }
     ui = { root: root };
-    state.only = !!V.storage.get("explorer:only", false);
-    state.filter = V.storage.get("explorer:filter", "all");
+    state.only = !!V.storage.get(key("only"), false);
+    state.filter = V.storage.get(key("filter"), "all");
     if (!FILTERS.some(function (f) { return f[0] === state.filter; })) state.filter = "all";
-    var kept = V.storage.get("explorer:trail", "");
+    var kept = V.storage.get(key("trail"), "");
     state.trail = m.trailById[kept] ? kept : m.trails[0].id;
     root.appendChild(statusLine());
     root.appendChild(findBox());
@@ -234,8 +299,9 @@
     window.addEventListener("resize", fitTree);
     fitTree();
     applyFilter();
+    if (policy().depth) setDepth(V.storage.get(key("depth"), "everything"));
     if (!readHash(true)) {
-      var last = parseTarget(V.storage.get("explorer:last", ""));
+      var last = parseTarget(V.storage.get(key("last"), ""));
       if (last && last.sc) select(last.sc, { hash: false, quiet: true });
       else walk(1, 0, { hash: false, quiet: true });
     }
@@ -321,17 +387,63 @@
   // MARK: The trails
 
   function trailStrip() {
-    var m = model();
-    ui.trailGrid = V.trailPicker(m.index.picker, m.trailById, function (id) { chooseTrail(id); }, "The trails through the code");
+    var m = model(), P = policy();
+    ui.trailGrid = V.trailPicker(m.set.picker, m.trailById, function (id) { chooseTrail(id); }, P.pickerLabel);
     ui.stepList = h("ol", { class: "xp-steps" });
     ui.say = h("p", { class: "xp-say" });
+    ui.lanes = h("p", { class: "xp-lanes", hidden: true });
     ui.prev = h("button", { type: "button", class: "xp-walk" }, "← previous");
     ui.next = h("button", { type: "button", class: "xp-walk" }, "next →");
     ui.prev.addEventListener("click", function () { stepBy(-1); });
     ui.next.addEventListener("click", function () { stepBy(1); });
     return h("div", { class: "xp-trail" }, [h("div", { class: "xp-trails" }, ui.trailGrid),
                                            h("div", { class: "scroll" }, ui.stepList),
-                                           h("div", { class: "xp-say-row" }, [ui.say, h("span", { class: "xp-walks" }, [ui.prev, ui.next])])]);
+                                           h("div", { class: "xp-say-row" }, [ui.say, h("span", { class: "xp-walks" }, [ui.prev, ui.next])]),
+                                           ui.lanes,
+                                           h("div", { class: "xp-trail-foot" }, [P.depth ? depthControl() : null, legend()])]);
+  }
+  /** The depth control: how much of each step's card the reader sees. CSS hides the rest, so the card never redraws. */
+  function depthControl() {
+    ui.depth = {};
+    var seg = h("span", { class: "xp-seg", role: "group", "aria-label": "How deep the cards go" }, DEPTHS.map(function (d) {
+      var b = h("button", { type: "button", "aria-pressed": "false", "data-depth": d[0], title: d[2] }, d[1]);
+      b.addEventListener("click", function () { setDepth(d[0]); });
+      ui.depth[d[0]] = b;
+      return b;
+    }));
+    return h("div", { class: "xp-depth-row" }, [h("span", { class: "xp-depth-label" }, "Depth"), h("span", { class: "xp-tools" }, seg)]);
+  }
+  function setDepth(v) {
+    if (!ui || !ui.depth) return;
+    if (!DEPTHS.some(function (d) { return d[0] === v; })) v = "everything";
+    state.depth = v;
+    ui.root.setAttribute("data-depth", v);
+    Object.keys(ui.depth).forEach(function (k) { ui.depth[k].setAttribute("aria-pressed", k === v ? "true" : "false"); });
+    V.storage.set(key("depth"), v);
+  }
+  /** What the marks mean: every trail of the page's set, its mark, title and steps, each a link to its first step; on
+   *  the ML explorer also the code explorer's marks, which its twin links name. Built from the data. */
+  function legend() {
+    var m = model(), P = policy(), t0 = m.trails[0], n = Math.min(4, t0.steps.length);
+    function list(trails, page) {
+      return h("ul", { class: "xp-legend-list" }, trails.map(function (t) {
+        return h("li", { "data-mark": t.mark }, [h("a", { href: (page ? V.root() + page : "") + "#trail-" + t.id + "-1", title: t.subtitle },
+          [h("span", { class: "xp-badge", "data-kind": t.kind }, t.mark), " " + t.title]), h("small", null, " · " + t.steps.length + " steps")]);
+      }));
+    }
+    var d = h("details", { class: "xp-legend", open: V.storage.get(key("legend"), false) ? true : null }, [
+      h("summary", null, "What the marks mean"),
+      h("p", { class: "xp-legend-how" }, "A mark and a number name a step: " + t0.mark + n + " is step " + n + " of the " + trailName(t0) + " trail. In the tree, " +
+        t0.mark + "2,3 beside a name means steps 2 and 3 of that trail. A mark's colour is its kind, the column it sits in above."),
+      list(m.trails, null)
+    ]);
+    if (P.name !== "code" && m.sets.code) {
+      d.appendChild(h("p", { class: "xp-legend-how" }, "On the code explorer, where each step's twin links lead: the same flows, told in the order the code runs."));
+      d.appendChild(list(m.sets.code.trails, SETS.code.page));
+    }
+    d.addEventListener("toggle", function () { V.storage.set(key("legend"), d.open); });
+    ui.legend = d;
+    return d;
   }
   /** The walked trail's step buttons, rebuilt when the trail changes. */
   function stepButtons() {
@@ -344,7 +456,9 @@
     ui.stepList.style.setProperty("--cols", String(n <= 3 ? n : n === 4 ? 2 : 3));
     ui.stepList.style.setProperty("--n", String(n));
     ui.steps = t.steps.map(function (st) {
-      var b = h("button", { type: "button", "data-step": st.n, "aria-pressed": "false", title: st.title }, [h("span", { class: "xp-n" }, String(st.n)), h("span", { class: "xp-t" }, st.title)]);
+      var lane = laneOf(t, st);
+      var b = h("button", { type: "button", "data-step": st.n, "aria-pressed": "false", title: st.title + (lane ? ", on " + lane.label : "") },
+                [h("span", { class: "xp-n" }, String(st.n)), h("span", { class: "xp-t" }, st.title), lane ? lanePill(t, lane, false) : null]);
       b.addEventListener("click", function () { walk(st.n, 0, { from: "trail" }); });
       var li = h("li", null, b);
       ui.stepList.appendChild(li);
@@ -357,13 +471,21 @@
     V.pressTrail(ui.trailGrid, t.id);
     ui.steps.forEach(function (li, k) { li.firstChild.setAttribute("aria-pressed", state.step === k + 1 ? "true" : "false"); });
     ui.say.textContent = "";
+    ui.lanes.textContent = "";
+    ui.lanes.hidden = !t.lanes;
+    if (t.lanes) {
+      ui.lanes.appendChild(document.createTextNode("This trail keeps its paths apart. Each step says which it is on: "));
+      t.lanes.forEach(function (l, i) { ui.lanes.appendChild(document.createTextNode(i ? ", " : "")); ui.lanes.appendChild(lanePill(t, l, false)); ui.lanes.appendChild(document.createTextNode(" " + l.label)); });
+      ui.lanes.appendChild(document.createTextNode("."));
+    }
     if (!state.step) {
       ui.say.appendChild(document.createTextNode(t.say + " Pick a step."));
     } else {
-      var st = t.steps[state.step - 1];
+      var st = t.steps[state.step - 1], lane = laneOf(t, st);
       if (state.pos >= 0) {
         ui.say.appendChild(h("b", null, t.mark + " · step " + st.n + " of " + t.steps.length));
-        ui.say.appendChild(document.createTextNode(" · " + st.title + " · function " + (state.pos + 1) + " of " + st.entries.length));
+        ui.say.appendChild(document.createTextNode(" · " + st.title + " · " + policy().unit + " " + (state.pos + 1) + " of " + st.entries.length));
+        if (lane) { ui.say.appendChild(document.createTextNode(" · ")); ui.say.appendChild(lanePill(t, lane, true)); }
         if (st.chapters && st.chapters.length) { ui.say.appendChild(document.createTextNode(" · ")); ui.say.appendChild(chapterLinks(st.chapters)); }
       } else {
         var back = h("button", { type: "button", class: "xp-link" }, "back to function " + (state.lastPos + 1));
@@ -416,7 +538,7 @@
   function setTrail(id) {
     if (state.trail === id) return;
     state.trail = id;
-    V.storage.set("explorer:trail", id);
+    V.storage.set(key("trail"), id);
   }
   function walk(n, k, opts) {
     var t = current(), st = t.steps[n - 1];
@@ -462,21 +584,21 @@
       var parts = file.path.split("/"), node = roots;
       if (parts.length === 1) parts = ["(the repo root)", parts[0]];
       for (var i = 0; i < parts.length - 1; i++) {
-        var key = (node.key ? node.key + "/" : "") + parts[i];
-        if (!node.folders[parts[i]]) { node.folders[parts[i]] = { key: key, name: parts[i], folders: {}, order: [], files: [] }; node.order.push(parts[i]); }
+        var folderKey = (node.key ? node.key + "/" : "") + parts[i];
+        if (!node.folders[parts[i]]) { node.folders[parts[i]] = { key: folderKey, name: parts[i], folders: {}, order: [], files: [] }; node.order.push(parts[i]); }
         node = node.folders[parts[i]];
       }
       node.files.push(file);
     });
-    var remembered = V.storage.get("explorer:open", {}) || {};
+    var remembered = V.storage.get(key("open"), {}) || {};
     ui.fileNodes = {};
     ui.folderNodes = [];
     function count(node) { var n = node.files.length; node.order.forEach(function (k) { n += count(node.folders[k]); }); return n; }
-    function remember(d, key) {
+    function remember(d, at) {
       d.addEventListener("toggle", function () {
-        var open = V.storage.get("explorer:open", {}) || {};
-        if (d.open) open[key] = true; else delete open[key];
-        V.storage.set("explorer:open", open);
+        var open = V.storage.get(key("open"), {}) || {};
+        if (d.open) open[at] = true; else delete open[at];
+        V.storage.set(key("open"), open);
       });
     }
     function folder(node) {
@@ -509,7 +631,7 @@
       var n = m.files.filter(function (file) { return passes(file, f[0]); }).length;
       return h("option", { value: f[0], selected: f[0] === state.filter ? true : null }, f[1] + " (" + n + ")");
     }));
-    ui.filter.addEventListener("change", function () { state.filter = ui.filter.value; V.storage.set("explorer:filter", state.filter); applyFilter(); });
+    ui.filter.addEventListener("change", function () { state.filter = ui.filter.value; V.storage.set(key("filter"), state.filter); applyFilter(); });
     ui.treeLabel = h("span", null, "Files");
     ui.files = h("details", { class: "xp-files", open: true }, [h("summary", null, ui.treeLabel),
       h("label", { class: "xp-filter" }, ["Show", ui.filter]), h("div", { class: "xp-tree-inner" }, tops)]);
@@ -580,7 +702,7 @@
     ui.onlyButton = h("button", { type: "button", "aria-pressed": "false", title: "Show only the selected declaration" }, "Only this declaration");
     ui.copyLine.addEventListener("click", function () { var t = copyLineText(); V.copy(t, "Copied " + t, ui.source); });
     ui.copyLink.addEventListener("click", function () { V.copy(location.href.split("#")[0] + "#" + hashFor(), "Link copied", ui.source); });
-    ui.onlyButton.addEventListener("click", function () { state.only = !state.only; V.storage.set("explorer:only", state.only); applyOnly(); });
+    ui.onlyButton.addEventListener("click", function () { state.only = !state.only; V.storage.set(key("only"), state.only); applyOnly(); });
     ui.pre = h("pre", { tabindex: "0", "aria-label": "Source" });
     ui.pre.addEventListener("click", function (e) {
       var row = e.target.closest && e.target.closest(".ln");
@@ -767,7 +889,7 @@
     ui.root.setAttribute("data-line", String(sc.sig));
     try { window.dispatchEvent(new CustomEvent("veilgarde:context")); } catch (e) { /* an old browser: the orb reads the selection when it opens */ }
     if (opts.hash !== false) writeHash();
-    V.storage.set("explorer:last", sc.id);
+    V.storage.set(key("last"), sc.id);
     if (!opts.quiet && window.innerWidth <= NARROW && (opts.from === "find" || opts.from === "trail" || opts.from === "hash")) ui.source.scrollIntoView({ block: "start" });
   }
 
@@ -805,21 +927,31 @@
     return wrap;
   }
   function trailBlock(on) {
-    var t = on.trail, st = t.steps[on.step - 1], entry = st.entries[on.pos];
+    var m = model(), P = policy(), t = on.trail, st = t.steps[on.step - 1], entry = st.entries[on.pos], lane = laneOf(t, st);
     var wrap = h("div", { class: "xp-on-trail", "data-trail": t.id, "data-kind": t.kind }, [
       h("h4", null, [h("span", { class: "xp-badge", "data-trail": t.id, "data-kind": t.kind }, t.mark + st.n), " On the " + trailName(t) + " trail"]),
-      h("p", { class: "xp-step-line" }, "Step " + st.n + " of " + t.steps.length + " · " + st.title + " · function " + (on.pos + 1) + " of " + st.entries.length),
+      h("p", { class: "xp-step-line" }, ["Step " + st.n + " of " + t.steps.length + " · " + st.title + " · " + P.unit + " " + (on.pos + 1) + " of " + st.entries.length,
+                                          lane ? [" · ", lanePill(t, lane, true)] : null]),
+      st.primer ? h("div", { class: "xp-primer" }, [h("span", { class: "xp-tag" }, "For a newcomer"), h("p", null, st.primer)]) : null,
       h("p", { class: "xp-note" }, entry.note)
     ]);
+    if (entry.deeper) {
+      wrap.appendChild(h("div", { class: "xp-deeper" }, [h("span", { class: "xp-tag" }, "For a practitioner"), h("p", null, entry.deeper.text),
+                                                        h("p", { class: "xp-links" }, ["Source: ", citeLink(entry.deeper)])]));
+    }
+    if (entry.facts) wrap.appendChild(factBlock(entry.facts));
     var links = h("p", { class: "xp-links" });
     if (entry.cite) {
       links.appendChild(document.createTextNode("Source of the why: "));
-      links.appendChild(entry.href ? h("a", { href: V.root() + entry.href }, citeLabel(entry)) : document.createTextNode(citeLabel(entry)));
+      links.appendChild(citeLink(entry));
     } else links.appendChild(document.createTextNode("No cite: the note says what the code does."));
-    links.appendChild(document.createTextNode(" · "));
-    links.appendChild(h("a", { href: V.root() + "index.html#step-" + t.id + "-" + st.n }, "the overview at this step"));
+    if (P.overviewSteps) {
+      links.appendChild(document.createTextNode(" · "));
+      links.appendChild(h("a", { href: V.root() + "index.html#step-" + t.id + "-" + st.n }, "the overview at this step"));
+    }
     if (st.chapters && st.chapters.length) { links.appendChild(document.createTextNode(" · ")); links.appendChild(chapterLinks(st.chapters)); }
     wrap.appendChild(links);
+    if (entry.code && m.sets.code) wrap.appendChild(twinBlock(entry.code));
     var prev = h("button", { type: "button", class: "xp-walk" }, "← previous on this trail"), next = h("button", { type: "button", class: "xp-walk" }, "next on this trail →");
     var lastStep = t.steps[t.steps.length - 1];
     prev.disabled = st.n === 1 && on.pos === 0;
@@ -830,7 +962,55 @@
     wrap.appendChild(h("p", { class: "xp-walks" }, [prev, next]));
     return wrap;
   }
+  /** A cite's link. On the ML explorer a cite into the code explorer stays on this page, which holds the same files. */
+  function citeHref(x) {
+    if (!x.href) return null;
+    return policy().name !== "code" && /^code\.html#/.test(x.href) ? x.href.slice(9) : V.root() + x.href;
+  }
+  function citeLink(x) { var href = citeHref(x); return href ? h("a", { href: href }, citeLabel(x)) : document.createTextNode(citeLabel(x)); }
+  /** The code-trail steps an ML entry is the twin of, each a link to that step on the change explorer. */
+  function twinBlock(ids) {
+    var code = model().sets.code, p = h("p", { class: "xp-links xp-twins" }, "On the code trails: ");
+    ids.forEach(function (id, i) {
+      var r = /^(.*)-(\d+)$/.exec(id), t = r && code.trailById[r[1]], st = t && t.steps[+r[2] - 1];
+      if (!st) return;
+      if (i) p.appendChild(document.createTextNode(" · "));
+      p.appendChild(h("a", { class: "xp-code-twin", href: V.root() + SETS.code.page + "#trail-" + id, title: "Walk this step on the change explorer" },
+                      [h("span", { class: "xp-badge", "data-kind": t.kind }, t.mark + st.n), " " + t.title + ", step " + st.n + ": " + st.title]));
+    });
+    return p;
+  }
+  function twinWords(ids) {
+    var code = model().sets.code;
+    return ids.map(function (id) {
+      var r = /^(.*)-(\d+)$/.exec(id), t = r && code.trailById[r[1]], st = t && t.steps[+r[2] - 1];
+      return st ? t.mark + st.n + ", step " + st.n + " of " + trailName(t) + ", \"" + st.title + "\"" : id;
+    }).join("; ");
+  }
+  /** A fact as the card writes it: rounded as the trail says, a whole number with its commas, a word as it is. */
+  function factText(f) {
+    var v = V.factValue(f.path);
+    if (typeof v === "number") return V.fmt.minus(f.round !== undefined ? v.toFixed(f.round) : Number.isInteger(v) ? V.fmt.int(v) : String(+v.toPrecision(6)));
+    return v === undefined ? "not in the data" : String(v);
+  }
+  /** The shipped file a fact was read from: a booster's JSON, the calibration, the combiner or the manifest. */
+  function factSource(path) {
+    var top = path.split(".");
+    if (top[0] === "boosters") return V.factValue("boosters." + top[1] + ".file") || null;
+    var p = V.factValue(top[0] + ".path") || (top[0] === "frozenRoles" ? V.factValue("frozenRoles.source") : null);
+    return p ? String(p).split("/").pop() : null;
+  }
+  function factBlock(facts) {
+    var files = [];
+    facts.forEach(function (f) { var s = factSource(f.path); if (s && files.indexOf(s) < 0) files.push(s); });
+    return h("div", { class: "xp-facts" }, [
+      h("dl", null, facts.map(function (f) { return [h("dt", null, f.label), h("dd", { "data-fact-path": f.path, title: f.path }, factText(f))]; })),
+      h("p", { class: "xp-facts-from" }, "Read live from the shipped bundle: " + (files.join(", ") || "its facts") + ".")
+    ]);
+  }
+  function factWords(facts) { return facts.map(function (f) { return f.label + " = " + factText(f) + " (" + f.path + ")"; }).join("; "); }
   function citeLabel(entry) {
+    if (entry.citeLabel) return entry.citeLabel;
     var c = entry.cite;
     if (/^ledger#/.test(c)) return "the ledger, " + c.slice(7);
     if (/^(PIN|WHAT)$/.test(c)) return "this file's " + c;
@@ -892,6 +1072,7 @@
     try { raw = decodeURIComponent((location.hash || "").slice(1)); } catch (e) { raw = (location.hash || "").slice(1); }
     var t = parseTarget(raw);
     if (!t) return false;
+    if (t.redirect) { try { location.replace(V.root() + t.redirect); } catch (e) { /* the link stays as it was */ } return true; }
     if (t.query !== undefined) { ui.find.value = t.query; fitFind(); runSearch(true); return true; }
     if (t.step) { walkTo(t.trail, t.step, t.pos, { hash: false, from: "hash", quiet: first }); return true; }
     if (t.sc) { select(t.sc, { hash: false, from: "hash", line: t.line, quiet: first }); return true; }
@@ -921,16 +1102,26 @@
   /** One declaration as the chat reads it: where it sits, its change, its trail notes, its file's header, its code
    *  with the editor's line numbers, its calls and callers. */
   function describe(sc, lead, cap) {
-    var m = model(), file = sc.file, lines = V.linesOf(file);
+    var m = model(), P = policy(), file = sc.file, lines = V.linesOf(file);
     var from = sc.from, to = lastLine(sc), last = Math.min(to, from + cap - 1), parts = [];
     var parent = sc.parent >= 0 ? file.scopes[sc.parent] : null;
     parts.push(lead + sc.label + ": " + V.kindWords(sc) + " in " + file.path + ", line " + sc.sig + (parent ? ", inside " + parent.qualified : "") + ".");
     parts.push("Its change since the base: " + changeLine(file, sc));
     m.placesOf(sc.g).forEach(function (on) {
-      var t = on.trail, st = t.steps[on.step - 1], en = st.entries[on.pos];
-      parts.push("It is on the " + trailName(t) + " trail, " + t.subtitle + ", told in the order it runs: step " + st.n + " of " + t.steps.length + ", \"" + st.title + "\", function " + (on.pos + 1) +
-                 " of " + st.entries.length + ". The trail's note on it: " + en.note + (en.cite ? " Source of the note: " + en.cite + "." : " The note has no cite: it says what the code does."));
+      var t = on.trail, st = t.steps[on.step - 1], en = st.entries[on.pos], lane = laneOf(t, st);
+      parts.push("It is on the " + trailName(t) + " trail, " + t.subtitle + ", " + P.told + ": step " + st.n + " of " + t.steps.length + ", \"" + st.title + "\"" +
+                 (lane ? ", on " + lane.label : "") + ", " + P.unit + " " + (on.pos + 1) + " of " + st.entries.length + ". " +
+                 (st.primer ? "The step's primer, for a reader new to it: " + st.primer + " " : "") +
+                 "The trail's note on it: " + en.note + (en.cite ? " Source of the note: " + en.cite + "." : " The note has no cite: it says what the code does.") +
+                 (en.deeper ? " Deeper: " + en.deeper.text + " Source: " + en.deeper.cite + "." : "") +
+                 (en.facts ? " Facts it shows, read live from the shipped bundle: " + factWords(en.facts) + "." : "") +
+                 (en.code ? " Its twins on the code explorer's trails: " + twinWords(en.code) + "." : ""));
     });
+    if (P.name !== "code" && m.sets.code) {
+      var codePlaces = m.sets.code.placesOf(sc.g);
+      if (codePlaces.length) parts.push("On the code explorer's trails, which follow the code in the order it runs, it sits at " +
+        codePlaces.map(function (o) { return o.trail.mark + o.step + ", step " + o.step + " of " + trailName(o.trail); }).join("; ") + ".");
+    }
     var what = headerPart(file, "what"), pin = headerPart(file, "pin");
     if (what) parts.push("The file's header, WHAT: " + what);
     if (pin) parts.push("The file's header, PIN: " + pin);
@@ -959,20 +1150,23 @@
     if (!ui) return null;
     if (state.sc) {
       var here = onCurrent(state.sc) || placesOf(state.sc)[0];
-      return { kind: "code", label: state.sc.label + (here ? " · " + here.trail.mark + here.step : ""), text: describe(state.sc, "The reader is on the change explorer, looking at ", 220) };
+      return { kind: "code", label: state.sc.label + (here ? " · " + here.trail.mark + here.step : ""), text: describe(state.sc, policy().lead, 220) };
     }
-    if (state.file) return { kind: "code", label: state.file.path, text: describeFile(state.file, "The reader is on the change explorer, looking at ", state.line, 220) };
+    if (state.file) return { kind: "code", label: state.file.path, text: describeFile(state.file, policy().lead, state.line, 220) };
     return null;
   }
 
-  var mapText = null;
+  var mapText = {};
   var MAP_BUDGET = 24000; // characters, about 6,000 tokens
-  /** The codebase at a glance, for the chat: every file with the first sentence of its header, folder by folder,
-   *  what was left out, then every trail. The sentences are cut shorter until the whole fits the budget. */
+  /** The codebase at a glance, for the chat. On the change explorer: every file with the first sentence of its
+   *  header, folder by folder, what was left out, then every trail. On the ML explorer: the shipped models' facts
+   *  first, then every ML trail with each step's lane, the first sentence of its primer and its declarations, then the
+   *  files. The sentences are cut shorter until the whole fits the budget; past the last cut, files keep their names. */
   function codeMap() {
-    if (mapText) return mapText;
-    var m = model(), idx = m.index;
-    function render(cap) {
+    var m = model(), idx = m.index, P = policy();
+    if (mapText[P.name]) return mapText[P.name];
+    function cut(s, cap) { s = (s || "").replace(/\s+/g, " ").trim(); return s.length > cap ? s.slice(0, cap - 1) + "…" : s; }
+    function filesLines(cap) {
       var out = [], folder = null;
       out.push(idx.files.length + " files changed from " + (idx.base.label || idx.base.short) + " to " + (idx.head.first ? "this tree" : (idx.head.short || "the head") + (idx.head.dirty ? " and the working tree" : "")) +
                ", by folder, each with the first sentence of its header; a file not marked was added:");
@@ -980,19 +1174,52 @@
         var dir = f.path.indexOf("/") < 0 ? "(the repo root)" : f.path.split("/").slice(0, -1).join("/");
         if (dir !== folder) { out.push(dir + "/"); folder = dir; }
         var what = (f.what || "").replace(/\s+/g, " ").trim();
-        out.push("  " + f.name + (f.status === "added" ? "" : " [" + f.status + "]") + ": " + (what ? (what.length > cap ? what.slice(0, cap - 1) + "…" : what) : "no header"));
+        out.push("  " + f.name + (f.status === "added" ? "" : " [" + f.status + "]") + (cap ? ": " + (what ? (what.length > cap ? what.slice(0, cap - 1) + "…" : what) : "no header") : ""));
       });
-      out.push("", "Left out of this page, by name only: " + idx.excluded.length + " files, among them the shipped model JSONs under Sources/VeilGardeInference/Resources/, test fixtures, Package.resolved and LICENSE.");
-      out.push("", "The trails through the code, each in the order it runs:");
+      return out;
+    }
+    function excludedLines() {
+      return ["", "Left out of this page, by name only: " + idx.excluded.length + " files, among them the shipped model JSONs under Sources/VeilGardeInference/Resources/, test fixtures, Package.resolved and LICENSE."];
+    }
+    function trailLines(cap) {
+      var out = ["", P.mapTrails];
       m.trails.forEach(function (t) {
         out.push(t.title + " (" + t.mark + ", " + t.kind + "), " + t.subtitle + ":");
-        t.steps.forEach(function (st) { out.push("  " + st.n + ". " + st.title + ": " + st.entries.map(function (en) { return m.scopes[en.scope].qualified; }).join(", ")); });
+        t.steps.forEach(function (st) {
+          var lane = laneOf(t, st), names = st.entries.map(function (en) { return m.scopes[en.scope].qualified; }).join(", ");
+          out.push("  " + st.n + ". " + st.title + (lane ? " [" + lane.label + "]" : "") + (st.primer && cap ? " (" + cut(st.primer.split(/(?<=[.!?])\s/)[0], cap) + ")" : "") + ": " + names);
+        });
       });
-      return out.join("\n");
+      return out;
     }
-    var caps = [140, 110, 90, 70, 50, 30, 20];
-    for (var k = 0; k < caps.length; k++) { mapText = render(caps[k]); if (mapText.length <= MAP_BUDGET) break; }
-    return mapText;
+    function factsLines() {
+      var f = idx.facts || {}, out = ["The shipped models' facts, read from the bundle the detector ships, Sources/VeilGardeInference/Resources/:"];
+      function base(p) { return p ? String(p).split("/").pop() : "?"; }
+      Object.keys(f.boosters || {}).forEach(function (k) {
+        var b = f.boosters[k];
+        out.push("  " + k + ", " + b.file + ": gradient-boosted trees, " + b.trees + " trees, depth " + b.depth + ", " + b.features + " features");
+      });
+      var c = f.calibration;
+      if (c && c.cuts) out.push("  the camera-sensor call, " + base(c.path) + ": " + c.calibration + " on the " + c.score_semantics + ", real at or below " + c.cuts.real_at_or_below +
+        " and generated at or above " + c.cuts.generated_at_or_above + ", inconclusive between" + (c.derived_from ? "; the cuts are where the Platt contract it derives from turned, threshold " +
+        c.derived_from.decision_threshold + " with band " + c.derived_from.uncertain_band : "") + "; sensor variant " + c.sensor_variant + "; trust law " + c.trust_law);
+      var s = f.combiner;
+      if (s) out.push("  the stack combiner, " + base(s.path) + ": the " + s.formula + " formula, version " + s.version + "; inputs " + (s.inputs || []).join(", ") + "; w0 " + s.w0 + ", w_base " + s.w_base +
+        ", w_gen " + JSON.stringify(s.w_gen) + " for art, blur and human, w_rescue " + s.w_rescue + ", w_np " + s.w_np + "; caps " + s.cap_base + " on the base and " + s.cap_head + " on a head; gate ceiling " +
+        s.gate_ceiling + "; threshold " + s.threshold + "; the art-pair adjudicates: " + s.pair_adjudicates);
+      if (f.frozenRoles && f.frozenRoles.roles) out.push("  frozen roles, which no automated path writes: " + f.frozenRoles.roles.join(", "));
+      if (f.manifest && f.manifest.artifacts) out.push("  the bundle's artifacts: " + f.manifest.artifacts.map(function (a) { return a.file + " as " + a.role + (a.head ? " " + a.head : ""); }).join(", "));
+      return out;
+    }
+    function render(cap) {
+      var lines = P.name === "code" ? filesLines(cap).concat(excludedLines(), trailLines(cap))
+                                    : factsLines().concat(trailLines(cap), [""], filesLines(cap), excludedLines());
+      return lines.join("\n");
+    }
+    var caps = [140, 110, 90, 70, 50, 30, 20, 0], text = "";
+    for (var k = 0; k < caps.length; k++) { text = render(caps[k]); if (text.length <= MAP_BUDGET || (P.name === "code" && caps[k] === 20)) break; }
+    mapText[P.name] = text;
+    return text;
   }
 
   // MARK: The chat's tools: the whole change, read on demand, from the data this page already holds
@@ -1008,6 +1235,18 @@
       parameters: { type: "object", properties: { path: { type: "string", description: "Its path, such as Sources/VeilGardeLens/Warp/WarpLens.swift, or its file name when unique" },
                                                    from: { type: "integer" }, to: { type: "integer" } }, required: ["path"] } } }
   ];
+  var EXTRA_SPECS = {
+    read_step: { type: "function", "function": { name: "read_step", description: "Read one step of a trail whole: its title, its primer, its lane, and every entry's declaration with its file and line, its note and cite, its deeper line, the facts it shows and its twins on the code trails.",
+      parameters: { type: "object", properties: { trail: { type: "string", description: "The trail's id or mark, such as warp-model or MW, from the map" }, n: { type: "integer", description: "The step's number, from 1" } }, required: ["trail", "n"] } } }
+  };
+  /** The tools the page's chat gets: the four that read the change, and the page's own. */
+  function toolSpecs() { return TOOL_SPECS.concat(policy().extraTools.map(function (n) { return EXTRA_SPECS[n]; })); }
+  /** What the ask orb reads on an explorer: its words, the selection, the map and the tools. Null before the mount. */
+  function provider() {
+    if (!ui) return null;
+    var P = policy();
+    return { kind: "code", set: P.name, page: P.page, voice: P.voice, context: context, map: codeMap, tools: toolSpecs(), tool: runTool };
+  }
   function resolveDeclaration(q) {
     var m = model();
     q = String(q || "").trim().replace(/^`+|`+$/g, "");
@@ -1027,6 +1266,27 @@
     return m.files.filter(function (f) { return f.name === p || f.path.slice(-p.length - 1) === "/" + p; });
   }
   var TOOLS = {
+    read_step: function (a) {
+      var m = model(), q = String(a.trail || "").trim(), n = Math.floor(+a.n || 0), t = null;
+      [m.set.name].concat(Object.keys(m.sets).filter(function (s) { return s !== m.set.name; })).some(function (s) {
+        t = m.sets[s].trailById[q] || m.sets[s].trails.filter(function (x) { return x.mark.toLowerCase() === q.toLowerCase(); })[0] || null;
+        return !!t;
+      });
+      if (!t) return { text: "No trail is named \"" + q + "\". This page's trails: " + m.trails.map(function (x) { return x.id + " (" + x.mark + ")"; }).join(", ") + "." };
+      var st = t.steps[n - 1];
+      if (!st) return { text: t.title + " has steps 1 to " + t.steps.length + "." };
+      var lane = laneOf(t, st), out = [];
+      out.push(t.mark + st.n + " · " + t.title + ", " + t.subtitle + ": step " + st.n + " of " + t.steps.length + ", \"" + st.title + "\"" + (lane ? ", on " + lane.label : "") + ".");
+      if (st.primer) out.push("Primer, for a reader new to it: " + st.primer);
+      if (st.chapters && st.chapters.length) out.push("Chapters that tell it: " + st.chapters.join(", "));
+      st.entries.forEach(function (en, k) {
+        var sc = m.scopes[en.scope];
+        out.push((k + 1) + ". " + sc.qualified + sc.labelText + ", " + KIND[sc.kind] + " at " + sc.file.path + ":" + sc.sig + ". Note: " + en.note + (en.cite ? " Source: " + en.cite + "." : "") +
+                 (en.deeper ? " Deeper: " + en.deeper.text + " Source: " + en.deeper.cite + "." : "") + (en.facts ? " Facts, read live from the shipped bundle: " + factWords(en.facts) + "." : "") +
+                 (en.code ? " Its twins on the code trails: " + twinWords(en.code) + "." : ""));
+      });
+      return { read: { label: t.mark + st.n, href: "#trail-" + t.id + "-" + st.n }, text: out.join("\n") };
+    },
     find_declarations: function (a) {
       var q = String(a.query || "").trim(), m = model();
       if (!q) return { text: "Give a name to find." };
@@ -1133,39 +1393,66 @@
     check("the ids this page derives equal the build's", !bad.length, bad.length ? bad[0][1] + " is " + (m.scopes[bad[0][0]] || {}).id : idx.sample.length + " sampled");
     bad = idx.edges.filter(function (e) { return !m.scopes[e[0]] || !m.scopes[e[1]] || !(e[2] >= 0 && e[2] <= 2) || !(e[3] >= 1); });
     check("every call edge joins two declarations, with a tier and a line", !bad.length, V.fmt.int(idx.edges.length) + " edges");
-    var trails = m.trails, pages = V.pages.map(function (p) { return p.file; });
+    var trails = m.trails, pages = V.pages.map(function (p) { return p.file; }), code = m.sets.code, P = policy();
     check("eleven trails: the four verdict flows trained and run, the watermark signed and matched, and the pruning study, each with a mark of its own and its steps numbered from 1",
-          trails.length === 11 && ["warp", "fusion", "specialist", "noiseprint"].every(function (k) { return m.trailById[k + "-training"] && m.trailById[k + "-inference"]; }) &&
-          m.trailById["watermark-signing"] && m.trailById["watermark-matching"] && m.trailById.pruning &&
-          trails.every(function (t, i) { return t.mark && trails.findIndex(function (u) { return u.mark === t.mark; }) === i; }) &&
-          trails.every(function (t) { return t.steps.length >= 3 && t.steps.length <= 9 && t.steps.every(function (st, i) { return st.n === i + 1 && st.entries.length > 0; }); }),
-          trails.map(function (t) { return t.mark + " " + t.steps.length; }).join(" · "));
-    var cells = [];
-    bad = [];
-    (idx.picker || []).forEach(function (sec) {
-      sec.rows.forEach(function (row) {
-        row.trails.forEach(function (id, ci) { var t = m.trailById[id]; cells.push(id); if (!t || !sec.columns[ci] || sec.columns[ci].kind !== t.kind) bad.push(id); });
-      });
-    });
-    check("the picker holds every trail once, each in its kind's column",
-          !bad.length && cells.length === trails.length && trails.every(function (t) { return cells.indexOf(t.id) >= 0; }), bad.join(", ") || (idx.picker || []).map(function (sec) { return sec.title; }).join(" · "));
-    bad = [];
-    trails.forEach(function (t) {
-      var seen = {};
-      t.steps.forEach(function (st) {
-        (st.chapters || []).forEach(function (f) { if (pages.indexOf(f) < 0) bad.push(t.id + " step " + st.n + " names " + f); });
-        st.entries.forEach(function (en) {
-          var sc = m.scopes[en.scope];
-          if (!sc || sc.id !== en.id) { bad.push(en.id + " does not resolve"); return; }
-          if (seen[en.scope]) bad.push(t.id + " holds " + en.id + " twice");
-          seen[en.scope] = true;
-          var body = V.linesOf(sc.file).slice(sc.from - 1, lastLine(sc)).join("\n");
-          if (body.indexOf(en.anchor) < 0) bad.push(en.id + " lost its anchor");
-          if ((V.linesOf(sc.file)[en.line - 1] || "").indexOf(en.anchor.split("\n")[0]) < 0) bad.push(en.id + "'s anchor moved from line " + en.line);
+          code.trails.length === 11 && SETS.code.expect.every(function (id) { return code.trailById[id]; }) &&
+          code.trails.every(function (t, i) { return t.mark && code.trails.findIndex(function (u) { return u.mark === t.mark; }) === i; }) &&
+          code.trails.every(function (t) { return t.steps.length >= 3 && t.steps.length <= 9 && t.steps.every(function (st, i) { return st.n === i + 1 && st.entries.length > 0; }); }),
+          code.trails.map(function (t) { return t.mark + " " + t.steps.length; }).join(" · "));
+    Object.keys(m.sets).forEach(function (name) {
+      var set = m.sets[name], tag = name === "code" ? "" : "the ML explorer: ", cells = [];
+      bad = [];
+      (set.picker || []).forEach(function (sec) {
+        sec.rows.forEach(function (row) {
+          row.trails.forEach(function (id, ci) { var t = set.trailById[id]; cells.push(id); if (!t || !sec.columns[ci] || sec.columns[ci].kind !== t.kind) bad.push(id); });
         });
       });
+      check(tag + "the picker holds every trail once, each in its kind's column",
+            !bad.length && cells.length === set.trails.length && set.trails.every(function (t) { return cells.indexOf(t.id) >= 0; }), bad.join(", ") || (set.picker || []).map(function (sec) { return sec.title; }).join(" · "));
+      bad = [];
+      set.trails.forEach(function (t) {
+        var seen = {};
+        t.steps.forEach(function (st) {
+          (st.chapters || []).forEach(function (f) { if (pages.indexOf(f) < 0) bad.push(t.id + " step " + st.n + " names " + f); });
+          st.entries.forEach(function (en) {
+            var sc = m.scopes[en.scope];
+            if (!sc || sc.id !== en.id) { bad.push(en.id + " does not resolve"); return; }
+            if (seen[en.scope]) bad.push(t.id + " holds " + en.id + " twice");
+            seen[en.scope] = true;
+            var body = V.linesOf(sc.file).slice(sc.from - 1, lastLine(sc)).join("\n");
+            if (body.indexOf(en.anchor) < 0) bad.push(en.id + " lost its anchor");
+            if ((V.linesOf(sc.file)[en.line - 1] || "").indexOf(en.anchor.split("\n")[0]) < 0) bad.push(en.id + "'s anchor moved from line " + en.line);
+          });
+        });
+      });
+      check(tag + "every trail entry resolves, once a trail, and still holds its anchor; every chapter a step names is a page", !bad.length, bad.join("; ") || set.entries.length + " entries");
     });
-    check("every trail entry resolves, once a trail, and still holds its anchor; every chapter a step names is a page", !bad.length, bad.join("; ") || m.entries.length + " entries");
+    if (m.sets.ml) {
+      var mlSet = m.sets.ml, kinds = (mlSet.kinds || []).map(function (k) { return k.id; });
+      bad = [];
+      mlSet.trails.forEach(function (t) {
+        if (kinds.indexOf(t.kind) < 0) bad.push(t.id + " is of an undeclared kind");
+        if (!(t.steps.length >= 3 && t.steps.length <= 9 && t.steps.every(function (st, i) { return st.n === i + 1 && st.entries.length > 0; }))) bad.push(t.id + "'s steps");
+        t.steps.forEach(function (st) {
+          if (!st.primer) bad.push(t.id + " step " + st.n + " has no primer");
+          if (t.lanes ? !laneOf(t, st) : st.lane) bad.push(t.id + " step " + st.n + "'s lane");
+          st.entries.forEach(function (en) {
+            (en.facts || []).forEach(function (f) { var v = V.factValue(f.path); if (v === undefined || v === null || typeof v === "object") bad.push(f.path + " is not in the facts"); });
+            (en.code || []).forEach(function (c) { var r = /^(.*)-(\d+)$/.exec(c), u = r && code.trailById[r[1]]; if (!u || !u.steps[+r[2] - 1]) bad.push(c + " is no code-trail step"); });
+          });
+        });
+      });
+      check("the ML explorer: every trail of a declared kind, 3 to 9 steps from 1, each step with a primer and, on a laned trail, its lane; every fact read from the bundle; every twin a code-trail step",
+            !bad.length, bad.slice(0, 4).join("; ") || mlSet.trails.map(function (t) { return t.mark + " " + t.steps.length; }).join(" · "));
+      var both = code.trails.concat(mlSet.trails), marks = both.map(function (t) { return t.mark; }), tids = both.map(function (t) { return t.id; });
+      check("trail ids and marks are unique across both explorers, so a #trail- link names one place",
+            marks.every(function (x, i) { return marks.indexOf(x) === i; }) && tids.every(function (x, i) { return tids.indexOf(x) === i; }), both.length + " trails");
+    }
+    if (ui && ui.legend) {
+      var shown = Array.prototype.map.call(ui.legend.querySelectorAll("[data-mark]"), function (li) { return li.getAttribute("data-mark"); });
+      var wantMarks = trails.map(function (t) { return t.mark; }).concat(P.name !== "code" ? code.trails.map(function (t) { return t.mark; }) : []);
+      check("the legend names every mark the page shows, once", shown.length === wantMarks.length && wantMarks.every(function (x) { return shown.indexOf(x) >= 0; }), shown.join(" "));
+    }
     var first = m.scopes[trails[0].steps[0].entries[0].scope], top = function (q) { var r = search(q)[0]; return r && r.sc; };
     var body = V.linesOf(first.file).slice(first.decl - 1, lastLine(first)).join("\n");
     var bySig = search(signature(first).split("\n").join(" ")).filter(function (r) { return r.sc; }).map(function (r) { return r.sc; });
@@ -1174,25 +1461,40 @@
           first.label + (bySig.length > 1 ? "; " + bySig.length + " declarations share its signature line" : ""));
     var reindented = body.split("\n").map(function (l) { return "\t  " + l.trim(); }).join("\n");
     check("a pasted body, reindented, still finds it", top(reindented) === first);
-    var a = parseTarget(first.file.path + ":" + first.sig), b = parseTarget(first.id), c = parseTarget("trail-" + trails[0].id + "-1;n=1"), d = parseTarget("trail-3;n=2"),
-        w = parseTarget("trail-watermark-3;n=2");
-    check("every deep-link form names its place: a line, an id, a trail step, an older step link through the map of old steps, and a step of a renamed trail",
-          a && b && a.sc === first && b.sc === first && c && c.trail === trails[0].id && c.step === 1 && c.pos === 0 && d && d.trail === "warp-inference" && d.step === 3 && d.pos === 1 &&
-          w && w.trail === "watermark-matching" && w.step === 3 && w.pos === 1);
+    var a = parseTarget(first.file.path + ":" + first.sig), b = parseTarget(first.id), c = parseTarget("trail-" + trails[0].id + "-1;n=1");
+    if (P.legacy) {
+      var d = parseTarget("trail-3;n=2"), w = parseTarget("trail-watermark-3;n=2");
+      check("every deep-link form names its place: a line, an id, a trail step, an older step link through the map of old steps, and a step of a renamed trail",
+            a && b && a.sc === first && b.sc === first && c && c.trail === trails[0].id && c.step === 1 && c.pos === 0 && d && d.trail === "warp-inference" && d.step === 3 && d.pos === 1 &&
+            w && w.trail === "watermark-matching" && w.step === 3 && w.pos === 1);
+    } else {
+      var away = parseTarget("trail-" + code.trails[0].id + "-1"), old = parseTarget("trail-3;n=2");
+      check("every deep-link form names its place: a line, an id, a trail step; a step of the code explorer's trails leads there, and the code explorer's old step links name nothing here",
+            a && b && a.sc === first && b.sc === first && c && c.trail === trails[0].id && c.step === 1 && c.pos === 0 && away && away.redirect === SETS.code.page + "#trail-" + code.trails[0].id + "-1" && !old);
+    }
     var map = codeMap();
-    check("the codebase map names every file and every trail, in about 6,000 tokens", m.files.every(function (f) { return map.indexOf("\n  " + f.name + (f.status === "added" ? ":" : " [")) >= 0; }) &&
+    check("the codebase map names every file and every trail, in about 6,000 tokens", m.files.every(function (f) {
+            var at = "\n  " + f.name + (f.status === "added" ? "" : " [");
+            return map.indexOf(at + (f.status === "added" ? ":" : "")) >= 0 || (f.status === "added" && (map.indexOf(at + "\n") >= 0 || map.slice(-at.length) === at));
+          }) &&
           trails.every(function (t) { return map.indexOf(t.title + " (" + t.mark + ", ") >= 0; }) && map.length <= MAP_BUDGET + 2000, V.fmt.int(map.length) + " characters");
     var reads = [runTool("read_declaration", { name: "WarpInference.run" }), runTool("read_file", { path: "WarpLens.swift" }), runTool("search_text", { text: "dual-warp" }),
                  runTool("find_declarations", { query: "ResultJSON.encode" }), runTool("read_file", { path: "Sources/VeilGardeLens/Warp/WarpResidual.swift", from: 17, to: 20 })];
     check("the chat's tools read a declaration, a file, a search, a lookup and a range of lines",
           /static func run\(cgImage/.test(reads[0].text) && /Declarations:/.test(reads[1].text) && /dual-warp/i.test(reads[2].text) && /ResultJSON\.encode/.test(reads[3].text) && /^17  /m.test(reads[4].text),
           reads.map(function (r) { return r.text.length; }).join(", ") + " characters");
+    if (P.extraTools.indexOf("read_step") >= 0) {
+      var st0 = trails[0].steps[0], read = runTool("read_step", { trail: trails[0].mark, n: 1 });
+      check("the chat's read_step reads a whole step: its primer and every entry, with the step's link",
+            read.read && read.read.href === "#trail-" + trails[0].id + "-1" && read.text.indexOf((st0.primer || "").slice(0, 40)) >= 0 &&
+            st0.entries.every(function (en) { return read.text.indexOf(m.scopes[en.scope].qualified) >= 0; }), read.text.length + " characters");
+    }
     return out;
   }
 
   V.explorer = {
     mount: mount, selfCheck: selfCheck, search: search, parseTarget: parseTarget, model: model, context: context,
-    map: codeMap, tools: TOOL_SPECS, tool: runTool, describe: describe,
+    map: codeMap, tools: TOOL_SPECS, tool: runTool, describe: describe, provider: provider, policy: function () { return policy().name; },
     trailFile: function (id, n) { var m = model(), t = m && m.trailById[id]; return t && t.steps[n - 1] ? m.scopes[t.steps[n - 1].entries[0].scope].file.path : null; }
   };
   if (V.data().index) V.extraChecks.push({ name: "explorer", run: selfCheck });

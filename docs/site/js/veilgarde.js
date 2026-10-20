@@ -28,6 +28,7 @@
   ];
   V.appendices = [
     { file: "code.html", short: "The change explorer" },
+    { file: "ml.html", short: "The ML explorer" },
     { file: "selfcheck.html", short: "The self-check" }
   ];
 
@@ -278,17 +279,26 @@
     });
     var out = {}, into = {};
     index.edges.forEach(function (e) { if (scopes[e[0]] && scopes[e[1]]) { push(out, e[0], e); push(into, e[1], e); } });
-    // The trails, and every place a declaration takes on them: once a trail at most.
-    var trails = index.trails || [], trailById = {}, onTrail = {}, entries = [];
-    trails.forEach(function (t) {
-      trailById[t.id] = t;
-      t.steps.forEach(function (st) {
-        st.entries.forEach(function (en, k) { push(onTrail, en.scope, { trail: t, step: st.n, pos: k }); entries.push({ trail: t, step: st.n, pos: k, entry: en }); });
+    // The trail sets: the code's (index.trails, code.html) and the models' (index.ml, ml.html). Each knows its trails
+    // and every place a declaration takes on them, once a trail at most. The page's set, body[data-trails], is also
+    // the model's own trails, trailById, placesOf and entries, so a reader that knows one set reads either.
+    function setFrom(name, trails, picker, kinds) {
+      var trailById = {}, onTrail = {}, entries = [];
+      trails.forEach(function (t) {
+        trailById[t.id] = t;
+        t.steps.forEach(function (st) {
+          st.entries.forEach(function (en, k) { push(onTrail, en.scope, { trail: t, step: st.n, pos: k }); entries.push({ trail: t, step: st.n, pos: k, entry: en }); });
+        });
       });
-    });
+      return { name: name, trails: trails, picker: picker, kinds: kinds, trailById: trailById, placesOf: function (g) { return onTrail[g] || []; }, entries: entries };
+    }
+    var sets = { code: setFrom("code", index.trails || [], index.picker || [], null) };
+    if (index.ml) sets.ml = setFrom("ml", index.ml.trails || [], index.ml.picker || [], index.ml.kinds || []);
+    var wanted = (document.body && document.body.getAttribute("data-trails")) || "code", set = sets[wanted] || sets.code;
     model = { index: index, files: files, byPath: byPath, scopes: scopes, byQualified: byQualified, byName: byName, byLabelled: byLabelled,
               out: function (g) { return out[g] || []; }, into: function (g) { return into[g] || []; },
-              trails: trails, trailById: trailById, placesOf: function (g) { return onTrail[g] || []; }, entries: entries, missing: missing, stripped: {} };
+              sets: sets, set: set, wanted: wanted,
+              trails: set.trails, trailById: set.trailById, placesOf: set.placesOf, entries: set.entries, missing: missing, stripped: {} };
     return model;
   };
   V.linesOf = function (file) { if (!file.lines) file.lines = splitLines(file.text) || []; return file.lines; };

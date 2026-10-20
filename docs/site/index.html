@@ -19,6 +19,7 @@
 <p class="lede"><em>On what this run built, in the order the code runs, and what was checked.</em></p>
 <p>VeilGarde is a detector for AI-generated images, in one Swift and MLX package. It reads an image, measures every tile with the warp lens, pools the fusion base and the specialist heads into one verdict, and writes it as Garde's own JSON. It trains every model it ships, grows the specialist heads without storing an image, and signs an image with a watermark read off the same residual.</p>
 <p>Eleven trails walk the code in the order it runs. Four follow how each part of the verdict is trained: the warp model, the fusion head, the specialist heads and the noiseprint. Four follow the same parts at inference, from an image to the final verdict. Two follow the watermark, signing an image and matching a crop of it, and one follows the pruning study, which measures what the system could do without.</p>
+<p><a href="ml.html">The ML explorer</a> tells the same flows as machine learning: what each model learns from, why its algorithm was chosen, how it is calibrated, and how the models together reach the majority and the weighted verdicts. Its steps link back to these trails.</p>
 
 <div id="request"></div>
 

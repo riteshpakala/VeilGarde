@@ -40,6 +40,11 @@ body.explorer .menu { display: inline-flex; align-items: center; gap: .4rem; fon
 .xp-badge[data-kind="inference"] { border-color: var(--accent); color: var(--accent-ink); }
 .xp-badge[data-kind="signing"], .xp-badge[data-kind="matching"] { border-color: var(--wm); color: var(--wm); }
 .xp-badge[data-kind="research"] { border-color: var(--link); color: var(--link); }
+/* The ML explorer's kinds (ml.html): a model, the system the models make together, the watermark's signal, a method. */
+.xp-badge[data-kind="model"] { border-color: var(--accent); color: var(--accent-ink); }
+.xp-badge[data-kind="system"] { border-color: var(--mod); color: var(--mod); }
+.xp-badge[data-kind="signal"] { border-color: var(--wm); color: var(--wm); }
+.xp-badge[data-kind="method"] { border-color: var(--link); color: var(--link); }
 .xp-chapters a { color: var(--link); }
 .xp-steps { list-style: none; display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: .35rem; margin: 0; padding: 0 0 .2rem; }
 .xp-steps li { display: flex; min-width: 0; }
@@ -54,6 +59,22 @@ body.explorer .menu { display: inline-flex; align-items: center; gap: .4rem; fon
 .xp-walks { display: inline-flex; gap: .4rem; }
 .xp-walk { font: .8rem var(--font-sans); color: var(--fg); background: var(--bg); border: 1px solid var(--border-strong); border-radius: 5px; padding: .2rem .5rem; cursor: pointer; }
 .xp-walk:disabled { opacity: .45; cursor: default; }
+/* The ML explorer's trail strip: a laned trail's key, the lane on each step, the depth control and the legend. */
+.xp-lane { display: inline-block; flex: none; font: 600 .62rem/1.5 var(--font-sans); letter-spacing: .03em; border-radius: 3px; padding: 0 .3rem; color: var(--fg-2); background: var(--bg-sunk); white-space: nowrap; }
+.xp-lane[data-lane="majority"] { color: var(--accent-ink); background: var(--accent-soft); }
+.xp-lane[data-lane="weighted"] { color: var(--mod); background: var(--mod-soft); }
+.xp-steps .xp-lane { margin-left: auto; }
+.xp-lanes { margin: .4rem 0 0; max-width: none; font-size: .8rem; color: var(--fg-2); }
+.xp-trail-foot { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem 1.2rem; margin-top: .55rem; }
+.xp-depth-row { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--dim); }
+.xp-legend { flex: 1 1 18rem; min-width: 0; font-size: .82rem; }
+.xp-legend > summary { cursor: pointer; color: var(--fg-2); }
+.xp-legend-how { margin: .4rem 0; max-width: none; color: var(--fg-2); }
+.xp-legend-list { list-style: none; margin: 0 0 .4rem; padding: 0; columns: 2 15rem; column-gap: 1.2rem; }
+.xp-legend-list li { break-inside: avoid; padding: .1rem 0; overflow-wrap: anywhere; }
+.xp-legend-list a { color: var(--fg); text-decoration: none; }
+.xp-legend-list a:hover { text-decoration: underline; }
+.xp-legend-list small { color: var(--dim); }
 .xp-link { all: unset; cursor: pointer; color: var(--link); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
 .xp-link:focus-visible { outline: 2px solid var(--focus); }
 
@@ -135,6 +156,22 @@ body.explorer .menu { display: inline-flex; align-items: center; gap: .4rem; fon
 .xp-step-line { margin: 0 0 .35rem; font-size: .78rem; color: var(--dim); max-width: none; }
 .xp-note { margin: 0 0 .5rem; font-size: .9rem; line-height: 1.5; color: var(--fg); max-width: none; }
 .xp-links { margin: 0 0 .5rem; font-size: .78rem; color: var(--dim); max-width: none; overflow-wrap: anywhere; }
+/* An ML step's card: the primer for a newcomer, the deeper line for a practitioner, the facts read live from the
+   bundle, and the twins on the code trails. The depth control hides the primer or the deeper line by CSS alone. */
+.xp-tag { display: block; font: 600 .62rem/1.4 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); margin-bottom: .15rem; }
+.xp-primer { margin: 0 0 .55rem; padding: .45rem .6rem; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 5px; }
+.xp-primer p, .xp-deeper p { margin: 0; max-width: none; font-size: .86rem; line-height: 1.5; }
+.xp-deeper { margin: 0 0 .55rem; padding: .1rem 0 .1rem .6rem; border-left: 2px solid var(--border-strong); }
+.xp-deeper p { color: var(--fg-2); font-size: .83rem; }
+.xp-deeper p.xp-links { margin: .25rem 0 0; font-size: .76rem; color: var(--dim); }
+.xp-facts { margin: 0 0 .55rem; }
+.xp-facts dl { display: grid; grid-template-columns: minmax(6rem, max-content) 1fr; gap: .1rem .8rem; margin: 0; font-size: .8rem; }
+.xp-facts dt { color: var(--dim); }
+.xp-facts dd { margin: 0; font-family: var(--font-mono); overflow-wrap: anywhere; }
+.xp-facts-from { margin: .2rem 0 0; font-size: .72rem; color: var(--dim); max-width: none; }
+.xp-twins a { color: var(--link); }
+.xp-twins .xp-badge { margin-right: .15rem; }
+.xp[data-depth="newcomer"] .xp-deeper, .xp[data-depth="practitioner"] .xp-primer { display: none; }
 .xp-header { margin-top: .9rem; border-top: 1px dashed var(--border); padding-top: .5rem; }
 .xp-header > summary { cursor: pointer; font-size: .8rem; color: var(--dim); }
 .xp-edges ul { list-style: none; margin: .2rem 0 .5rem; padding: 0; }
@@ -163,6 +200,10 @@ body.explorer .menu { display: inline-flex; align-items: center; gap: .4rem; fon
   .xp-source pre { max-height: 70vh; }
   .xp-steps { grid-template-columns: repeat(var(--n, 6), minmax(0, 1fr)); }
   .xp-steps .xp-t { display: none; }
+  .xp-steps .xp-lane { font-size: 0; width: .45rem; height: .45rem; padding: 0; border-radius: 50%; margin-left: .25rem; align-self: center; }
+  .xp-steps .xp-lane[data-lane="majority"] { background: var(--accent); }
+  .xp-steps .xp-lane[data-lane="weighted"] { background: var(--mod); }
+  .xp-steps .xp-lane:not([data-lane="majority"]):not([data-lane="weighted"]) { background: var(--fg-2); }
   .xp-steps button { justify-content: center; }
   .xp-find .note { margin-left: 0; }
   .xp-find-label { flex-direction: column; align-items: stretch; gap: .3rem; }
