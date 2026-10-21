@@ -42,7 +42,7 @@ The site is read from `file://`. Chrome blocks `fetch()` of a local file and `<s
 
 From an empty repository, git's empty tree, to the working tree: `git diff --name-status -M <empty tree>` plus the untracked files git does not ignore. Each file keeps its status, its base text from `git show`, its text from disk, and git's hunks, checked by applying them. Left out, and listed by name and size on the overview: everything under `Sources/VeilGardeInference/Resources/`, every `Tests/**/Fixtures/**` file, `*.safetensors`, `Package.resolved`, `LICENSE`, anything gitignored, binaries, secret-shaped file names, and any file holding a key-shaped string, whose kind and line are printed but never the string. The site's own `data/` is the build's output and not part of the change.
 
-The data's cap is 3 MB; the build prints the size. Over the cap it drops the base text of the least-changed modified files, then the edge counts, and never a changed file.
+The data's cap is 3.5 MB, raised from 3 MB on 2026-10-20 when the reduction study's sources took the data past it (ledger decision-102); the build prints the size. Over the cap it drops the base text of the least-changed modified files, then the edge counts, and never a changed file.
 
 ## Declarations, ids and calls
 

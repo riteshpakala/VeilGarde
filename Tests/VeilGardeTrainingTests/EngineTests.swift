@@ -7,7 +7,8 @@
 //        training, a refusal stops the run before a candidate exists, and the run writes a
 //        candidate bundle that verifies, whose warp model is its own sensor model with a
 //        calibration bound to it, whose fusion head keeps the parent's 940 trees byte for byte,
-//        and whose heads and combiner load as the detector loads them.
+//        and whose heads and combiner load as the detector loads them. A masked warp model stays
+//        19 wide, splits only on its mask, and calibrates as any warp model does.
 //
 
 import Foundation
@@ -105,6 +106,30 @@ struct EngineTests {
         #expect(try JSONDecoder().decode(TrainingRecipe.self, from: Data(contentsOf: c.root.appendingPathComponent("recipe.json"))) == recipe(s))
         // A second run under the same id is refused.
         #expect(throws: VeilGardeFailure.self) { try engine.train(recipe(s)) }
+    }
+
+    @Test("a masked warp candidate is 19 wide, splits only on its mask, and gets a bound calibration")
+    func maskedWarp() throws {
+        let s = try SyntheticArea.make()
+        defer { s.remove() }
+        let engine = TrainingEngine(area: s.area, parent: s.parent, store: s.store)
+        let r = try TrainingRecipe(id: "trio") {
+            try WarpTileModel(dataset: s.dataset).trees(12).depth(3).features(["FR", "LV", "CV"])
+            SensorCalibration()
+        }
+        #expect(try engine.plan(r).summary.contains("splits on 3 of 19 features (FR, LV, CV)"))
+        let c = try engine.train(r).candidate
+        try c.verify()
+        let warp = try #require(c.manifest.artifact(.warpTile)), sensor = try #require(c.manifest.artifact(.warpMajoritySensor))
+        #expect(warp.sha256 == sensor.sha256)
+        let model = try GBDTModel.load(c.url(.warpTile)!)
+        #expect(model.featureCount == WarpFeatures.count && model.featureNames == WarpFeatures.names)
+        #expect(model.trees.allSatisfy { t in (0..<t.nodeCount).allSatisfy { t.leftChildren[$0] == -1 || t.splitIndices[$0] <= 2 } })
+        let contract = try SensorCalibrationContract.decode(Data(contentsOf: c.url(.sensorCalibration)!), expectedModelSHA256: warp.sha256, expectedSensorVariant: "warp19")
+        #expect(contract.transform == .cuts)
+        let recorded = try JSONDecoder().decode(TrainingRecipe.self, from: Data(contentsOf: c.root.appendingPathComponent("recipe.json")))
+        guard case .warpTile(let w) = recorded.ordered[0] else { Issue.record("no warp in the recorded recipe"); return }
+        #expect(w.params.allowedColumns == [0, 1, 2])
     }
 
     @Test("a warp model retrained without its calibration drops the parent's contract")

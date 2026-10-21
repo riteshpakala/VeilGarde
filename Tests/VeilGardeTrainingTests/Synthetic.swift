@@ -6,6 +6,8 @@
 //  WHAT: A throwaway work area for the engine's tests: a copy of the shipped bundle as the parent,
 //        a seeded features-only store with every category the recipes read, and a dataset whose
 //        tiles are already cached, so a full recipe trains without the GPU or a single image.
+//        Each cached image names a source pool (a quarter of the reals are "iphone"), which only
+//        the core study reads.
 //
 
 import Foundation
@@ -90,8 +92,9 @@ struct SyntheticArea {
         let manifest = ImageManifest(records: records, root: url.deletingLastPathComponent()).withSplits()
         try manifest.write(to: url)
         var tileImages: [TileImage] = [], features: [Float] = [], texture: [Float] = []
-        for r in manifest.records {
-            tileImages.append(TileImage(stem: r.stem, path: r.path, label: r.label, split: r.split!, pool: nil, tag: nil, rows: 2, cols: 2,
+        for (i, r) in manifest.records.enumerated() {
+            let pool = r.label == 1 ? (i % 4 == 1 ? "final_gen" : "agvr_gen") : (i % 8 == 0 ? "iphone" : "final_real")
+            tileImages.append(TileImage(stem: r.stem, path: r.path, label: r.label, split: r.split!, pool: pool, tag: nil, rows: 2, cols: 2,
                                         start: texture.count, width: 64, height: 64))
             for _ in 0..<4 {
                 var row = (0..<WarpFeatures.count).map { _ in Float(rng.unit()) }

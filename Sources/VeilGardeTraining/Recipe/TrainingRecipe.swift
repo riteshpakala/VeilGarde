@@ -47,7 +47,19 @@ public struct WarpTileModel: Sendable, Equatable, Codable {
     }
 
     private func with(_ change: (inout WarpTileModel) -> Void) -> WarpTileModel { var c = self; change(&c); return c }
-    public func shape(_ shape: WarpShape) -> WarpTileModel { with { $0.shape = shape; $0.params = shape.params } }
+    public func shape(_ shape: WarpShape) -> WarpTileModel {
+        with { let mask = $0.params.allowedColumns; $0.shape = shape; $0.params = shape.params; $0.params.allowedColumns = mask }
+    }
+    /// Split only on these columns; the model stays 19 wide, so it deploys and calibrates as any warp model does.
+    public func features(columns: [Int]) -> WarpTileModel {
+        precondition(!columns.isEmpty && Set(columns).count == columns.count && columns.allSatisfy { (0..<WarpFeatures.count).contains($0) },
+                     "a warp feature mask names distinct columns of the \(WarpFeatures.count)")
+        return with { $0.params.allowedColumns = columns.sorted() }
+    }
+    /// Split only on the named features (WarpFeatures.names).
+    public func features(_ names: [String]) throws -> WarpTileModel { features(columns: try WarpFeatures.columns(named: names)) }
+    /// The mask's feature names, nil without one.
+    public var featureNames: [String]? { params.allowedColumns?.map { WarpFeatures.names[$0] } }
     public func trees(_ n: Int) -> WarpTileModel { with { $0.params.trees = n } }
     public func depth(_ d: Int) -> WarpTileModel { with { $0.params.maxDepth = d } }
     public func eta(_ e: Double) -> WarpTileModel { with { $0.params.eta = e } }

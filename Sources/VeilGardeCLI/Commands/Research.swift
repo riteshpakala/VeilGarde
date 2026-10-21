@@ -5,11 +5,14 @@
 //
 //  WHAT: `veilgarde research`: measurements that ask what the system could do without. `prune`
 //        runs the pruning study (PruningStudy) on the work area's tile cache and store against the
-//        shipped bundle; `census` runs the full detector over images (the battery's, a final_mixed
+//        shipped bundle; `core` refits the warp tile model on feature subsets (CoreStudy,
+//        ResearchCore.swift); `census` runs the full detector over images (the battery's, a final_mixed
 //        sample, or any given) and counts how often each mechanism and stack row runs, how often it
 //        decides the call, and how often the stack and the semantic chain move it.
 //  PIN:  prune is CPU work on cached tiles and stored features; census is one MLX workload, one
 //        image at a time. Each writes <work area>/research/<what>-<stamp>.json and prints a table.
+//        A census names the bundle and the base expert it ran, and per image the sensor call and
+//        the warp lens's own score beside the routed verdict (fields older censuses lack).
 //
 
 import ArgumentParser
@@ -19,7 +22,7 @@ import VeilGarde
 struct ResearchCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "research", abstract: "Measure what the system could do without: the pruning study and the mechanism census.",
-        subcommands: [Prune.self, Census.self])
+        subcommands: [Prune.self, Core.self, Redundancy.self, Condensed.self, Census.self, Compare.self])
 
     static func output(_ area: WorkArea, _ what: String) throws -> URL {
         let folder = area.root.appendingPathComponent("research", isDirectory: true)
@@ -107,7 +110,10 @@ struct ResearchCommand: ParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "census", abstract: "Run the full detector over images and count how often each mechanism runs and decides the call.",
             discussion: "With no images it takes the battery's (every group) and a final_mixed sample. One MLX workload, one image at a time.")
-        @Argument(help: "Images, or text files of image paths (one per line).") var images: [String] = []
+        @Argument(help: "Images, folders (searched recursively), or text files of image paths (one per line).") var images: [String] = []
+        @Option(help: "The label of the images named as arguments: real or generated.") var label: String?
+        @Option(help: "A bundle directory to detect with instead of the shipped one (live, or a candidate).") var bundle: String?
+        @OptionGroup var expert: BaseExpertOptions
         @Flag(help: "Add the battery's images (every group of the work area's spec).") var battery = false
         @Option(help: "Add this many final_mixed images, half real and half generated, every k-th by name.") var sample = 0
         @Option(name: .customLong("final-mixed"), help: "The final_mixed folder (default: final_mixed under VEILGARDE_DATASETS, else the work area's datasets/).") var finalMixed: String?
@@ -118,15 +124,9 @@ struct ResearchCommand: ParsableCommand {
         func run() throws {
             guarded {
                 let area = try workArea.resolve()
+                if let label, !["real", "generated"].contains(label) { throw VeilGardeFailure.usage("--label is real or generated, not \(label)") }
                 var items: [(path: String, label: String?)] = []
-                for input in images {
-                    if input.hasSuffix(".txt") {
-                        let text = try String(contentsOf: datasetURL(input), encoding: .utf8)
-                        items += text.split(separator: "\n").map { (String($0).trimmingCharacters(in: .whitespaces), nil) }.filter { !$0.0.isEmpty && !$0.0.hasPrefix("#") }
-                    } else {
-                        items.append((input, nil))
-                    }
-                }
+                for input in images { items += try imageInputs(input).map { ($0.path, label) } }
                 let defaults = images.isEmpty && !battery && sample == 0
                 if battery || defaults {
                     let fly = FlywheelArea(area)
@@ -149,9 +149,19 @@ struct ResearchCommand: ParsableCommand {
                     }
                 }
                 guard !items.isEmpty else { throw VeilGardeFailure.usage("no images: name some, or pass --battery or --sample") }
-                let config = try route.config()
+                var config = try bundle.map { try route.config(bundle: try DetectorBundle.load(datasetURL($0))) } ?? route.config()
+                config.baseExpert = try expert.resolve()
                 var census = MechanismCensus()
+                census.bundle = config.bundle.directory.path
+                census.provenance = config.bundle.provenance
+                census.baseExpert = config.baseExpert.rawValue
+                census.warpRule = config.decision
+                census.weightsDir = route.weightsDir
+                census.modelOverride = route.model
+                census.dinoVariant = config.dinoVariant.rawValue
+                census.coreVersion = VeilGardeVersion.string
                 for (k, item) in items.enumerated() {
+                    defer { LensRuntime.releaseMemory() }
                     do {
                         let cg = try loadImage(item.path)
                         let routed = try Detector.shared.detect(cgImage: cg, config: config)
@@ -189,9 +199,26 @@ struct MechanismCensus: Codable {
         var semanticDecisive: Bool
         var previewTriggered: Bool
         var previewDecisive: Bool
+        /// The camera-sensor call and its vote (the majority route), nil off the camera route.
+        var sensorP: Float? = nil
+        var sensorCall: String? = nil
+        /// The warp lens's own weighted score and its call at the warp rule, whatever the base expert.
+        var warpP: Float? = nil
+        var warpCall: String? = nil
+        /// The base expert's own call (the first stack row).
+        var baseCall: String? = nil
     }
 
     var date = Date()
+    /// What ran: the bundle, its artifacts' hashes, the base expert and the overrides.
+    var bundle: String? = nil
+    var provenance: [String: String]? = nil
+    var baseExpert: String? = nil
+    var warpRule: DecisionRule? = nil
+    var weightsDir: String? = nil
+    var modelOverride: String? = nil
+    var dinoVariant: String? = nil
+    var coreVersion: String? = nil
     var rows: [Row] = []
     var errors: [String] = []
     var routes: [String: Int] = [:]
@@ -207,16 +234,34 @@ struct MechanismCensus: Codable {
     /// The final call against the label, where the label is known.
     var correct: [String: Int] = [:]
     var labelled: [String: Int] = [:]
+    /// By label ("unlabelled" when unknown), then call: the sensor's, the routed verdict's, the warp lens's own.
+    var sensorCalls: [String: [String: Int]]? = nil
+    var finalCalls: [String: [String: Int]]? = nil
+    var warpCalls: [String: [String: Int]]? = nil
+    /// The warp lens's own call against the label.
+    var warpCorrect: [String: Int]? = nil
 
     mutating func add(_ path: String, label: String?, _ r: InferenceResult, domain: String) {
         let cap = r.captureSignature.map { $0.valid ? ($0.present ? "present" : "absent") : "invalid" } ?? "none"
         let d = r.routeDiagnostics
         let stack = r.specialists ?? []
-        let row = Row(path: path, label: label, route: domain, capture: cap, baseP: d?.warpP, preSemanticP: d?.preSemanticP, p: r.weightedScore,
+        var row = Row(path: path, label: label, route: domain, capture: cap, baseP: d?.warpP, preSemanticP: d?.preSemanticP, p: r.weightedScore,
                       call: r.weightedPrediction, preSemanticCall: d?.preSemanticPrediction, shown: stack.map(\.name),
                       decisive: stack.filter { $0.weight >= 1 }.map(\.name), semanticTriggered: d?.semanticTriggered ?? false,
                       semanticDecisive: d?.semanticDecisive ?? false, previewTriggered: d?.previewTriggered ?? false, previewDecisive: d?.previewDecisive ?? false)
+        row.sensorP = r.sensorRawProbability
+        row.sensorCall = r.sensorPrediction
+        row.warpP = r.warpWeightedScore
+        row.warpCall = r.warpWeightedScore.map { (warpRule ?? .warpWeighted).label($0) }
+        row.baseCall = stack.first?.verdict
         rows.append(row)
+        let key = label ?? "unlabelled"
+        if let s = row.sensorCall { sensorCalls = Self.counted(sensorCalls, key, s) }
+        finalCalls = Self.counted(finalCalls, key, row.call)
+        if let w = row.warpCall {
+            warpCalls = Self.counted(warpCalls, key, w)
+            if let label { warpCorrect = (warpCorrect ?? [:]).merging([label: w == label ? 1 : 0], uniquingKeysWith: +) }
+        }
         routes[domain, default: 0] += 1
         capture[cap, default: 0] += 1
         for name in Set(row.shown) { shown[name, default: 0] += 1 }
@@ -229,9 +274,16 @@ struct MechanismCensus: Codable {
         }
     }
 
+    static func counted(_ table: [String: [String: Int]]?, _ label: String, _ call: String) -> [String: [String: Int]] {
+        var t = table ?? [:]
+        t[label, default: [:]][call, default: 0] += 1
+        return t
+    }
+
     var table: String {
         var lines = ["census: \(rows.count) images (\(errors.count) errors); routes " + routes.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")
                      + "; capture " + capture.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")]
+        if let bundle { lines.append("bundle \(bundle), base \(baseExpert ?? "fusion")" + (modelOverride.map { ", base warp model \($0)" } ?? "")) }
         lines.append("  stack row                shown  full weight (by label)")
         for (name, n) in shown.sorted(by: { $0.value > $1.value }) {
             let by = (decisive[name] ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")
@@ -240,6 +292,15 @@ struct MechanismCensus: Codable {
         }
         lines.append("the stack moved the base's call on \(stackMovedCall) capture-absent images; the semantic chain moved the call on \(semanticMovedCall)")
         lines.append("correct: " + labelled.sorted { $0.key < $1.key }.map { "\($0.key) \(correct[$0.key] ?? 0) of \($0.value)" }.joined(separator: ", "))
+        if let warpCorrect {
+            lines.append("the warp lens's own call correct: " + labelled.sorted { $0.key < $1.key }.map { "\($0.key) \(warpCorrect[$0.key] ?? 0) of \($0.value)" }.joined(separator: ", "))
+        }
+        for (title, table) in [("sensor calls", sensorCalls), ("routed calls", finalCalls)] {
+            guard let table else { continue }
+            lines.append("\(title): " + table.sorted { $0.key < $1.key }.map { label, calls in
+                "\(label) " + ["real", "inconclusive", "generated"].map { "\($0) \(calls[$0] ?? 0)" }.joined(separator: " / ")
+            }.joined(separator: "; "))
+        }
         return lines.joined(separator: "\n")
     }
 }

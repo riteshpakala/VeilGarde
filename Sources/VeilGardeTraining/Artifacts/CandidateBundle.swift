@@ -96,6 +96,21 @@ public struct CandidateBundle: Sendable {
         return weight
     }
 
+    /// Writes an edited copy of an inherited artifact, a measurement variant: `put`, then the
+    /// artifact's source and its parent's hash, and the history events that say what was done.
+    @discardableResult
+    public mutating func derive(_ data: Data, as file: String, role: ArtifactRole, head: HeadKind? = nil, source: String, parentSHA256: String?,
+                                events: [BundleEvent]) throws -> Artifact {
+        var artifact = try put(data, as: file, role: role, head: head, parent: parentSHA256)
+        if let i = manifest.artifacts.firstIndex(where: { $0.role == role && $0.head == head }) {
+            manifest.artifacts[i].source = source
+            artifact = manifest.artifacts[i]
+        }
+        manifest.history += events
+        try save()
+        return artifact
+    }
+
     /// Removes an artifact (and its file, when nothing else names it); the caller saves.
     public mutating func dropArtifact(_ artifact: Artifact) {
         manifest.artifacts.removeAll { $0.role == artifact.role && $0.head == artifact.head }

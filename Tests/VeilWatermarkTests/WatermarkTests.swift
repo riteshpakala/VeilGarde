@@ -138,3 +138,21 @@ extension WatermarkMLXSuites {
         }
     }
 }
+
+@Suite("Watermark invariance")
+struct WatermarkInvarianceTests {
+    static func row(_ path: String, cid: String = "c1", bits: Int = 930) -> InvarianceRow {
+        InvarianceRow(path: path, fileSHA256: "f-\(path)", width: 512, height: 512, rows: 16, cols: 16, sections: 16, measuredBits: bits, cid: cid,
+                      compactSHA256: "k-\(cid)", seconds: 1)
+    }
+
+    @Test("equal reports have no difference; a moved signature, a lost image and a new one each show")
+    func compare() {
+        let baseline = InvarianceReport(date: Date(), coreVersion: "x", images: [Self.row("/a.png"), Self.row("/b.png")], skipped: [])
+        #expect(WatermarkInvariance.compare(baseline: baseline, current: baseline).isEmpty)
+        let moved = InvarianceReport(date: Date(), coreVersion: "x", images: [Self.row("/a.png", cid: "c2", bits: 929), Self.row("/c.png")], skipped: ["/b.png: gone"])
+        let d = WatermarkInvariance.compare(baseline: baseline, current: moved)
+        #expect(Set(d.map(\.field)) == ["cid", "compactSHA256", "measuredBits", "signed"])
+        #expect(d.contains { $0.path == "/b.png" && $0.current == "no" } && d.contains { $0.path == "/c.png" && $0.baseline == "absent" })
+    }
+}

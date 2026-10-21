@@ -6,7 +6,8 @@
 //  WHAT: `veilgarde bundle`: what a detector bundle holds. `show` lists its artifacts by role with
 //        their hashes, sizes and provenance; `verify` re-hashes every file against the manifest;
 //        `diff` names the roles whose bytes differ between two bundles (the shipped one by default),
-//        which is what a promote would change.
+//        which is what a promote would change; `derive` makes a measurement variant of a bundle,
+//        its combiner edited, re-pinned and recorded (BundleDerivation).
 //
 
 import ArgumentParser
@@ -15,7 +16,7 @@ import VeilGarde
 
 struct BundleCommand: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "bundle", abstract: "Show, verify and diff detector bundles (manifest.json and its artifacts).",
-                                                    subcommands: [Show.self, Verify.self, Diff.self])
+                                                    subcommands: [Show.self, Verify.self, Diff.self, Derive.self])
 
     static func directory(_ path: String?) -> URL {
         path.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true) } ?? ShippedBundle.directory
@@ -70,6 +71,38 @@ struct BundleCommand: ParsableCommand {
                     print("  " + slot.padding(toLength: 22, withPad: " ", startingAt: 0) + "\(x?.sha256.prefix(12) ?? "absent") → \(y?.sha256.prefix(12) ?? "absent")")
                 }
                 print(changed == 0 ? "no artifact differs" : "\(changed) role(s) differ")
+            }
+        }
+    }
+
+    struct Derive: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "derive", abstract: "Make a measurement variant of a bundle under <work area>/candidates/<id>: its combiner edited, re-pinned and recorded.",
+            discussion: "Edits: combiner.w_np=null (the noiseprint does not run), or combiner.w_np, combiner.w_rescue, combiner.w_gen[0-2] set to a value ≥ 0. Nothing is promoted.")
+        @Option(help: "The parent: a bundle directory, shipped, or live.") var from: String
+        @Option(help: "The variant's candidate id.") var id: String
+        @Option(name: .customLong("set"), help: "An edit; repeatable.") var edits: [String]
+        @Option(help: "Why, recorded with the edit.") var note: String
+        @Flag(help: "Replace a candidate of the same id.") var replace = false
+        @OptionGroup var workArea: WorkAreaOptions
+
+        func run() throws {
+            guarded {
+                let area = try workArea.resolve()
+                let root = from == "shipped" ? ShippedBundle.directory : from == "live" ? area.live : BundleCommand.directory(from)
+                let parent = try ModelBundle.load(root)
+                let parsed = try edits.map(CombinerEdit.parse)
+                let candidate = try BundleDerivation.derive(id: id, in: area, from: parent, edits: parsed, note: note, replacing: replace)
+                print("derived \(candidate.root.path) from \(parent.root.path): \(parsed.map(\.description).joined(separator: ", "))")
+                for artifact in candidate.manifest.artifacts where artifact.sha256 != parent.manifest.artifact(slot: artifact.slot)?.sha256 {
+                    print("  " + artifact.slot.padding(toLength: 22, withPad: " ", startingAt: 0)
+                          + "\(parent.manifest.artifact(slot: artifact.slot)?.sha256.prefix(12) ?? "absent") → \(artifact.sha256.prefix(12))")
+                }
+                if let url = candidate.url(.combiner) {
+                    let c = try StackCombiner.load(url)
+                    print(String(format: "  combiner: w0 %.4f, w_base %.4f, w_gen [%@], w_rescue %.3f, w_np %@", c.w0, c.wBase,
+                                 c.wGen.map { String(format: "%.4f", $0) }.joined(separator: ", "), c.wRescue, c.wNp.map { String(format: "%.3f", $0) } ?? "absent"))
+                }
             }
         }
     }

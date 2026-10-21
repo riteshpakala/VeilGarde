@@ -101,11 +101,52 @@ struct DetectionOptions: ParsableArguments {
         config.timing = timing
         return config
     }
+
+    /// The same, reading every model from `bundle`; a --model override still wins for the base warp model.
+    func config(bundle: DetectorBundle) throws -> InferenceConfig {
+        var config = try config()
+        let modelOverride = model.map { _ in config.modelURL }
+        config.rebind(to: bundle)
+        if let modelOverride { config.modelURL = modelOverride }
+        return config
+    }
+}
+
+/// `--base`: the camera domain's base expert, the fusion head unless a study asks for the warp lens alone.
+struct BaseExpertOptions: ParsableArguments {
+    @Option(name: .customLong("base"), help: "The camera base expert: fusion (the detector) or warp (the warp lens alone at 0.56 ± 0.04, a measurement mode).")
+    var base: String = BaseExpert.fusion.rawValue
+
+    func resolve() throws -> BaseExpert {
+        guard let expert = BaseExpert(rawValue: base) else { throw VeilGardeFailure.usage("--base is fusion or warp, not \(base)") }
+        return expert
+    }
 }
 
 /// Reads an image the way the detector sees it (EXIF orientation applied).
 func loadImage(_ path: String) throws -> CGImage {
     try ImageDecoding.cgImage(contentsOf: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))
+}
+
+/// The images an argument names: a text file of paths (one per line, `#` comments), a folder
+/// (searched recursively, sorted by path, exFAT sidecars skipped), or one image.
+func imageInputs(_ input: String) throws -> [URL] {
+    let url = datasetURL(input)
+    if url.pathExtension == "txt" {
+        let text = try String(contentsOf: url, encoding: .utf8)
+        return text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && !$0.hasPrefix("#") }.map(datasetURL)
+    }
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { throw VeilGardeFailure.missing("no image or folder at \(url.path)") }
+    guard isDirectory.boolValue else { return [url] }
+    var out: [URL] = []
+    let walker = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])
+    while let next = walker?.nextObject() as? URL {
+        let name = next.lastPathComponent
+        guard !name.hasPrefix("._"), ShardExtractor.imageExtensions.contains(next.pathExtension.lowercased()) else { continue }
+        out.append(next)
+    }
+    return out.sorted { $0.path < $1.path }
 }
 
 /// Writes JSON to stdout with a trailing newline (`--json -`), or to a file.

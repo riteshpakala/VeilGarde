@@ -36,4 +36,16 @@ public struct DetectorBundle: Sendable, Equatable {
     }
 
     public var isShipped: Bool { directory.standardizedFileURL == ShippedBundle.directory.standardizedFileURL }
+
+    /// What a report names to say which models it measured: the bundle's directory, the hashes of
+    /// its warp, sensor, calibration, fusion and combiner artifacts, and its manifest's hash.
+    public var provenance: [String: String] {
+        var out = ["bundle": directory.path]
+        for (key, role) in [("weighted_base_model_sha256", ArtifactRole.warpTile), ("sensor_model_sha256", .warpMajoritySensor),
+                            ("sensor_calibration_sha256", .sensorCalibration), ("fusion_head_sha256", .fusionHead), ("combiner_sha256", .combiner)] {
+            if let sha = manifest.artifact(role)?.sha256 { out[key] = sha }
+        }
+        if let data = try? JSONCoding.prettyEncoder().encode(manifest) { out["manifest_sha256"] = ContentHash.sha256Hex(data) }
+        return out
+    }
 }

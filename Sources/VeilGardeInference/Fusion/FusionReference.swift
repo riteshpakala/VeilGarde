@@ -22,9 +22,7 @@ enum FusionReference {
 
     /// The reference base probability with the capture-validity flags neutralized.
     static func neutralizedBaseP(_ s: DetectionSignals) -> Float? {
-        var cfg = s.config
-        cfg.useFusion = false
-        guard let warp = try? WarpInference.run(cgImage: s.cgImage, config: cfg),
+        guard let warp = try? WarpInference.run(cgImage: s.cgImage, config: s.config),
               let emb = try? SemanticLens.fusionEmbedding(s.cgImage, variant: s.config.dinoVariant),
               let url = modelURL(s.config), let head = try? TreeModelCache.shared.model(url) else { return nil }
         var cap = CaptureLens.features(s.cgImage).asVector

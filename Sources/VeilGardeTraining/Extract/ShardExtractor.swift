@@ -8,7 +8,8 @@
 //        dropped. Nothing but the six columns and the row's metadata is written.
 //  PIN:  The id is the SHA-1 of the file's bytes; an id the store already holds is skipped (the
 //        store is append-only and an image is measured once). An image that fails to decode is
-//        reported, never fatal. The shard is written once, at the end, under a new name.
+//        reported, never fatal. The shard is written once, at the end, under a new name. A row
+//        names the warp model only when its warp column was measured.
 //
 
 import CoreGraphics
@@ -77,7 +78,8 @@ public enum ShardExtractor {
                 let cg = try ImageDecoding.cgImage(data: data, name: url.lastPathComponent)
                 let f = try extractor.extract(cg)
                 rows.append(FeatureRow(id: id, path: url.path, label: item.label, category: item.category, source: item.source,
-                                       golden: item.golden ?? false, genFamily: item.genFamily, warpModel: extractor.warpModelTag,
+                                       golden: item.golden ?? false, genFamily: item.genFamily,
+                                       warpModel: extractor.columns.contains(.warp) ? extractor.warpModelTag : nil,
                                        width: f.width, height: f.height))
                 for column in FeatureColumn.allCases { columns[column]! += f.values(column) }
                 known.insert(id)

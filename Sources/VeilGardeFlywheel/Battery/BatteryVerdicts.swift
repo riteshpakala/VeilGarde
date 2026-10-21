@@ -9,7 +9,9 @@
 //  PIN:  The values are read from the result JSON the detector writes (schema v2, Garde's bytes),
 //        exactly as the Python runner's route backend reads Garde's --route-json:
 //        verdict.weighted.prediction and .score, the share of semantic_tiles cells above 0.5
-//        (nil without tiles), capture.present.
+//        (nil without tiles), capture.present. A study may run the battery with the warp lens as
+//        the camera base (`flywheel battery --base warp`); the runtime says which base ran, and
+//        promote and rollback always gate the detector as it ships.
 //
 
 import CoreGraphics
@@ -57,17 +59,15 @@ public final class DetectorVerdicts: BatteryVerdictSource {
     private let config: InferenceConfig
     public private(set) var runtime: [String: String]
 
-    public init(bundle: DetectorBundle) {
+    public init(bundle: DetectorBundle, baseExpert: BaseExpert = .fusion) {
         self.bundle = bundle
         var config = InferenceConfig(bundle: bundle)
         config.timing = false
+        config.baseExpert = baseExpert
         self.config = config
-        var runtime = ["backend": "veilgarde-detector", "bundle": bundle.directory.path, "core_version": VeilGardeVersion.string]
-        for (key, role) in [("weighted_base_model_sha256", ArtifactRole.warpTile), ("sensor_model_sha256", .warpMajoritySensor),
-                            ("sensor_calibration_sha256", .sensorCalibration), ("fusion_head_sha256", .fusionHead), ("combiner_sha256", .combiner)] {
-            if let sha = bundle.manifest.artifact(role)?.sha256 { runtime[key] = sha }
-        }
-        if let data = try? JSONCoding.prettyEncoder().encode(bundle.manifest) { runtime["manifest_sha256"] = ContentHash.sha256Hex(data) }
+        var runtime = ["backend": "veilgarde-detector", "core_version": VeilGardeVersion.string]
+        runtime.merge(bundle.provenance) { _, new in new }
+        if baseExpert != .fusion { runtime["base_expert"] = baseExpert.rawValue }
         self.runtime = runtime
     }
 

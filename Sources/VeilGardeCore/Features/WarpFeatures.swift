@@ -86,6 +86,20 @@ public struct WarpFeatures: Sendable, Equatable, Codable {
         let d = index - count
         return d < DirectionalSignature.names.count ? DirectionalSignature.names[d] : "f\(index)"
     }
+
+    /// The columns of the named features, ascending (a column mask); an unknown or repeated name is refused.
+    public static func columns(named wanted: [String]) throws -> [Int] {
+        var out: [Int] = []
+        for name in wanted {
+            guard let column = names.firstIndex(of: name) else {
+                throw VeilGardeFailure.usage("no warp feature is named \(name)", hint: "the 19 are \(names.joined(separator: ", "))")
+            }
+            guard !out.contains(column) else { throw VeilGardeFailure.usage("the warp feature \(name) is named twice") }
+            out.append(column)
+        }
+        guard !out.isEmpty else { throw VeilGardeFailure.usage("a feature mask names at least one warp feature") }
+        return out.sorted()
+    }
 }
 
 /// The 21 columns a 40-column warp model reads after the 19: the residual energy of eight

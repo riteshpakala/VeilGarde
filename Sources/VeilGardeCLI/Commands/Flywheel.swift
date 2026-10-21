@@ -214,18 +214,21 @@ struct FlywheelCommand: ParsableCommand {
         @Option(help: "Write the report JSON here (`-` for stdout).") var json: String?
         @Flag(help: "Re-record the ratchet floors from this run (full gate only, with --yes-i-reviewed).") var rebaseline = false
         @Flag(name: .customLong("yes-i-reviewed"), help: "Confirms a rebaseline was reviewed.") var reviewed = false
+        @OptionGroup var expert: BaseExpertOptions
         @OptionGroup var workArea: WorkAreaOptions
 
         func run() throws {
             guarded {
                 guard let g = BatterySpec.Gate(rawValue: gate) else { throw VeilGardeFailure.usage("--gate is promote or full") }
                 if rebaseline && !(g == .full && reviewed) { throw VeilGardeFailure.usage("--rebaseline needs --gate full and --yes-i-reviewed") }
+                let base = try expert.resolve()
+                if rebaseline && base != .fusion { throw VeilGardeFailure.usage("--rebaseline records the detector's floors; it cannot run with --base \(base.rawValue)") }
                 let area = try FlywheelCommand.area(workArea)
                 ShippedBundle.registerWeightFolders(workArea: area.area)
                 let root = bundle.map(datasetURL) ?? area.live
                 let spec = try BatterySpec.load(area.batterySpec)
                 let report = try BatteryRunner.run(spec: spec, specURL: area.batterySpec, gate: g, baselineURL: area.batteryBaseline,
-                                                   verdicts: DetectorVerdicts(bundle: try DetectorBundle.load(root)),
+                                                   verdicts: DetectorVerdicts(bundle: try DetectorBundle.load(root), baseExpert: base),
                                                    vars: spec.resolvedVars(images: area.batteryImages), rebaseline: rebaseline, note: note)
                 let saved = area.batteryRuns.appendingPathComponent("\(FlywheelArea.stamp())-\(g.rawValue).json")
                 try JSONCoding.write(report, to: saved)

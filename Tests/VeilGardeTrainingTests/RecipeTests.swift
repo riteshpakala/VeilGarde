@@ -5,7 +5,8 @@
 //
 //  WHAT: The recipe DSL: the builder takes `if` and `for`, modifiers return changed copies, the
 //        engine's order is the dependency order, recipes round-trip as JSON, and recipe.toml
-//        reads into the same values (refusing what it does not know).
+//        reads into the same values (refusing what it does not know). A warp feature mask reads
+//        from names, survives the shape modifier, and travels through TOML and JSON.
 //
 
 import Foundation
@@ -78,5 +79,24 @@ struct RecipeTests {
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[optimizer]\nlr = 1") }
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("[heads]\nkinds = [\"art\"]") }
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[heads]\nkinds = [\"faces\"]") }
+    }
+
+    @Test("a warp feature mask: names to columns, kept by the shape, carried by TOML and JSON")
+    func featureMask() throws {
+        let w = try WarpTileModel(dataset: dataset).features(["CV", "FR", "LV"])
+        #expect(w.params.allowedColumns == [0, 1, 2] && w.featureNames == ["FR", "LV", "CV"])
+        #expect(w.shape(.deployed).params.allowedColumns == [0, 1, 2] && w.shape(.deployed).params.trees == 200)
+        #expect(WarpTileModel(dataset: dataset).featureNames == nil)
+        #expect(throws: VeilGardeFailure.self) { try WarpTileModel(dataset: dataset).features(["colour"]) }
+        #expect(throws: VeilGardeFailure.self) { try WarpTileModel(dataset: dataset).features(["FR", "FR"]) }
+        #expect(throws: VeilGardeFailure.self) { try WarpTileModel(dataset: dataset).features([]) }
+        #expect(try WarpFeatures.columns(named: ["nyq_R", "FR", "xcorr_RG"]) == [0, 10, 18])
+
+        let parsed = try RecipeFile.parse("id = \"m\"\n[warp]\ndataset = \"/data/final_mixed\"\nfeatures = [\"FR\", \"LV\", \"CV\", \"nyq_R\"]")
+        let expected = TrainingRecipe(id: "m") { WarpTileModel(dataset: dataset).features(columns: [0, 1, 2, 18]) }
+        #expect(parsed == expected)
+        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"m\"\n[warp]\ndataset = \"/d\"\nfeatures = [\"warp\"]") }
+        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"m\"\n[warp]\ndataset = \"/d\"\nfeatures = 3") }
+        #expect(try JSONDecoder().decode(TrainingRecipe.self, from: JSONEncoder().encode(expected)) == expected)
     }
 }

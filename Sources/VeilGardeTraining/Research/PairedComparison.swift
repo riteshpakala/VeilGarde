@@ -110,4 +110,13 @@ public struct PairedComparison: Codable, Sendable, Equatable {
         return PairedComparison(reference: ra, variant: rb, delta: rb - ra, low: percentile(0.025), high: percentile(0.975),
                                 items: n, changedCalls: changed, changedShare: n > 0 ? Double(changed) / Double(n) : 0)
     }
+
+    /// The same comparison with each side called by its own rule (two models, each with its own cuts).
+    public static func measure(reference: [Float], variant: [Float], labels: [Float], resamples: Int, seed: UInt64,
+                               referenceCall: (Float) -> String, variantCall: (Float) -> String) -> PairedComparison {
+        var c = measure(reference: reference, variant: variant, labels: labels, resamples: resamples, seed: seed, call: { _ in "" })
+        c.changedCalls = zip(reference, variant).filter { referenceCall($0.0) != variantCall($0.1) }.count
+        c.changedShare = c.items > 0 ? Double(c.changedCalls) / Double(c.items) : 0
+        return c
+    }
 }

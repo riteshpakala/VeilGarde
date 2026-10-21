@@ -6,11 +6,13 @@
 //  WHAT: How one detection runs, grouped by what each setting governs: the models (the frozen
 //        base warp model, the public sensor model and its calibration), the warp lens
 //        (patch size, the 512 cap, quantized warps, the weight map and hotspot rule, the native
-//        check), the weighted verdict's operating point, the semantic backbone, and the router's
-//        mechanisms and campaign switches.
+//        check), the weighted verdict's operating point, the semantic backbone, the camera
+//        domain's base expert, and the router's mechanisms and campaign switches.
 //  PIN:  Every default is Garde's InferenceConfig default, and the model URLs default to the
 //        shipped bundle, the sensor pair included: a nil sensor default would silently fall back
-//        to the identity calibration, the one change that passes tests and moves verdicts.
+//        to the identity calibration, the one change that passes tests and moves verdicts. The base
+//        expert defaults to the fusion head; the warp lens alone is a measurement mode (the
+//        2026-10-20 detector studies), and promote and rollback never set it.
 //
 
 import Foundation
@@ -33,6 +35,14 @@ public struct RouterMechanisms: Sendable, Equatable {
     public init() {}
 }
 
+/// The camera domain's base expert: what the specialist stack compounds onto.
+public enum BaseExpert: String, Sendable, Codable, CaseIterable {
+    /// The warp lens and the fusion head over DINOv2, capture and sharpness: the detector.
+    case fusion
+    /// The warp lens alone, its weighted score at the config's decision rule: a measurement mode.
+    case warp
+}
+
 public struct InferenceConfig: Sendable {
     /// The artifacts this detection reads (the shipped bundle unless told otherwise).
     public var bundle: DetectorBundle
@@ -46,8 +56,8 @@ public struct InferenceConfig: Sendable {
     /// The warp-only weighted verdict's operating point (0.56 ± 0.04).
     public var decision: DecisionRule
     public var dinoVariant: DinoVariant
-    /// Run the fusion head on top of the warp lens (the camera base expert).
-    public var useFusion: Bool
+    /// The camera domain's base expert (the fusion head unless a study asks for the warp lens alone).
+    public var baseExpert: BaseExpert
     public var mechanisms: RouterMechanisms
     /// Write the tile feature matrix here (Garde's --dump-features format).
     public var featureDumpURL: URL?
@@ -59,7 +69,7 @@ public struct InferenceConfig: Sendable {
     /// The models default to the bundle's: its warp tile model, its sensor model and calibration.
     public init(bundle: DetectorBundle = .shipped,
                 warp: WarpParameters = WarpParameters(), decision: DecisionRule = .warpWeighted, dinoVariant: DinoVariant = .small,
-                useFusion: Bool = false, mechanisms: RouterMechanisms = RouterMechanisms(), featureDumpURL: URL? = nil, timing: Bool = false) {
+                baseExpert: BaseExpert = .fusion, mechanisms: RouterMechanisms = RouterMechanisms(), featureDumpURL: URL? = nil, timing: Bool = false) {
         self.bundle = bundle
         self.modelURL = bundle.url(.warpTile) ?? ShippedBundle.url(.warpTile)
         self.majoritySensorModelURL = bundle.url(.warpMajoritySensor)
@@ -67,11 +77,19 @@ public struct InferenceConfig: Sendable {
         self.warp = warp
         self.decision = decision
         self.dinoVariant = dinoVariant
-        self.useFusion = useFusion
+        self.baseExpert = baseExpert
         self.mechanisms = mechanisms
         self.featureDumpURL = featureDumpURL
         self.timing = timing
         self.skipFrameCheck = false
+    }
+
+    /// Reads every model from `bundle` instead: its warp tile model, its sensor model and calibration.
+    public mutating func rebind(to bundle: DetectorBundle) {
+        self.bundle = bundle
+        modelURL = bundle.url(.warpTile) ?? ShippedBundle.url(.warpTile)
+        majoritySensorModelURL = bundle.url(.warpMajoritySensor)
+        sensorCalibrationURL = bundle.url(.sensorCalibration)
     }
 
     /// The shipped defaults.

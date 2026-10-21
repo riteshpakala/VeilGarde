@@ -8,7 +8,8 @@
 //        and gains within float rounding, with weights, scale_pos_weight, γ, λ and
 //        min_child_weight. On continuous data it lands within ±0.005 AUC and ±0.01 log loss of
 //        xgboost's model, a warm start continues a model xgboost wrote without touching its
-//        trees, and every model it writes reads back through Frigate's evaluator unchanged.
+//        trees, and every model it writes reads back through Frigate's evaluator unchanged. A
+//        column mask keeps the data's width and grows, node for node, a refit on only its columns.
 //
 
 import Foundation
@@ -142,6 +143,57 @@ struct BoostTrainerTests {
             let row = validation.row(i)
             #expect(frigate.predict(row) == result.model.predict(row))
         }
+    }
+
+    @Test("a column mask keeps the data's width and grows, node for node, the trees a refit on only its columns grows")
+    func columnMask() throws {
+        let (train, validation, _) = try Self.histData()
+        let mask = [1, 3, 6]
+        var params = BoostParams(trees: 40, maxDepth: 4, eta: 0.1, subsample: 0.8, colsampleByTree: 0.8, seed: 3)
+        let compact = BoostTrainer.train(PruningStudy.keeping(train, mask), params: params).model
+        params.allowedColumns = mask
+        let masked = BoostTrainer.train(train, params: params).model
+        #expect(masked.featureCount == 8 && compact.featureCount == 3)
+        #expect(masked.trees.count == 40 && compact.trees.count == 40)
+        for (m, c) in zip(masked.trees, compact.trees) {
+            #expect(m.leftChildren == c.leftChildren && m.rightChildren == c.rightChildren && m.parents == c.parents)
+            #expect(m.splitConditions == c.splitConditions && m.baseWeights == c.baseWeights)
+            #expect(m.lossChanges == c.lossChanges && m.sumHessian == c.sumHessian)
+            #expect(m.numFeature == 8 && c.numFeature == 3)
+            let splits = (0..<m.nodeCount).filter { m.leftChildren[$0] != -1 }
+            #expect(splits.allSatisfy { Int(m.splitIndices[$0]) == mask[Int(c.splitIndices[$0])] }, "a masked split names the compact split's column")
+        }
+        let used = Set(masked.trees.flatMap { t -> [Int] in (0..<t.nodeCount).filter { t.leftChildren[$0] != -1 }.map { Int(t.splitIndices[$0]) } })
+        let allowed: Set<Int> = Set(mask)
+        #expect(!used.isEmpty && used.isSubset(of: allowed))
+        let differing = (0..<validation.count).filter { i in
+            let row = validation.row(i)
+            return masked.predict(row) != compact.predict(mask.map { row[$0] })
+        }
+        #expect(differing.isEmpty, "\(differing.count) validation rows score differently")
+        // Eight wide through Frigate's evaluator, as the lens would read it.
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("vg-masked-\(UUID().uuidString).json")
+        try masked.encodeXGBoostJSON().write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let frigate = try XGBoostTreeModel(url: file)
+        #expect(frigate.numFeatures == 8)
+        #expect((0..<validation.count).allSatisfy { frigate.predict(validation.row($0)) == masked.predict(validation.row($0)) })
+    }
+
+    @Test("no mask and a mask of every column are one model; the mask is recorded only when set")
+    func fullMask() throws {
+        let (train, _, _) = try Self.histData()
+        var params = BoostParams(trees: 15, maxDepth: 3, eta: 0.2, subsample: 0.8, colsampleByTree: 0.75, seed: 5)
+        let plain = BoostTrainer.train(train, params: params).model.encodeXGBoostJSON()
+        params.allowedColumns = Array(0..<8)
+        #expect(BoostTrainer.train(train, params: params).model.encodeXGBoostJSON() == plain)
+        params.allowedColumns = [4]
+        let one = BoostTrainer.train(train, params: params).model
+        #expect(one.trees.allSatisfy { t in (0..<t.nodeCount).allSatisfy { t.leftChildren[$0] == -1 || t.splitIndices[$0] == 4 } })
+        let unset = String(decoding: try JSONEncoder().encode(BoostParams()), as: UTF8.self)
+        #expect(!unset.contains("allowedColumns"), "an unmasked recipe encodes as before")
+        params.allowedColumns = [0, 2]
+        #expect(try JSONDecoder().decode(BoostParams.self, from: JSONEncoder().encode(params)) == params)
     }
 
     @Test("base_score: the weighted mean at scale_pos_weight 1, a Newton step otherwise")

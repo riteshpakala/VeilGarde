@@ -11,6 +11,7 @@
 //            dataset = "~/datasets/final_mixed"
 //            shape = "deployed"           # deployed | v18
 //            sample_per_label = 200       # optional: a quick run
+//            features = ["FR", "LV", "CV"]  # optional: split only on these; the model stays 19 wide
 //
 //            [calibration]
 //            max_real_fpr = 0.10
@@ -42,7 +43,7 @@ import VeilGardeCore
 public enum RecipeFile {
     static let keys: [String: Set<String>] = [
         "": ["id"],
-        "warp": ["dataset", "shape", "sample_per_label", "sample_seed", "trees", "depth", "eta", "seed"],
+        "warp": ["dataset", "shape", "sample_per_label", "sample_seed", "trees", "depth", "eta", "seed", "features"],
         "calibration": ["dataset", "max_real_fpr", "band"],
         "fusion": ["mode", "add", "trees", "eta", "new_generator_weight", "preview_weight", "allow_mixed_warp"],
         "heads": ["kinds", "C", "version"],
@@ -83,6 +84,10 @@ public enum RecipeFile {
             if let n = v("warp", "depth")?.integer { w = w.depth(n) }
             if let e = v("warp", "eta")?.float { w = w.eta(e) }
             if let s = v("warp", "seed")?.integer { w = w.seed(UInt64(s)) }
+            if let entry = v("warp", "features") {
+                guard let names = entry.strings else { throw VeilGardeFailure.usage("recipe: [warp] features is a list of feature names") }
+                w = try w.features(names)
+            }
             models.append(.warpTile(w))
         }
         if has("calibration") {

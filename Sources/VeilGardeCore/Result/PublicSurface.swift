@@ -56,7 +56,7 @@ public enum PublicSurface {
                               specialists: [SpecialistContribution], semanticTiles: [[Float]]?, majorityPrediction: String? = nil,
                               majorityScore: Float? = nil, majoritySource: ResultSource? = nil, tileMapSource: ResultSource? = nil,
                               routeDiagnostics: RouteDiagnostics? = nil) -> InferenceResult {
-        InferenceResult(
+        var routed = InferenceResult(
             scorer: base.scorer,
             majorityPrediction: majorityPrediction ?? base.majorityPrediction,
             majorityScore: majorityScore ?? base.majorityScore,
@@ -76,5 +76,7 @@ public enum PublicSurface {
             baseWarpModelSHA256: base.baseWarpModelSHA256,
             sensorWarpModelSHA256: base.sensorWarpModelSHA256,
             routeDiagnostics: routeDiagnostics ?? base.routeDiagnostics)
+        routed.warpWeightedScore = base.warpWeightedScore
+        return routed
     }
 }

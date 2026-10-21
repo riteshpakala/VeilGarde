@@ -107,7 +107,8 @@ public final class TrainingEngine {
                         StageDecision(.tiles, runs: pending > 0, pending > 0 ? "cut \(pending) of \(manifest.count) images into \(cache.directory.path)" : "all \(manifest.count) images are cached"),
                         StageDecision(.data, runs: true, "the tiles of \(manifest.count) images: \(counts) (StableSplit by stem)"),
                         StageDecision(.fit, runs: true, "\(w.shape.rawValue): \(w.params.trees) trees, depth \(w.params.maxDepth), η \(w.params.eta), subsample \(w.params.subsample), colsample \(w.params.colsampleByTree)"
-                                      + (w.params.earlyStoppingRounds.map { ", early stop \($0)" } ?? "")),
+                                      + (w.params.earlyStoppingRounds.map { ", early stop \($0)" } ?? "")
+                                      + (w.featureNames.map { "; splits on \($0.count) of \(WarpFeatures.count) features (\($0.joined(separator: ", "))), the model stays \(WarpFeatures.count) wide" } ?? "")),
                         StageDecision(.evaluate, runs: true, "tile AUC and per-image weighted and majority AUC on validation and test, beside the parent's warp model"),
                         StageDecision(.write, runs: true, "warp/warp_tile32.xgb.json, and the same bytes as the sensor model"),
                     ]
@@ -308,6 +309,7 @@ public final class TrainingEngine {
         let stems = Set(manifest.records.map(\.stem))
         let shards = try cache.load()
         emit(.stage(model: name, .fit))
+        if let names = w.featureNames { emit(.note("warp: splits on \(names.joined(separator: ", ")) only; the model stays \(WarpFeatures.count) wide")) }
         let result = WarpTrainer.train(shards: shards, params: w.params, include: { stems.contains($0.stem) }, note: { self.emit(.note($0)) })
         emit(.stage(model: name, .evaluate))
         let parentModel = try GBDTModel.load(parentBundle.root.appendingPathComponent(parentBundle.manifest.artifact(.warpTile)!.file))

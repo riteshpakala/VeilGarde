@@ -76,6 +76,18 @@ struct CommandTreeTests {
         ["research", "prune", "--parts", "warp,stack", "--resamples", "100", "--tiles", "/tmp/t", "--store", "/tmp/s", "--no-single-features", "--fusion-trees", "100", "--json", "-"],
         ["research", "census", "a.jpg", "list.txt", "--battery", "--sample", "40", "--final-mixed", "/data/fm", "--json", "-", "--weights-dir", "/tmp/w"],
         ["flywheel", "init", "--battery"],
+        ["train", "warp", "--dataset", "/data/fm", "--features", "FR,LV,CV", "--id", "core-trio"],
+        ["research", "core", "--arms", "trio+cfa_G,raw9", "--resamples", "100", "--tiles", "/tmp/t", "--leave-pool-out", "iphone", "--no-forward", "--json", "-"],
+        ["research", "core", "--combine", "a.json", "b.json"],
+        ["research", "redundancy", "--golden-report", "g.json", "--resamples", "100", "--aux", "/tmp/aux", "--json", "-"],
+        ["research", "condensed", "--golden", "FR,LV,CV", "--arms", "full@golden", "--epochs", "2", "--seeds", "0,1", "--battery-tiles", "/tmp/b"],
+        ["research", "census", "/d", "--label", "real", "--bundle", "/tmp/b", "--base", "warp"],
+        ["research", "compare", "--reference", "a.json", "--variant", "b.json", "--reference-iphone", "c.json", "--variant-iphone", "d.json", "--battery", "r.json", "--judge", "part", "--name", "v"],
+        ["route", "x.jpg", "--base", "warp", "--json"], ["batch", "in.jsonl", "out.jsonl", "--base", "warp"],
+        ["flywheel", "battery", "--gate", "full", "--bundle", "/tmp/c", "--base", "warp"],
+        ["bundle", "derive", "--from", "shipped", "--id", "v", "--set", "combiner.w_np=null", "--set", "combiner.w_rescue=0", "--note", "n", "--replace"],
+        ["features", "extract", "list.jsonl", "--shard", "s", "--columns", "noiseprint", "--store", "/tmp/aux"],
+        ["watermark", "invariance", "--images", "/d", "--images", "list.txt", "--baseline", "b.json", "--out", "o.json"],
     ])
     func invocationParses(arguments: [String]) throws {
         _ = try VeilGardeCommand.parseAsRoot(arguments)

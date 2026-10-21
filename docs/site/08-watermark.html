@@ -67,6 +67,11 @@
 <h2 id="resize">What it cannot do</h2>
 <p>A resize moves every tile, so the signature does not survive it, and v1 does not claim to. On every fourth image the crop was also resized to 0.9 and 0.75 of its size, and none of them matched.</p>
 
+<h2 id="invariance">Kept as it was</h2>
+<p>A signature is only as good as its sameness: a change anywhere under the residual would silently stop old signatures from matching. So a gate guards it. It signs a fixed set of images exactly as signing does and fails on any content id, grid or bit count that moved from a baseline.</p>
+<div class="code" data-excerpt="Sources/VeilWatermark/Acceptance/WatermarkInvariance.swift:WatermarkInvariance.compare(baseline:current:)"></div>
+<p>On 2026-10-20, before the reduction study changed any code, the baseline was taken on the battery's 105 images, and three of its signatures were checked against the untouched binary's. After the study's last build all 105 signatures were the same. The study changed no file the residual is read through, so the acceptance run above stands without a rerun.</p>
+
 
 <h2 id="sources">Where the numbers come from</h2>
 <div class="scroll">
@@ -81,6 +86,7 @@
 <tr><td>73.2%, 0.958, 81.3% at 0.73 with 0.0%, 0.698, 0.496 to 0.498</td><td>Ledger command for <code>watermark accept --n 200</code>; the report at &lt;work area&gt;/watermark/accept_v1_n200.json</td><td>2026-10-19, 198 images</td></tr>
 <tr><td>By size, by label, by misalignment; 50 of 53 misses at their offset; z 9.2 and 11.9</td><td>The same report's rows, broken down</td><td>2026-10-19</td></tr>
 <tr><td>Resizes on every fourth image, none matched</td><td>The same report; ledger decision on the resizes</td><td>2026-10-19</td></tr>
+<tr><td>105 signatures equal before and after</td><td>Ledger commands for <code>watermark invariance</code>; the reports at &lt;work area&gt;/watermark/invariance-baseline-20261020.json and invariance-after-20261020.json</td><td>2026-10-20</td></tr>
 </tbody>
 </table>
 </div>

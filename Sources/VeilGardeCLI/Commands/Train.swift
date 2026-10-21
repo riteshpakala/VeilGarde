@@ -115,6 +115,7 @@ struct TrainCommand: ParsableCommand {
         @Option(help: "Override the shape's tree count.") var trees: Int?
         @Option(help: "Override the shape's depth.") var depth: Int?
         @Option(help: "Override the shape's learning rate.") var eta: Double?
+        @Option(help: "Split only on these warp features, comma separated (FR,LV,CV,…); the model stays 19 wide.") var features: String?
         @Flag(name: .customLong("no-calibration"), help: "Do not refit the calibration (the sensor lane then falls back to identity).") var noCalibration = false
         @OptionGroup var options: TrainingOptions
 
@@ -126,6 +127,7 @@ struct TrainCommand: ParsableCommand {
                 if let trees { w = w.trees(trees) }
                 if let depth { w = w.depth(depth) }
                 if let eta { w = w.eta(eta) }
+                if let features { w = try w.features(features.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }) }
                 let calibrate = !noCalibration
                 try options.run(TrainingRecipe(id: options.candidateID("warp")) {
                     w

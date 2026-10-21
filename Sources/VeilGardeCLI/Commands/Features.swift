@@ -130,12 +130,22 @@ struct FeaturesCommand: ParsableCommand {
         @Option(help: "The feature store directory (default: <work area>/store/shards).") var store: String?
         @Option(help: "Read at most this many images.") var limit: Int?
         @Option(help: "small, xsmall or xxsmall.") var dino: String = DinoVariant.small.rawValue
+        @Option(help: "Measure only these columns, comma separated (dino_norm, dino_fusion, cap, warp, sharp, noiseprint); the rest are NaN.") var columns: String?
         @OptionGroup var workArea: WorkAreaOptions
 
         func run() throws {
             guarded {
                 ShippedBundle.registerWeightFolders()
                 guard let variant = DinoVariant(rawValue: dino) else { throw VeilGardeFailure.usage("--dino is small, xsmall or xxsmall") }
+                let measured = try columns.map { list in
+                    Set(try list.split(separator: ",").map { name -> FeatureColumn in
+                        let trimmed = name.trimmingCharacters(in: .whitespaces)
+                        guard let column = FeatureColumn(rawValue: trimmed) else {
+                            throw VeilGardeFailure.usage("--columns names \(FeatureColumn.allCases.map(\.rawValue).joined(separator: ", ")), not \(trimmed)")
+                        }
+                        return column
+                    })
+                } ?? Set(FeatureColumn.allCases)
                 let url = datasetURL(input)
                 var items: [ExtractionItem]
                 if url.pathExtension == "jsonl" {
@@ -150,7 +160,7 @@ struct FeaturesCommand: ParsableCommand {
                 }
                 if let limit { items = Array(items.prefix(limit)) }
                 let storeURL = try store.map(datasetURL) ?? workArea.resolve().root.appendingPathComponent("store/shards", isDirectory: true)
-                let extractor = try FeatureExtractor(warpModelURL: ShippedBundle.url(.warpTile), variant: variant)
+                let extractor = try FeatureExtractor(warpModelURL: ShippedBundle.url(.warpTile), variant: variant, columns: measured)
                 note("extract: \(items.count) images → \(storeURL.path)/\(shard)")
                 let report = try ShardExtractor.extract(items, shard: shard, store: FeatureStore(directory: storeURL), extractor: extractor, note: note)
                 print(String(format: "%@: %d rows written, %d already in the store, %d skipped, %.1fs", report.shard, report.rows, report.skippedKnown,

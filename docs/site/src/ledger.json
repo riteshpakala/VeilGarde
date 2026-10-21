@@ -76,6 +76,26 @@
       "id": "amendment-15",
       "date": "2026-10-20",
       "text": "Can we update the excerpts for ml explorer and explorer to be 1 paragraph [the ML explorer's four intro paragraphs, pasted] this part for both"
+    },
+    {
+      "id": "amendment-16",
+      "date": "2026-10-20",
+      "text": "I want to create a thorough testing rubric on this base implementation to essentially greatly reduce and cut it to its core high fidelity detection mechanisms on the majority route prior to the specialist heads. I want to run multiple tests with the Warp 19, to see if we just rely on FR, LV, CV and then see if any this actually moves the needle or not on top. [a pasted table of nine features: XR, CFA, xBG, xRB, cfaR, cfaB, noiseRatio, diagAxial, nyqR, each with what it measures] Let's find the golden combination. After that we need to test the actual necessity of fusion head and noiseprint in this process. The reason for this process is that the specialist heads seemed to cover the gaps compeltely towards the end allowing us to simplify the core patent process that is currently filed to its roots and what it does best, creating that PRNU signal and generating the watermark we require, while detecting an accurate iphone real camera signature bypassing deepfusion's artifacts. The watermark creation right now should remain untouched unless the above changes impacts the watermark and maintains its stats from the initial creation."
+    },
+    {
+      "id": "amendment-17",
+      "date": "2026-10-20",
+      "text": "Another golden outcome is understanding if the same signals that were being derived from noiseprint, fusion head can be found from expanding on the initial trio. A redundancy check against he baseline theorem of reconstruction via warp residual thought."
+    },
+    {
+      "id": "amendment-18",
+      "date": "2026-10-20",
+      "text": "This might inadvertently lead to us creating a new model format to train that combines the prowess of DinoV2, fusion and noiseprint. If we can plan a new model algo/formate to use and train to supplement all of them to use in combination with the warp trio that should also be another route to experiment and test. Building it on the MLX framework in Frigate. We have enough data and findings that can also source from [the research], in order to create a condensed model type to harness all of the signals to use in succinct combination with the warp trio or how many ever crucial features we still require on top of the warp trio."
+    },
+    {
+      "id": "amendment-19",
+      "date": "2026-10-20",
+      "text": "Make this an unsupervised run, I will be AFK."
     }
   ],
   "answers": [
@@ -133,6 +153,55 @@
       "question_id": "question-5",
       "question": "The noiseprint does not feed the warp-to-fusion path: it acts only in the combiner, on an image with no capture signature and a base under 0.75, and only to pull it toward real (answer-7 assumed otherwise). The photoreal net is the better camera detector on its own held-out images (AUC 0.963 against 0.947; the forged anchor at 0.386 against 0.429), but in the full detector it changed no call on the battery (command-51) or on 300 census images (command-66), moving scores both ways. Swap it in for the shipped net, or keep the shipped one?",
       "answer": "no"
+    },
+    {
+      "id": "answer-10",
+      "date": "2026-10-20",
+      "question_id": "question-6",
+      "question": "The 19 warp features split into the residual ten (FR, LV, CV, CM, CC, CR and the four seams) and the raw-tile nine the request lists. What happens with the seven residual features the request does not name: CM, CC, CR and the seams?",
+      "answer": "Add them to the pool: forward selection may pick any of the sixteen non-trio features."
+    },
+    {
+      "id": "answer-11",
+      "date": "2026-10-20",
+      "question_id": "question-7",
+      "question": "The 438 iPhone originals are final_mixed's iphone pool, so the stem split puts 296 in training and 74 in the test partition. How is the iPhone camera signature measured?",
+      "answer": "Both designs: per-pool rows on the stem-split test partition, and a second run that leaves the whole iPhone pool out of training and calibration and scores all 438."
+    },
+    {
+      "id": "answer-12",
+      "date": "2026-10-20",
+      "question_id": "question-8",
+      "question": "Which bars decide a feature that moves the needle and the golden combination: 0.005 vote AUC and 2 points on the sensor-call shares, tighter at 0.0025 and 1 point, or looser at 0.01 and 5 points?",
+      "answer": "0.005 vote AUC and 2 points, with the seed-control floor for moving the needle."
+    },
+    {
+      "id": "answer-13",
+      "date": "2026-10-20",
+      "question_id": "question-9",
+      "question": "How deep does the fusion test go: the warp score pooled in the fusion head's place on the shipped stack, or also a store re-derivation with a combiner refit on the warp base, several GPU hours?",
+      "answer": "The bypass on the shipped stack only; the re-derivation and the refit are written up as a follow-on."
+    },
+    {
+      "id": "answer-14",
+      "date": "2026-10-20",
+      "question_id": "question-10",
+      "question": "The redundancy check needs each final_mixed image's noiseprint, DINOv2 and capture beside its cached tiles. The store holds 8,760 of the 12,000 with DINOv2 and capture, and no noiseprint on any. Measure all 12,000 or only the noiseprint of those 8,760?",
+      "answer": "Only the 8,760 store rows."
+    },
+    {
+      "id": "answer-15",
+      "date": "2026-10-20",
+      "question_id": "question-11",
+      "question": "Expanding the trio could also mean the lens's dormant directional probes, columns 20 to 40, which need a new tile cut and a truncated grid. Include them?",
+      "answer": "Not in this run: written up as a follow-on with their cost and their geometry."
+    },
+    {
+      "id": "answer-16",
+      "date": "2026-10-20",
+      "question_id": "question-12",
+      "question": "The redundancy verdicts' bars: redundant at a gain of at most 0.005 AUC, complementary when the gain's interval excludes zero and exceeds 0.005, reconstructed at a held-out AUC of at least 0.90; or tighter, or looser?",
+      "answer": "The owner answered with amendment-18, the condensed model, and named no bar; the proposed 0.005 and 0.90 were fixed when the plan was approved."
     }
   ],
   "base": {
@@ -782,6 +851,76 @@
       "rejected": "tracking the runbook",
       "reason": "decision-81: everything under docs/ but the site stays local",
       "file": "docs/site/README.md"
+    },
+    {
+      "id": "decision-93",
+      "chose": "A column mask in the boost trainer, BoostParams.allowedColumns: each tree's column sample is drawn from the mask by the same permutation, the floor of colsample times the mask's size, and the model keeps the data's 19 columns. train warp --features, the recipe's features modifier and the TOML key carry it, and the candidate's recipe and metrics record it",
+      "rejected": "the pruning study's compact refits, re-indexed to the kept columns",
+      "reason": "a compact model cannot deploy: the lens writes 19 fixed columns and a sensor calibration binds only a 19, 35 or 40 column model. A masked fit grows the compact refit's trees node for node, so the study measures the model that would ship",
+      "file": "Sources/VeilGardeTraining/Boost/BoostTrainer.swift"
+    },
+    {
+      "id": "decision-94",
+      "chose": "The core study's rules, fixed before it runs. R0: every arm is the deployed shape refit on final_mixed's train partition under a column mask, colsample taken over the mask, every model 19 wide, its sensor cuts refit on the validation partition by the engine's rule, every number held out. The seed floor is the largest vote-AUC move of the full model refit with seed 1 or 2. R1: a feature moves the needle when the vote AUC it adds to the trio FR, LV, CV has a 95% interval excluding zero and a gain above the seed floor. Forward selection adds the best vote gain until that gain's interval holds zero or does not pass the seed floor. R2: the golden combination is the smallest arm whose vote AUC is within 0.005 of the full model's, whose iPhone real-call share is no more than 2 points under the full model's and whose share of generated images called real is no more than 2 points over it, in both the stem-split run and the run that leaves the iPhone pool out; if none qualifies, the full model",
+      "rejected": "judging on the weighted lane; a single run with the iPhone pool partly in training",
+      "reason": "the majority route is the tile vote and its two cuts. The owner chose the pool, both designs and the bars (answer-10, answer-11, answer-12). Stated before the run: one seed floor serves every arm, nothing adjusts for the number of arms, and the test partition holds 74 iPhone images",
+      "file": "Sources/VeilGardeTraining/Research/CoreStudy.swift"
+    },
+    {
+      "id": "decision-95",
+      "chose": "The pruning study and the paired comparison keep their bytes: the core study calls PruningStudy.padded, and a new overload of PairedComparison.measure, which calls each side with its own cuts, wraps the existing one",
+      "rejected": "moving timed and padded into a shared file; folding the two-call form into measure",
+      "reason": "both declarations carry trail anchors, and a moved line fails the site's build; the published pruning report's call counts stay as they were",
+      "file": "Sources/VeilGardeTraining/Research/PairedComparison.swift"
+    },
+    {
+      "id": "decision-96",
+      "chose": "The redundancy check's rules, fixed before it runs. On the 8,760 final_mixed images the store holds, joined by id to their DINOv2 and capture rows and a freshly measured noiseprint, and by stem to their cached tiles, each arm's residual view, its weighted score, vote, sharpness and the mean and spread of each allowed column, is asked to reconstruct the noiseprint's call and the fusion head's call, and each signal's gain on top of the view is measured on held-out images. Every second-stage model is the scratch fusion shape, cross-fitted on the held-out partitions, fit on validation and scored on test and the other way round, so no stacked model sees a residual score from an image the warp model trained on. The combiner replayed with and without the noiseprint is descriptive. RR1: a signal is redundant with the residual under an arm when its AUC gain on top of the view is at most 0.005, complementary when the gain's 95% interval excludes zero and exceeds 0.005, else undetermined. RR2: the residual reconstructs a signal when it predicts that signal's call with held-out AUC of at least 0.90",
+      "rejected": "a store-wide check, whose warp column an older model wrote and whose noiseprint is missing on four rows in five",
+      "reason": "amendment-17 asks whether the noiseprint's and the fusion head's signals are recoverable from the trio expanded. Only final_mixed's images have cached tiles; the store holds 8,760 of them with DINOv2 and capture and none with a noiseprint, so it is measured once into a scratch store (answer-14)",
+      "file": "Sources/VeilGardeTraining/Research/RedundancyStudy.swift"
+    },
+    {
+      "id": "decision-97",
+      "chose": "A condensed model as a second route, trained in Swift on MLX through Frigate: the core's tiles through one shared per-tile network, pooled by means and a soft vote and never by softmax attention, beside the nine capture values and the noiseprint's P(camera), and DINOv2's embedding. Its arms: full, no-semantic, no-provenance, residual-only, semantic and provenance alone, and per-column aggregates, on the trio, the golden set and all 19. It is admissible only when C1 its held-out AUC is at least the gradient-boosted model's on the same inputs minus 0.005, C2 its real false-positive rate at that model's recall is at most 0.01 above it, C3 it calls every HARD battery image right, offline, and C4 its iPhone real share is at least the trio warp model's. Measured offline; nothing is wired into the detector in this run",
+      "rejected": "a co-registered head pooled by softmax attention; a blended meta-combiner",
+      "reason": "amendment-18. The research found a learned meta-combiner raised real false positives from 8% to 50 to 92% on screenshots (2026-06-29, quoted), and an attention-pooled co-registered head closed at parity with the flat fusion, its pooling firing on single regions (2026-07-20, quoted). C2 and the pooling are those lessons written as rules",
+      "file": "Sources/VeilGardeTraining/Condensed/CondensedTrainer.swift"
+    },
+    {
+      "id": "decision-98",
+      "chose": "Measurement switches for the full detector: InferenceConfig.baseExpert, fusion by default and warp to pool the warp lens's own weighted score where the fusion head's would go, replacing the dead useFusion flag; --base on route, batch, research census and flywheel battery; research census gains --bundle, --label and folders and records the sensor call, the warp-only score and the bundle it ran; bundle derive makes a variant from a parent with one recorded, re-pinned combiner edit, in place of the hand edits behind the prune candidates",
+      "rejected": "dropping the fusion head from a bundle, which makes the camera route throw; hand-edited bundles",
+      "reason": "the fusion test is the bypass on the shipped stack as it stands (answer-13). Promote and rollback keep the default, and the result JSON's keys and the golden tests do not move",
+      "file": "Sources/VeilGardeInference/Route/Heads/CameraFusionHead.swift"
+    },
+    {
+      "id": "decision-99",
+      "chose": "The detector matrix's rules, fixed before it runs: eight cells, the shipped bundle and the golden warp candidate, each with the fusion head or the warp base and with or without the noiseprint, each through the full battery, the 300-image census and the 438 iPhone originals. R1: the battery decides PASS or FAIL. R2: a part is not necessary only when the battery passes without it, the 200 labelled final_mixed census images lose at most 2 correct calls against the same warp model with the part, and the changed calls moved to the wrong label are no more than those moved to the right one. R3: the golden warp holds up when its cell passes the battery, its sensor call agrees with the shipped model's on at least 98% of the 738 images, and its iPhone sensor and final real shares are each no more than 2 points under the shipped model's. R4: every cell runs and is reported whatever an earlier one did; the 438 originals are partly the warp models' training images and every table says so",
+      "rejected": "judging a part on store rows, whose warp column an older model wrote",
+      "reason": "amendment-16 asks whether the fusion head and the noiseprint are needed once the specialist heads sit on top; the store re-derivation and a combiner refit on the warp base are the follow-on (answer-13)",
+      "file": "Sources/VeilGardeCLI/Commands/ResearchCompare.swift"
+    },
+    {
+      "id": "decision-100",
+      "chose": "A watermark invariance gate: watermark invariance signs a set of images exactly as watermark sign does and fails on any content id, grid or bit count that moved from a baseline. The baseline was taken on the battery's 105 images before any other change, three of its signatures checked against the untouched binary's, and it is re-run after every build. The hour-long acceptance runs again only if a file of the shared residual, or Frigate, changes",
+      "rejected": "re-running the acceptance after every change",
+      "reason": "amendment-16: the watermark stays as created unless a change reaches it. It reads FR's computation alone, which nothing in this study changes; the gate shows it instead of assuming it",
+      "file": "Sources/VeilWatermark/Acceptance/WatermarkInvariance.swift"
+    },
+    {
+      "id": "decision-101",
+      "chose": "The run goes unsupervised: the golden arm is whatever R2 names, the full model included; the GPU is checked before every MLX workload and waited on for up to three hours; a failure is recorded with its output and the independent steps go on; one commit at the end, only if every test target and both watermark gates pass; nothing is pushed, deleted or promoted",
+      "rejected": "stopping to ask at each branch",
+      "reason": "amendment-19",
+      "file": "docs/site/src/ledger.json"
+    },
+    {
+      "id": "decision-102",
+      "chose": "The site's data cap rises from 3.0 to 3.5 MB, in the build and in the check, so the site can show the reduction study's code, ledger and chapters",
+      "rejected": "leaving the site unbuilt and its check failing; cutting the study's sources or tests to fit",
+      "reason": "the study adds about 223 KB of source, and with git's empty tree as the base there is no old text to drop, so the data stood at 3.07 MB with nothing else changed. The 3 MB figure was the explorer runbook's default, \"unless the prompt says otherwise\"; this run took the decision unsupervised, and reverting the two constants and this entry restores it",
+      "file": "docs/site/src/build.py"
     }
   ],
   "commands": [
@@ -1589,6 +1728,211 @@
         "on ml.html: the first trail walked with ], the depth control kept over a reload, a card's facts equal to the data, a twin link and a chapter cite resolved, the lane on every step of the two verdicts trail, the legend's 18 marks, a code trail's link landing on code.html; the orb's stand-in test with the models' map and five tools",
         "nine broken copies of the ML trails, an anchor, a fact path, a twin, a chapter cite, a lane, a primer, a deeper cite, a mark that clashes and a banned word, each refused by the build with its reason"
       ]
+    },
+    {
+      "id": "command-71",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "VEILGARDE_SKIP_BUILD=1 VEILGARDE_CONFIG=release scripts/cli.sh watermark sign <three battery images> --json; then, with only the invariance command added, watermark invariance --images <work area>/battery/images --out <work area>/watermark/invariance-baseline-20261020.json",
+      "exit": 0,
+      "lines": [
+        "before any other change: Frigate 13a41e98, mlx.metallib 19ffa3f4, the untouched release binary b2a84c69",
+        "105 images signed, 0 skipped, in 299.8 s; three of the signatures equal the untouched binary's, content ids e93dd7f1, 68dae411 and e053ccfe",
+        "the baseline every later build is compared against (decision-100)"
+      ]
+    },
+    {
+      "id": "command-72",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "research core (the core study, stem split) on the release build",
+      "exit": 0,
+      "lines": [
+        "final_mixed: 8,414 training images, 1,847 for the cuts, 1,738 scored; 31 arms in 771 s, CPU only; report research/core-20261020T215645Z.json",
+        "the full model, all 19: vote AUC 0.7693, weighted 0.8092, iPhone real share 0.919 on the 74 held-out originals, generated called real 0.447; the seed floor 0.0032",
+        "the trio FR, LV, CV alone: vote AUC 0.6420, 0.127 under the full model; iPhone real 0.716; generated called real 0.672",
+        "every raw-tile feature moves the needle on the trio, noise_ratio most (+0.0444), then xcorr_BG, xcorr_RB and xcorr_RG; of the residual seven, CM and CR move it, CC does not, each seam by about 0.005",
+        "the nine raw-tile features alone: 0.7391; the ten residual features alone: 0.6844",
+        "the trio and the raw nine, 12 features: 0.7673, 0.0021 under the full model with an interval holding zero; iPhone real 0.946; generated called real 0.433; it meets R2 and is the smallest arm that does",
+        "forward selection: noise_ratio, xcorr_RB, xcorr_BG, nyq_R, then stops; its seven features reach 0.7580, 0.0113 under the full model"
+      ]
+    },
+    {
+      "id": "command-73",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "research core --leave-pool-out iphone",
+      "exit": 0,
+      "lines": [
+        "the 438 iPhone originals out of training and the cuts, scored whole beside the test partition: 8,118 training images, 2,102 scored, 740 s; report research/core-20261020T220905Z.json",
+        "the full model: vote AUC 0.7019; iPhone real share 0.532, against 0.919 when the pool trained it; the seed floor 0.0027",
+        "the trio: 0.5899, iPhone real 0.678 while it calls 0.706 of generated images real",
+        "the trio and the raw nine: 0.7025, 0.0005 over the full model; iPhone real 0.559; generated called real 0.439; it meets R2 again",
+        "forward selection: xcorr_BG, xcorr_RG, noise_ratio, nyq_R, then stops; its seven features reach 0.6982 but call 0.485 of generated images real, past the bar"
+      ]
+    },
+    {
+      "id": "command-74",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "research core --combine <stem-split report> <left-out-pool report>",
+      "exit": 0,
+      "lines": [
+        "golden across both runs: the trio and the raw nine, FR, LV, CV, xcorr_RG, cfa_G, xcorr_BG, xcorr_RB, cfa_R, cfa_B, noise_ratio, diag_axial, nyq_R; no smaller arm qualifies in either run",
+        "it leaves out CM, CC, CR and the four seam features; report research/core-golden-20261020T220906Z.json"
+      ]
+    },
+    {
+      "id": "command-75",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "train warp --dataset <datasets>/final_mixed --shape deployed --features FR,LV,CV,xcorr_RG,cfa_G,xcorr_BG,xcorr_RB,cfa_R,cfa_B,noise_ratio,diag_axial,nyq_R --id core-trio-raw9",
+      "exit": 0,
+      "lines": [
+        "candidates/core-trio-raw9 in 22.5 s, 14 artifacts verified; its warp model, 8cbfc524, is the core study's arm byte for byte, the same SHA-256",
+        "its cuts: Platt qualified, threshold 0.6315 at real FPR at most 0.10 on validation, said as real at or under 0.6166 of the tiles and generated at or over 0.7010",
+        "test: tile AUC 0.6592, weighted 0.8086, vote 0.7673"
+      ]
+    },
+    {
+      "id": "command-76",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "bundle derive --from shipped --id study-np --set combiner.w_np=null; bundle derive --from <work area>/candidates/core-trio-raw9 --id core-trio-raw9-np --set combiner.w_np=null",
+      "exit": 0,
+      "lines": [
+        "the combiner c6d138f5 becomes 6c83baa8 in both: w_np gone, every other weight kept; every other artifact the parent's bytes",
+        "the shipped parent's manifest c83382ab, its resources byte-identical to Sources/VeilGardeInference/Resources"
+      ]
+    },
+    {
+      "id": "command-77",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "features extract <the store's 8,760 final_mixed rows>.jsonl --columns noiseprint --shard final_mixed_np --store <work area>/store/aux",
+      "exit": 0,
+      "lines": [
+        "8,705 rows written in 922 s; 55 skipped because their bytes, and so their ids, equal an earlier row's, which they join through",
+        "the scratch store only: the seed store is left as it was, its final_mixed rows carry no noiseprint (decision-96)"
+      ]
+    },
+    {
+      "id": "command-78",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "features tiles <the battery's 100 gated images>.jsonl; features extract <the same images>.jsonl --shard battery_all --store <work area>/store/aux",
+      "exit": 0,
+      "lines": [
+        "100 images cut into store/tiles/battery, 19,548 tiles, in 14 s; every column measured into store/aux/battery_all in 25 s",
+        "each image keeps its group and mode, so the condensed model is judged on the HARD groups offline (decision-97, C3)"
+      ]
+    },
+    {
+      "id": "command-79",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "research redundancy --golden-report <work area>/research/core-golden-20261020T220906Z.json",
+      "exit": 0,
+      "lines": [
+        "8,760 final_mixed images joined; 2,620 held out, validation and test, cross-fitted; 155 s, CPU only",
+        "RR2: no residual view reconstructs either signal's call. The noiseprint's at AUC 0.654 from the trio to 0.766 from all 19; the fusion head's at 0.765 to 0.872; the bar is 0.90",
+        "RR1: on top of every residual view both signals are complementary. The noiseprint adds 0.0075 on the golden set and 0.0228 on the trio; DINOv2 and capture add 0.048 on the golden set and 0.090 on the trio",
+        "once DINOv2 and capture are there, the noiseprint is redundant in every arm: from -0.0035 to +0.0028, each interval holding zero",
+        "the residual is never redundant: it adds 0.085 to 0.114 on top of DINOv2, capture and the noiseprint together",
+        "the shipped combiner replayed on 2,288 capture-absent images: the noiseprint moves 4 to 13 calls, none of them to the right label",
+        "the 121 held-out iPhone originals under the golden set: its sensor call reads 116 real, the noiseprint 117 camera, and they agree on 112"
+      ]
+    },
+    {
+      "id": "command-80",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "watermark invariance --images <work area>/battery/images --baseline <work area>/watermark/invariance-baseline-20261020.json --out <work area>/watermark/invariance-after-20261020.json",
+      "exit": 0,
+      "lines": [
+        "on the build holding every part of the study: all 105 signatures equal the baseline, content ids, grids and bit counts, in 389.6 s",
+        "no file of the shared residual changed, nor Frigate 13a41e98 or mlx.metallib 19ffa3f4, so the acceptance of 2026-10-19 stands without a rerun (decision-100)"
+      ]
+    },
+    {
+      "id": "command-81",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "research condensed --golden-report <work area>/research/core-golden-20261020T220906Z.json",
+      "exit": 0,
+      "lines": [
+        "eight arms, three seeds each, on MLX: 6,140 training, 1,360 validation and 1,260 test images of the 8,760 joined, about two minutes in all; the weights under research/condensed-20261020T223359Z/; report research/condensed-20261020T223359Z.json",
+        "no arm is admissible: every one fails C3, calling 30 to 34 of the battery's 50 HARD images right offline; the protect-real anchors, the native cameras and the user's generated set are the misses",
+        "C1 and C2 hold for the full model on the golden core: test AUC 0.8771 against the boosted model's 0.8767 on the same inputs, real FPR 0.075 at its recall against 0.093; its iPhone real share 0.953 against the trio warp model's 0.750",
+        "DINOv2 adds nothing here: tiles with the capture values and the noiseprint reach 0.8771 too, 0.8855 over three seeds, with 5,122 parameters against 33,858; with DINOv2 the model stops improving within 3 to 6 epochs",
+        "the learned tile pooling beats the tiles summarized: the residual alone 0.8234 against the boosted model's 0.7948 on each feature's mean, spread and quantiles",
+        "the shipped fusion head reads 0.9837 on the same test images, as reliance: they trained it"
+      ]
+    },
+    {
+      "id": "command-82",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "scripts/parity-garde.sh --mode route --sample 20 --garde-metallib",
+      "exit": 3,
+      "lines": [
+        "20 of 20 differ from Garde's headless app, each in the fields changed on purpose before this run: the sensor calibration, two cuts since 2026-10-20 where Garde writes its Platt contract (ResultJSON.changedSinceGarde), and on one image the art-pair row Garde still shows, the adjudicator out of the combiner since 2026-10-19",
+        "the script compares every byte and cannot set those fields aside; the route goldens do, and pass (test-23)"
+      ]
+    },
+    {
+      "id": "command-83",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "research census --bundle Sources/VeilGardeInference/Resources, against research/census-20261020T051523Z.json",
+      "exit": 0,
+      "lines": [
+        "the default path, after every change of the study, image by image against the census of the same bundle taken before any: 300 of 300 routed scores, fusion base scores and pre-semantic scores exactly equal, no call moved, the same stack rows, decisions, capture states and routes",
+        "correct generated 109 of 139, real 152 of 161; the stack moved 6 calls and the semantic chain 1, as before"
+      ]
+    },
+    {
+      "id": "command-84",
+      "phase": 14,
+      "date": "2026-10-20",
+      "cmd": "for eight cells, the shipped warp or candidates/core-trio-raw9, the fusion base or --base warp, the combiner with or without w_np: flywheel battery --gate full --bundle <B> [--base warp]; research census --bundle <B> [--base warp]; research census <datasets>/iphone --label real --bundle <B> [--base warp]",
+      "exit": 0,
+      "lines": [
+        "one GPU workload at a time, 22:36Z to 00:30Z, about 13 to 16 minutes a cell; reports under research/study/matrix/",
+        "V0, as shipped: PASS; final_mixed correct 161 of 200, census 261 of 300; the 438 iPhone originals 97.5% sensor real, 99.8% routed real",
+        "V-np, no noiseprint: PASS; no call moved on the 300 or the 438, 30 and 2 scores moved",
+        "V-fu, the warp lens as the base: FAIL in six groups, gen_semantic 0.21, native_cam 0.88, wildlife_real 0.81, flux_anchor and native_12yrs 0; final_mixed correct 136; iPhone routed real 81.3%, 70 of 438 inconclusive",
+        "V-fu-np: FAIL as V-fu",
+        "G0, the golden warp: PASS; final_mixed correct 159; iPhone sensor real 96.6%, routed real 99.8%",
+        "G-np, the golden warp without the noiseprint: FAIL in user_real, HNT6bs5WMAA_dU5_full_res.jpeg from real 0.390 to generated 0.553",
+        "G-fu and G-fu-np: FAIL in seven groups; final_mixed correct 151 and 153",
+        "the 438 originals are partly both warp models' training images, and their capture signature is present on 425, where the stack stands down"
+      ]
+    },
+    {
+      "id": "command-85",
+      "phase": 14,
+      "date": "2026-10-21",
+      "cmd": "research compare for each cell against its reference, by the matrix's rules (decision-99)",
+      "exit": 0,
+      "lines": [
+        "the noiseprint with the shipped warp: not necessary by R2; with the golden warp: necessary, the battery fails without it",
+        "the fusion head: necessary by R2 with either warp model: the battery fails without it, 25 or 8 fewer final_mixed images right, 64 of 69 and 48 of 60 moved calls wrong",
+        "the golden warp does not hold up by R3: the battery passes and its iPhone shares hold, 96.6% sensor real against 97.5% and 99.8% routed real as before, but its sensor call agrees with the shipped model's on 81.9% of 733 images against the bar of 98%",
+        "of the 124 labelled census images where the two sensor calls differ, the golden model's is right on 70 and the shipped model's on 21, most of them generated images it now calls generated",
+        "the first pass of the compares wrote one shared research/ file, their stamps the same second, and read the battery's statuses as a map: both fixed, and the seven compares rerun from the same reports, verdicts unchanged"
+      ]
+    },
+    {
+      "id": "command-86",
+      "phase": 14,
+      "date": "2026-10-21",
+      "cmd": "on the final build: watermark invariance --baseline <work area>/watermark/invariance-baseline-20261020.json; the route on 20 final_mixed images against Garde's headless app with the fields changed on purpose set aside",
+      "exit": 0,
+      "lines": [
+        "all 105 signatures equal the baseline",
+        "20 of 20 routed results equal Garde's outside the two-cut calibration and the art-pair row, which Garde shows on 4 of them; the largest difference 1.04e-5, Frigate's Metal kernels against Garde's as on 2026-10-19"
+      ]
     }
   ],
   "assumptions": [
@@ -1645,6 +1989,50 @@
     {
       "id": "question-5",
       "text": "The noiseprint does not feed the warp-to-fusion path: it acts only in the combiner, on an image with no capture signature and a base under 0.75, and only to pull it toward real (answer-7 assumed otherwise). The photoreal net is the better camera detector on its own held-out images (AUC 0.963 against 0.947; the forged anchor at 0.386 against 0.429), but in the full detector it changed no call on the battery (command-51) or on 300 census images (command-66), moving scores both ways. Swap it in for the shipped net, or keep the shipped one?"
+    },
+    {
+      "id": "question-6",
+      "text": "The 19 warp features split into the residual ten (FR, LV, CV, CM, CC, CR and the four seams) and the raw-tile nine the request lists. What happens with the seven residual features the request does not name: CM, CC, CR and the seams?"
+    },
+    {
+      "id": "question-7",
+      "text": "The 438 iPhone originals are final_mixed's iphone pool, so the stem split puts 296 in training and 74 in the test partition. How is the iPhone camera signature measured?"
+    },
+    {
+      "id": "question-8",
+      "text": "Which bars decide a feature that moves the needle and the golden combination: 0.005 vote AUC and 2 points on the sensor-call shares, tighter at 0.0025 and 1 point, or looser at 0.01 and 5 points?"
+    },
+    {
+      "id": "question-9",
+      "text": "How deep does the fusion test go: the warp score pooled in the fusion head's place on the shipped stack, or also a store re-derivation with a combiner refit on the warp base, several GPU hours?"
+    },
+    {
+      "id": "question-10",
+      "text": "The redundancy check needs each final_mixed image's noiseprint, DINOv2 and capture beside its cached tiles. The store holds 8,760 of the 12,000 with DINOv2 and capture, and no noiseprint on any. Measure all 12,000 or only the noiseprint of those 8,760?"
+    },
+    {
+      "id": "question-11",
+      "text": "Expanding the trio could also mean the lens's dormant directional probes, columns 20 to 40, which need a new tile cut and a truncated grid. Include them?"
+    },
+    {
+      "id": "question-12",
+      "text": "The redundancy verdicts' bars: redundant at a gain of at most 0.005 AUC, complementary when the gain's interval excludes zero and exceeds 0.005, reconstructed at a held-out AUC of at least 0.90; or tighter, or looser?"
+    },
+    {
+      "id": "question-13",
+      "text": "The golden combination, the trio FR, LV, CV with the nine raw-tile features, is the smallest that keeps the full model's vote in both core runs (commands 72 to 74), and candidates/core-trio-raw9 passes the full battery with the iPhone shares held. It fails R3 as written: its camera-sensor call agrees with the shipped model's on 81.9% of 733 images, against the bar of 98%, and where the two differ on labelled census images it is right on 70 and the shipped model on 21, most of them generated images it now calls generated. Both models trained on final_mixed, so that comparison is partly in-sample. The warp model, its sensor copy and the cuts are frozen and yours to change: replace them with the candidate, keep the shipped model, or measure it first on images neither trained on?"
+    },
+    {
+      "id": "question-14",
+      "text": "The noiseprint term: with the shipped warp model the battery and all 738 census and iPhone images keep every call without it (V-np), and the redundancy check finds it adds nothing once DINOv2 and capture are present (command-79). With the golden warp model one protect-real image needs it, so the battery fails without it (G-np). Keep it, take it out while the shipped warp model ships, or decide it with the warp model?"
+    },
+    {
+      "id": "question-15",
+      "text": "The condensed model met no admission rule set: every arm missed the battery's veto, 30 to 34 of 50 HARD images right, though the golden-core arm matched a boosted model's AUC with fewer real false positives and DINOv2 added nothing to it (command-81). Pursue it with longer training and tiles cut from more of the store's pools, or close it?"
+    },
+    {
+      "id": "question-16",
+      "text": "The site's data cap was raised from 3.0 to 3.5 MB during this unsupervised run (decision-102), because the study's sources took the data to 3.07 MB with no old text to drop. Keep 3.5 MB, or restore 3 MB and decide what the site leaves out?"
     }
   ],
   "tests": [
@@ -1857,6 +2245,36 @@
       "failed": 0,
       "skipped": 0,
       "note": "Core 70, Lens 6, Inference 8, Training 50, Flywheel 22, Watermark 7, CLI 4"
+    },
+    {
+      "id": "test-22",
+      "phase": 14,
+      "date": "2026-10-20",
+      "suite": "all targets (scripts/test.sh, VEILGARDE_MLX_TESTS=0)",
+      "passed": 173,
+      "failed": 0,
+      "skipped": 17,
+      "note": "the CPU suites with the study's code: the column mask grows a compact refit's trees node for node and changes nothing unmasked; the recipe, TOML and CLI carry it; a masked candidate is 19 wide and calibrates as warp19; the core study, the redundancy check and the condensed model's arithmetic on synthetic areas; the golden rule; bundle derivation; the base expert's default; the battery's runtime; 66 command invocations; the watermark invariance compare"
+    },
+    {
+      "id": "test-23",
+      "phase": 14,
+      "date": "2026-10-20",
+      "suite": "all targets (scripts/test.sh, the GPU suites included)",
+      "passed": 190,
+      "failed": 0,
+      "skipped": 0,
+      "note": "the 17 GPU tests too: the full detector's goldens against Garde's on the default path, the warp lens's exactly; the watermark's signing and matching; the warp lens as the camera base keeping the sensor lane, the patch map and the capture signature byte for byte and the result JSON's bytes; the condensed model's arms training, their weights loading back, a seed naming one model"
+    },
+    {
+      "id": "test-24",
+      "phase": 14,
+      "date": "2026-10-21",
+      "suite": "all targets (scripts/test.sh, the GPU suites included), the final build",
+      "passed": 190,
+      "failed": 0,
+      "skipped": 0,
+      "note": "after the compare's last fix: every suite as in test-23"
     }
   ],
   "request_note": "Verbatim but for the research projects' names and the paths on the owner's Mac, which the owner asked to leave out of the project (amendment-4, item 1, and amendment-6); each bracket stands for a name or a path."

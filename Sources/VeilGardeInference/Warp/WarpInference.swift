@@ -102,7 +102,7 @@ public enum WarpInference {
                     x: x, y: y, width: min(sensor.patchSize, sensor.imageWidth - x), height: min(sensor.patchSize, sensor.imageHeight - y)))
             }
         }
-        return InferenceResult(
+        var result = InferenceResult(
             scorer: "xgboost",
             majorityPrediction: sensorPrediction, majorityScore: sensorProbability,
             weightedPrediction: config.decision.label(analysis.weightedScore), weightedScore: analysis.weightedScore,
@@ -113,6 +113,8 @@ public enum WarpInference {
             captureSignature: capture, sharpness: analysis.sharpness,
             sensorRawProbability: sensorRaw, sensorProbability: sensorProbability, sensorPrediction: sensorPrediction,
             sensorCalibration: calibration, baseWarpModelSHA256: baseModelSHA256, sensorWarpModelSHA256: sensorSHA256)
+        result.warpWeightedScore = analysis.weightedScore
+        return result
     }
 }
 

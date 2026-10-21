@@ -6,8 +6,9 @@
 //  WHAT: `veilgarde watermark`: a crop-robust signature read off an image's warp fragility
 //        pattern. `sign` prints it (vw1 text, or JSON); `match` finds where an image (a crop, a
 //        re-encode) sits on a signature; `verify` is match with the verdict as the exit code;
-//        `accept` runs v1's acceptance on final_mixed and evaluates its kill criterion.
-//  PIN:  Native resolution, one MLX workload. `accept` writes only its report.
+//        `accept` runs v1's acceptance on final_mixed and evaluates its kill criterion;
+//        `invariance` signs a set of images and, against a baseline, fails on any change.
+//  PIN:  Native resolution, one MLX workload. `accept` and `invariance` write only their reports.
 //
 
 import ArgumentParser
@@ -18,7 +19,7 @@ struct WatermarkCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "watermark", abstract: "Sign an image by its warp fragility pattern, and find a crop or a re-encode of it again.",
         discussion: "v1 is a design under measurement: run `watermark accept` before relying on it.",
-        subcommands: [Sign.self, Match.self, Verify.self, Accept.self])
+        subcommands: [Sign.self, Match.self, Verify.self, Accept.self, Invariance.self])
 
     static func signature(_ text: String) throws -> WatermarkSignature {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -111,6 +112,39 @@ struct WatermarkCommand: ParsableCommand {
                 }
                 print(s.killed ? "v1 KILLED: " + s.reasons.joined(separator: "; ") : "v1 passes its acceptance")
                 if let out { try JSONCoding.write(report, to: datasetURL(out)); note("report: \(out)") }
+            }
+        }
+    }
+
+    struct Invariance: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "invariance", abstract: "Sign images exactly as `sign` does and record each signature; with --baseline, exit 1 on any difference.",
+            discussion: "A gate for changes near the warp residual: take the baseline before the change and re-run after every build. One MLX workload.")
+        @Option(help: "A folder (searched recursively), a text file of image paths, or an image; repeatable.") var images: [String]
+        @Option(help: "A previous invariance report to compare against.") var baseline: String?
+        @Option(help: "Write the report here.") var out: String
+
+        func run() throws {
+            guarded {
+                let urls = try images.flatMap(imageInputs)
+                guard !urls.isEmpty else { throw VeilGardeFailure.usage("no images found in \(images.joined(separator: ", "))") }
+                note("invariance: \(urls.count) images")
+                let started = Date()
+                let report = WatermarkInvariance.measure(urls, note: note)
+                try JSONCoding.write(report, to: datasetURL(out))
+                print(String(format: "signed %d images (%d skipped) in %.1fs", report.images.count, report.skipped.count, Date().timeIntervalSince(started)))
+                for s in report.skipped { print("skipped \(s)") }
+                note("report: \(out)")
+                guard let baseline else { return }
+                let reference = try JSONCoding.read(InvarianceReport.self, from: datasetURL(baseline))
+                let differences = WatermarkInvariance.compare(baseline: reference, current: report)
+                if differences.isEmpty {
+                    print("invariant: all \(reference.images.count) signatures equal the baseline")
+                    return
+                }
+                for d in differences { print("DIFFERENT \(d.path) \(d.field): \(d.baseline) → \(d.current)") }
+                print("\(differences.count) differences from the baseline")
+                throw ExitCode(1)
             }
         }
     }

@@ -55,6 +55,9 @@ public struct InferenceResult: Sendable {
     public let semanticTiles: [[Float]]?
     public let tileMapSource: ResultSource
     public let routeDiagnostics: RouteDiagnostics?
+    /// The warp lens's own weighted score, kept beside whatever the base expert scored (the fusion
+    /// head's p, on a camera route). A diagnostic for studies: the result JSON never writes it.
+    public var warpWeightedScore: Float? = nil
 
     /// The share of the frozen base verdict's weight the visible sensor cells carry. Not
     /// renormalized when a sensor grid drops incomplete edge tiles.

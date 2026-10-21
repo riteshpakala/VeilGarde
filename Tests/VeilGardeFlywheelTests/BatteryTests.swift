@@ -190,3 +190,15 @@ struct BatteryTests {
         #expect(none.semanticScore == nil && !none.capturePresent)
     }
 }
+
+@Suite("Battery: the base expert it gates")
+struct BatteryBaseExpertTests {
+    @Test("the runtime names the bundle's hashes, and a study's warp base, never by default")
+    func runtime() {
+        let detector = DetectorVerdicts(bundle: .shipped)
+        #expect(detector.runtime["base_expert"] == nil && detector.runtime["bundle"] == DetectorBundle.shipped.directory.path)
+        #expect(detector.runtime["weighted_base_model_sha256"] == DetectorBundle.shipped.manifest.artifact(.warpTile)?.sha256)
+        #expect(detector.runtime["manifest_sha256"] != nil && detector.runtime["backend"] == "veilgarde-detector")
+        #expect(DetectorVerdicts(bundle: .shipped, baseExpert: .warp).runtime["base_expert"] == "warp")
+    }
+}

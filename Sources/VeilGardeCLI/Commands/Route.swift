@@ -20,6 +20,7 @@ struct RouteCommand: ParsableCommand {
 
     @Argument(help: "The image.") var image: String
     @OptionGroup var route: RouteOptions
+    @OptionGroup var expert: BaseExpertOptions
     @Option(help: "Skip domain detection: camera or screenshot.") var hint: String?
     @Flag(help: "The schema-v2 JSON on stdout.") var json = false
     @Flag(help: "Print the patch map and every verdict, as `score` does.") var map = false
@@ -28,7 +29,8 @@ struct RouteCommand: ParsableCommand {
 
     func run() throws {
         guarded {
-            let config = try route.config()
+            var config = try route.config()
+            config.baseExpert = try expert.resolve()
             let domainHint = try parseHint(hint)
             let cg = try loadImage(image)
             let ((routed), seconds) = try LensRuntime.withDevice(cpu: cpu) { try timed { try Detector.shared.detect(cgImage: cg, config: config, hint: domainHint) } }
@@ -64,7 +66,6 @@ struct FuseCommand: ParsableCommand {
             var config = try detection.config()
             guard let variant = DinoVariant(rawValue: dino) else { throw VeilGardeFailure.usage("--dino must be small, xsmall or xxsmall") }
             config.dinoVariant = variant
-            config.useFusion = true
             let cg = try loadImage(image)
             let (r, seconds) = try LensRuntime.withDevice(cpu: detection.cpu) { try timed { try Fusion.run(cgImage: cg, config: config) } }
             let device = LensRuntime.deviceName(cpu: detection.cpu)
@@ -83,6 +84,7 @@ struct BatchCommand: ParsableCommand {
     @Argument(help: "The manifest: one {\"id\", \"path\", \"hint\"} object per line.") var input: String
     @Argument(help: "The output JSONL; it must not exist.") var output: String
     @OptionGroup var route: RouteOptions
+    @OptionGroup var expert: BaseExpertOptions
 
     func run() throws {
         guarded {
@@ -90,7 +92,8 @@ struct BatchCommand: ParsableCommand {
             let outputURL = URL(fileURLWithPath: (output as NSString).expandingTildeInPath).standardizedFileURL
             guard inputURL.resolvingSymlinksInPath() != outputURL.resolvingSymlinksInPath() else { throw VeilGardeFailure.usage("the input and output paths must differ") }
             guard !FileManager.default.fileExists(atPath: outputURL.path) else { throw VeilGardeFailure.exists("refusing to overwrite \(outputURL.path)") }
-            let config = try route.config()
+            var config = try route.config()
+            config.baseExpert = try expert.resolve()
             // The whole manifest validates before any inference.
             let items = try RouteBatch.parse(Data(contentsOf: inputURL))
             let temporary = outputURL.deletingLastPathComponent().appendingPathComponent(".\(outputURL.lastPathComponent).tmp-\(UUID().uuidString)")
