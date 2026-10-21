@@ -20,6 +20,22 @@ It runs in two lanes.
 | `VeilWatermark` | the warp residual and a crop-robust signature read off each tile's fragility |
 | `veilgarde` | the CLI over all of it |
 
+## Detection accuracy
+
+**v1** is the shipped two lanes: the fusion head over DINOv2 and the capture signature, then the specialist stack. Its battery, spec v3, passes on 96 images and is the baseline for testing; four generated images it misses are set aside for research. Measured on 2026-10-21. A real image counts as right when it's called real; a generated image when it's called generated. "Inconclusive" counts as wrong.
+
+| Detector | Real, final_mixed census | Generated, final_mixed census | Real, unseen final_mixed | Generated, unseen final_mixed | Real, iPhone originals |
+|---|---|---|---|---|---|
+| **v1**, shipped: fusion head + stack | 95% | 41% | 90.0% | 34.5% | 99.3% |
+| Residual head, in-sample combiner | 97% | 91% | 85.3% | 56.6% | 99.8% |
+| Residual head, out-of-fold combiner | 97% | 89% | 87.6% | 52.0% | 99.8% |
+| The warp era, for reference | 91% | 70% | not measured | not measured | 99.8% |
+
+- **Census:** 100 real and 100 generated final_mixed images. Most of them are rows the fusion heads trained on, so these columns read high.
+- **Unseen:** the 3,217 final_mixed images in no store shard (1,602 real, 1,615 generated). This is the honest measure.
+- **iPhone originals:** 438 camera photos, all real.
+- **Residual head:** both DINOv2 readings, capture and the warp residual's statistics, 815 columns, 1,000 trees of depth 7.
+
 ## The CLI at a glance
 
 ```sh

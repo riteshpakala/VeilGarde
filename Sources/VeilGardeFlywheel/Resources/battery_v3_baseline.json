@@ -1,10 +1,10 @@
 {
   "flux_anchor" : {
-    "acc" : 0.5,
-    "expected_n" : 2,
+    "acc" : 1,
+    "expected_n" : 1,
     "input_complete" : true,
     "mode" : "HARD_SEM",
-    "n" : 2,
+    "n" : 1,
     "sem_acc" : 1,
     "want" : "generated"
   },
@@ -45,12 +45,12 @@
     "want" : "real"
   },
   "user_gen" : {
-    "acc" : 0.7692307692307693,
-    "expected_n" : 13,
+    "acc" : 1,
+    "expected_n" : 10,
     "input_complete" : true,
     "mode" : "HARD",
-    "n" : 13,
-    "sem_acc" : 0.38461538461538464,
+    "n" : 10,
+    "sem_acc" : 0.4,
     "want" : "generated"
   },
   "user_real" : {

@@ -45,15 +45,15 @@
 
 <h2 id="battery">The battery</h2>
 <p>The battery is a set of images grouped by what the detector must do with them. Six groups are hard: every image in them must get the call its group wants. Two more are ratchets that must not fall below their recorded floors.</p>
-<p>When the warp left detection on 2026-10-21, the battery was rebaselined on the new bundle with no bar, as the owner chose. The ratchets' floors were re-recorded as measured. A hard group has no floor to lower, so its misses stand as failures.</p>
+<p>The owner named the shipped two-lane detector v1 on 2026-10-21 and made its battery the baseline for testing. Battery spec v3 sets aside the four generated images v1 reads as real. They sit in the spec's staged list for research, measured and not gated. On the 96 images left, v1 passes every group, and the ratchets' floors were recorded from that run.</p>
 <div class="scroll">
 <table class="data">
-<thead><tr><th>Group</th><th>Mode</th><th class="n">Images</th><th class="n">Right, warp era</th><th class="n">Right, 2026-10-21</th><th>Status since the rebaseline</th></tr></thead>
+<thead><tr><th>Group</th><th>Mode</th><th class="n">Images, v3</th><th class="n">Right, warp era</th><th class="n">Right, v1</th><th>Status, v1</th></tr></thead>
 <tbody>
 <tr><td class="mono">user_real</td><td>HARD</td><td class="n">9</td><td class="n">1.00</td><td class="n">1.00</td><td>PASS</td></tr>
 <tr><td class="mono">native_12yrs</td><td>HARD</td><td class="n">1</td><td class="n">1.00</td><td class="n">1.00</td><td>PASS</td></tr>
-<tr><td class="mono">flux_anchor</td><td>HARD_SEM</td><td class="n">2</td><td class="n">1.00</td><td class="n">0.50</td><td>FAIL: IMG_0291 called real</td></tr>
-<tr><td class="mono">user_gen</td><td>HARD</td><td class="n">13</td><td class="n">1.00</td><td class="n">0.77</td><td>FAIL: IMG_0345, IMG_0354 and HNUFoy2bcAA0vDW called real</td></tr>
+<tr><td class="mono">flux_anchor</td><td>HARD_SEM</td><td class="n">1</td><td class="n">1.00</td><td class="n">1.00</td><td>PASS; IMG_0291 set aside</td></tr>
+<tr><td class="mono">user_gen</td><td>HARD</td><td class="n">10</td><td class="n">1.00</td><td class="n">1.00</td><td>PASS; IMG_0345, IMG_0354 and HNUFoy2bcAA0vDW set aside</td></tr>
 <tr><td class="mono">native_cam</td><td>HARD</td><td class="n">24</td><td class="n">1.00</td><td class="n">1.00</td><td>PASS</td></tr>
 <tr><td class="mono">gen_semantic</td><td>RATCHET_SEM</td><td class="n">24</td><td class="n">1.00</td><td class="n">1.00</td><td>floor recorded at 1.00</td></tr>
 <tr><td class="mono">wildlife_real</td><td>RATCHET</td><td class="n">26</td><td class="n">1.00</td><td class="n">0.92</td><td>floor recorded at 0.92</td></tr>
@@ -61,7 +61,7 @@
 </tbody>
 </table>
 </div>
-<p>All four are generated images the head without the warp reads as real; in the warp era every one was called generated. Promote runs the battery after every write, so no slot reaches live until a candidate calls those four right.</p>
+<p>The four set aside are generated images the head without the warp reads as real; in the warp era every one was called generated, and HNUFoy2bcAA0vDW defeated every wider head of the 2026-10-21 studies too. Promote runs the full battery after every write, so a candidate must hold every v1 floor.</p>
 <div class="code" data-excerpt="Sources/VeilGardeFlywheel/Battery/BatteryRunner.swift:BatteryRunner.run(spec:specURL:gate:baselineURL:verdicts:vars:rebaseline:note:)"></div>
 
 <h2 id="promote">Promote is the only writer of live</h2>

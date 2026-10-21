@@ -8,5 +8,5 @@
 //
 
 public enum VeilGardeVersion {
-    public static let string = "0.1.0"
+    public static let string = "1.0.0"
 }

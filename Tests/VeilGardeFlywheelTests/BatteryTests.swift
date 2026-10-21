@@ -23,7 +23,7 @@ struct BatteryTests {
         #expect(ContentHash.sha256Hex(spec) == FlywheelResources.batterySpecSHA256)
         #expect(ContentHash.sha256Hex(floors) == FlywheelResources.batteryBaselineSHA256)
         let s = try JSONDecoder().decode(BatterySpec.self, from: spec)
-        #expect(s.version == 2 && s.groups.count == 8 && s.tolerance == 0.001)
+        #expect(s.version == 3 && s.groups.count == 8 && s.tolerance == 0.001)
         #expect(s.groups.filter { $0.mode.isHard }.map(\.name) == ["user_real", "native_12yrs", "flux_anchor", "user_gen", "native_cam", "lion_hard"])
         #expect(s.groups.filter { !$0.mode.isHard }.map(\.name) == ["gen_semantic", "wildlife_real"])
         let everyPattern = s.groups.flatMap { ($0.paths ?? []) + ($0.globs ?? []) }
@@ -32,11 +32,13 @@ struct BatteryTests {
         let retired = (raw["retired"] as? [String: Any])?["groups"] as? [String] ?? []
         #expect(retired.count == 12 && retired.allSatisfy { $0.hasPrefix("atlas_") })
         let b = try JSONDecoder().decode([String: BatteryGroupResult].self, from: floors)
-        // The floors re-recorded on 2026-10-21 by `flywheel battery --rebaseline` on the detector without the warp.
+        // The v1 detector's floors, recorded on 2026-10-21 by `flywheel battery --rebaseline` on spec v3.
+        let staged = (raw["staged"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
+        #expect(["IMG_0291", "IMG_0345", "IMG_0354", "HNUFoy2bcAA0vDW"].allSatisfy(staged.contains), "the four images set aside for research")
         #expect(b["user_real"]?.acc == 1.0 && b["user_real"]?.mode == .hard)
         #expect(b["wildlife_real"]?.acc == 24.0 / 26.0 && b["wildlife_real"]?.semAcc == 24.0 / 26.0)
         #expect(b["gen_semantic"]?.acc == 1.0 && b["gen_semantic"]?.semAcc == 1.0)
-        #expect(b["flux_anchor"]?.acc == 0.5 && b["user_gen"]?.acc == 10.0 / 13.0, "the two HARD groups that still fail, as recorded")
+        #expect(b["flux_anchor"]?.acc == 1.0 && b["flux_anchor"]?.n == 1 && b["user_gen"]?.acc == 1.0 && b["user_gen"]?.n == 10, "every HARD group passes")
         #expect(Set(b.keys).isSubset(of: Set(s.groups.map(\.name))), "no floor for a retired group")
     }
 

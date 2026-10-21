@@ -128,6 +128,11 @@
       "date": "2026-10-21",
       "text": "After the testing is done we should update the trails in the explorer. \"Decode\" trail, \"Shared Signals\" trail, \"Domain\" trail, \"Base\" trail, that all route into each other and then eventually \"Revisions\" trail, \"Result\" trail. This is just for the detection part of the explorer. Add the stack trail in its order after the base.",
       "edited": true
+    },
+    {
+      "id": "amendment-26",
+      "date": "2026-10-21",
+      "text": "let's clean up the golden anchors and the batteries so they pass and we have a new baseline for testing, put HNUFoy2bcAA0vDW aside for research purposes. Let's call this entire stack v1 essentially. Prior to doing so can you create a brief simple table in the README showing the detection accuracy stats for real and generated"
     }
   ],
   "answers": [
@@ -322,6 +327,12 @@
       "date": "2026-10-21",
       "question": "If detection reads the residual again, where should its code live?",
       "answer": "Stay in VeilWatermark (Recommended)"
+    },
+    {
+      "id": "answer-31",
+      "date": "2026-10-21",
+      "question": "Which bundle becomes v1, the new baseline: the residual head with the out-of-fold combiner, with the in-sample combiner, or today's shipped two lanes, whose battery then needs IMG_0291, IMG_0345 and IMG_0354 set aside as well?",
+      "answer": "Today's shipped two lanes"
     }
   ],
   "base": {
@@ -793,7 +804,7 @@
       "chose": "Battery v2: v1's eight non-atlas groups with the same images (copied, byte-checked, into <work area>/battery/images, the spec's {IMAGES}), modes and floors; the twelve atlas groups listed as retired; lion_hard's floor row left out",
       "rejected": "marking the atlas groups skip_if_empty in the work-area spec; rebaselining",
       "reason": "the owner retired the atlas groups (answer-5). Carrying v1's floors unchanged is not a rebaseline. lion_hard's v1 row was recorded while its label was generated (want: generated), and a HARD group reads no floor, so copying it would carry a stale label into a new file",
-      "file": "Sources/VeilGardeFlywheel/Resources/battery_spec_v2.json"
+      "file": "Sources/VeilGardeFlywheel/Resources/battery_spec_v3.json"
     },
     {
       "id": "decision-66",
@@ -1201,6 +1212,13 @@
       "rejected": "two inference trails, the fusion base and the specialist stack",
       "reason": "the owner reads detection as one chain of stages (amendment-25); the training and watermark trails stay as they were",
       "file": "docs/site/src/trails.json"
+    },
+    {
+      "id": "decision-123",
+      "chose": "v1 is the shipped two-lane detector, version 1.0.0; battery spec v3 moves IMG_0291, IMG_0345, IMG_0354 and HNUFoy2bcAA0vDW to staged[] for research, the user_gen glob becoming explicit paths, and the floors are recorded from v1's passing run",
+      "rejected": "keeping the four in their HARD groups; moving the image files",
+      "reason": "the owner chose the shipped detector as v1 and a passing battery as the baseline for testing (amendment-26, answer-31); no image file moves, so the watermark's invariance set holds",
+      "file": "Sources/VeilGardeFlywheel/FlywheelResources.swift"
     }
   ],
   "commands": [
@@ -2514,6 +2532,18 @@
         "R-in and R-oof1: battery FAIL on HNUFoy2bcAA0vDW alone beside the two wildlife images the shipped bundle misses; final_mixed census 188 and 186 of 200; iPhone 437 of 438; unseen final_mixed reals 0.853 and 0.876, generated 0.566 and 0.520",
         "the owner stopped the run: nothing ships, the shipped bundle stays"
       ]
+    },
+    {
+      "id": "command-114",
+      "phase": 18,
+      "date": "2026-10-21",
+      "cmd": "flywheel init --battery; flywheel battery --gate full --rebaseline --yes-i-reviewed, on live, the shipped two lanes",
+      "exit": 0,
+      "lines": [
+        "spec v3 installed; the v2 spec and floors moved to battery/retired/20261021T225302Z",
+        "BATTERY: PASS on 96 images: every HARD group 1.00, gen_semantic 1.00, wildlife_real 0.92 at its floor",
+        "the floors recorded as v1's baseline and shipped as battery_v3_baseline.json"
+      ]
     }
   ],
   "assumptions": [
@@ -2916,6 +2946,16 @@
       "failed": 0,
       "skipped": 0,
       "note": "warp19 equals the research's dumps value for value and a final_mixed image's research tiles; the FR pins and signatures unchanged; an 815-column head reads FR's mean at column 777"
+    },
+    {
+      "id": "test-29",
+      "phase": 18,
+      "date": "2026-10-21",
+      "suite": "all targets (scripts/test.sh, the GPU suites included), v1 with battery spec v3",
+      "passed": 139,
+      "failed": 0,
+      "skipped": 0,
+      "note": "the spec and floors pinned at v3, every HARD group passing, the four set aside in staged[]"
     }
   ],
   "request_note": "Verbatim but for the research projects' names and the paths on the owner's Mac, which the owner asked to leave out of the project (amendment-4, item 1, and amendment-6); each bracket stands for a name or a path."

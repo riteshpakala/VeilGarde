@@ -142,8 +142,8 @@ let package = Package(
             // the work area, where the battery reads them); the category router's prompt matrix;
             // the collector jobs that fill each blind spot.
             resources: [
-                .copy("Resources/battery_spec_v2.json"),
-                .copy("Resources/battery_v2_baseline.json"),
+                .copy("Resources/battery_spec_v3.json"),
+                .copy("Resources/battery_v3_baseline.json"),
                 .copy("Resources/clip_prompts_v1.safetensors"),
                 .copy("Resources/acquire_targets_v1.json"),
             ],

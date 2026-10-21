@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "doc": "The battery spec, v2 (2026-10-19): the gate every promote is judged by. v2 retires v1's twelve atlas anchor groups (their images are gone; a new atlas comes later) and reads every image from {IMAGES}: the folder VEILGARDE_BATTERY_IMAGES names, else the work area's battery/images. The eight groups it keeps are v1's: the same images, modes and floors. Modes: HARD (any weighted miss = FAIL) · HARD_SEM (HARD + semantic must agree) · RATCHET (per-group weighted accuracy >= recorded baseline - tolerance) · RATCHET_SEM (RATCHET + semantic floor) · TAXONOMY (tracked, never gates) · REPORT (printed only). The floors live in battery_v2_baseline.json; never rebaseline during a migration, --rebaseline is an explicit, reviewed act. staged[] holds probes that do not gate yet.",
+  "version": 3,
+  "doc": "The battery spec, v3 (2026-10-21), the v1 detector's baseline: the gate every promote is judged by. v3 sets four images the two-lane detector misses aside for research, in staged[], measured but not gated. v2 (2026-10-19) v2 retires v1's twelve atlas anchor groups (their images are gone; a new atlas comes later) and reads every image from {IMAGES}: the folder VEILGARDE_BATTERY_IMAGES names, else the work area's battery/images. The eight groups it keeps are v1's: the same images, modes and floors. Modes: HARD (any weighted miss = FAIL) · HARD_SEM (HARD + semantic must agree) · RATCHET (per-group weighted accuracy >= recorded baseline - tolerance) · RATCHET_SEM (RATCHET + semantic floor) · TAXONOMY (tracked, never gates) · REPORT (printed only). The floors live in battery_v2_baseline.json; never rebaseline during a migration, --rebaseline is an explicit, reviewed act. staged[] holds probes that do not gate yet.",
   "tolerance": 0.001,
   "baseline": "battery_v2_baseline.json",
   "vars": {
@@ -38,17 +38,15 @@
       "mode": "HARD_SEM",
       "want": "generated",
       "paths": [
-        "{IMAGES}/test/flux_jobs.JPG",
-        "{IMAGES}/test/IMG_0291.JPG"
+        "{IMAGES}/test/flux_jobs.JPG"
       ],
-      "note": "Flux-2-Klein anchors. IMG_0291 is knife-edge under XGBoost non-determinism — warm-start only. HARD_SEM: semantic tile vote must also read generated."
+      "note": "Flux-2-Klein anchors. IMG_0291 is knife-edge under XGBoost non-determinism — warm-start only. HARD_SEM: semantic tile vote must also read generated. IMG_0291 set aside for research on 2026-10-21 (staged[])."
     },
     {
       "name": "user_gen",
       "mode": "HARD",
       "want": "generated",
       "globs": [
-        "{IMAGES}/test_generated/*.jpeg",
         "{IMAGES}/test_generated/*.PNG"
       ],
       "paths": [
@@ -57,9 +55,10 @@
         "{IMAGES}/test_generated/HNOzJOiWAAAxP0D.jpg",
         "{IMAGES}/test_resolution/HNOxadyW4AATeNm.jpg",
         "{IMAGES}/test_resolution/HNOyD6zXUAArDeR.jpg",
-        "{IMAGES}/test_resolution/HNUFoy2bcAA0vDW.jpg"
+        "{IMAGES}/test_generated/IMG_0343.jpeg",
+        "{IMAGES}/test_generated/IMG_0344.jpeg"
       ],
-      "note": "User gen probes. IMG_0467 dark-occult (2026-07-15). IMG_0500 filmic painterly — caught via frame-SEAM v3.3. HNOxadyW4AATeNm full-res gates; its _preview sibling is STAGED (see staged[]). HNOyD6zXUAArDeR full-res added 2026-07-16 (resolution-ladder pair; full gen 0.61, its preview flips real via the fusion itself). HNUFoy2bcAA0vDW full-res promoted staged→HARD 2026-07-16 after the v31 S2 base ship (route generated 0.805; was 0.28 — the blind spot closed at full-res, preview rung stays staged)."
+      "note": "User gen probes. IMG_0467 dark-occult (2026-07-15). IMG_0500 filmic painterly — caught via frame-SEAM v3.3. HNOxadyW4AATeNm full-res gates; its _preview sibling is STAGED (see staged[]). HNOyD6zXUAArDeR full-res added 2026-07-16 (resolution-ladder pair; full gen 0.61, its preview flips real via the fusion itself). HNUFoy2bcAA0vDW full-res promoted staged→HARD 2026-07-16 after the v31 S2 base ship (route generated 0.805; was 0.28 — the blind spot closed at full-res, preview rung stays staged). On 2026-10-21 the *.jpeg glob became explicit paths so IMG_0345, IMG_0354 and HNUFoy2bcAA0vDW could be set aside for research (staged[])."
     },
     {
       "name": "native_cam",
@@ -146,6 +145,38 @@
       ],
       "want": "generated",
       "note": "STAGED probe (2026-07-17): HNOv5's harder sibling — dark-filmic MJ-class X gen, invisible to EVERY lens (base 0.263, sem 0.008, art 0.000, tile_mean at the 36th percentile of the dark-REAL tail). The patent-supports-LensII probe (audit §13) measured no viable warp rescue: warp_weighted gen-lean is the D72 red-herring pattern (39-44% of dark reals in the base-failed tail read the same). Unblocker: mjdark/mjnearblack shards into the BASE corpus (family bulk already reads 0.87; these are outliers) — queued behind the S2 ratchet-debt decision."
+    },
+    {
+      "name": "IMG_0291",
+      "paths": [
+        "{IMAGES}/test/IMG_0291.JPG"
+      ],
+      "want": "generated",
+      "note": "Set aside for research by the owner on 2026-10-21: the two-lane detector, v1, misses it; measured, not gated."
+    },
+    {
+      "name": "IMG_0345",
+      "paths": [
+        "{IMAGES}/test_generated/IMG_0345.jpeg"
+      ],
+      "want": "generated",
+      "note": "Set aside for research by the owner on 2026-10-21: the two-lane detector, v1, misses it; measured, not gated."
+    },
+    {
+      "name": "IMG_0354",
+      "paths": [
+        "{IMAGES}/test_generated/IMG_0354.jpeg"
+      ],
+      "want": "generated",
+      "note": "Set aside for research by the owner on 2026-10-21: the two-lane detector, v1, misses it; measured, not gated."
+    },
+    {
+      "name": "HNUFoy2bcAA0vDW",
+      "paths": [
+        "{IMAGES}/test_resolution/HNUFoy2bcAA0vDW.jpg"
+      ],
+      "want": "generated",
+      "note": "Set aside for research by the owner on 2026-10-21: the two-lane detector, v1, misses it; measured, not gated. Every candidate of the 2026-10-21 studies called it real, too."
     }
   ],
   "retired": {
