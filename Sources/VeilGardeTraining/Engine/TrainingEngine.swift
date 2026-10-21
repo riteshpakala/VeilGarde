@@ -30,6 +30,8 @@ public final class TrainingEngine {
     private let onEvent: (TrainingEvent) -> Void
     private var log: JSONLWriter?
     private var storeRows: [(shard: String, row: FeatureRow)]?
+    /// The settings of the fusion head this run trained, for an out-of-fold combiner.
+    private var trainedFusion: FusionSettings?
 
     public init(area: WorkArea, parent: URL, store: URL? = nil, onEvent: @escaping (TrainingEvent) -> Void = { _ in }) {
         self.area = area
@@ -118,7 +120,14 @@ public final class TrainingEngine {
 
             case .combiner(let c):
                 var p = ModelPlan(model: model.name, stages: [], refusal: storeMissing)
-                let base = trainsFusion ? "the fusion head this recipe trains" : "the parent's fusion head"
+                var base = trainsFusion ? "the fusion head this recipe trains" : "the parent's fusion head"
+                if let folds = c.settings.baseFolds {
+                    let fusionRecipe = ordered.compactMap { if case .fusion(let f) = $0 { return f } else { return nil } }.first
+                    switch outOfFoldSource(folds: folds, recipeFusion: fusionRecipe?.settings, parentBundle: parentBundle) {
+                    case .some(let source): base += ", out-of-fold over \(folds) folds (\(source))"
+                    case .none: p.refusal = "an out-of-fold combiner needs the fusion head's settings: train a scratch fusion head in the same recipe, or name a parent candidate that trained one"
+                    }
+                }
                 // An art-pair head joins only when the recipe trains one or the parent carries one; the shipped bundle does not.
                 let pairHere = trainedHeads.contains(.artPair) || parentBundle.url(.head, head: .artPair) != nil
                 let heads = ([HeadKind.art, .blur, .human] + (pairHere ? [.artPair] : [])).map { trainedHeads.contains($0) ? "\($0.rawValue) (trained)" : "\($0.rawValue) (parent)" }.joined(separator: ", ")
@@ -187,6 +196,7 @@ public final class TrainingEngine {
 
     private func trainFusion(_ f: FusionHead, into candidate: inout CandidateBundle) throws -> String {
         let name = "fusion-head"
+        trainedFusion = f.settings
         emit(.stage(model: name, .data))
         let dataset = try FusionDataset.assemble(FeatureStore(directory: store), settings: f.settings)
         let parentArtifact = candidate.manifest.artifact(.fusionHead)
@@ -247,7 +257,14 @@ public final class TrainingEngine {
         let heads = try [HeadKind.art, .blur, .human].map(head)
         let pair = try? head(.artPair)
         let selection = try FeatureStore(directory: store).select(columns: Set(FeatureColumn.allCases)) { !$0.golden && !$0.nsfw }
-        let samples = try CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)
+        let samples: [CombinerSample]
+        if let folds = c.settings.baseFolds {
+            let oof = try outOfFoldBase(folds: folds, candidate: candidate)
+            samples = CombinerSample.captureAbsent(selection, outOfFold: oof.predictions, heads: heads, pair: pair)
+            emit(.note("combiner: \(samples.count) capture-absent rows with an out-of-fold base, \(folds) folds"))
+        } else {
+            samples = try CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)
+        }
         emit(.stage(model: name, .fit))
         let (file, report) = try CombinerTrainer.train(samples, settings: c.settings, note: { self.emit(.note($0)) })
         emit(.stage(model: name, .evaluate))
@@ -256,5 +273,46 @@ public final class TrainingEngine {
         emit(.stage(model: name, .write))
         try candidate.put(try JSONCoding.prettyEncoder().encode(file), as: "combiner/stack_combiner.json", role: .combiner)
         return try record(report, model: name, as: "combiner/metrics.json", in: candidate)
+    }
+
+    // MARK: Out-of-fold base predictions
+
+    /// Where an out-of-fold combiner's base predictions come from, or nil when nothing can make them.
+    func outOfFoldSource(folds: Int, recipeFusion: FusionSettings?, parentBundle: ModelBundle) -> String? {
+        if let f = recipeFusion { return isScratch(f) ? "refit with the recipe's fusion settings" : nil }
+        let headSHA = parentBundle.sha256(.fusionHead)
+        if let cached = try? JSONCoding.read(OutOfFoldBase.self, from: parent.appendingPathComponent(OutOfFoldBase.file)),
+           cached.folds == folds, cached.headSHA256 == headSHA { return "the parent's cached predictions" }
+        if let m = try? JSONCoding.read(FusionMetrics.self, from: parent.appendingPathComponent("fusion/metrics.json")), isScratch(m.settings) {
+            return "refit with the parent's fusion settings"
+        }
+        return nil
+    }
+
+    private func isScratch(_ f: FusionSettings) -> Bool { if case .scratch = f.mode { return true } else { return false } }
+
+    /// The candidate's out-of-fold base predictions: cached in the candidate or its parent for the
+    /// same head and folds, else refit and cached in the candidate.
+    private func outOfFoldBase(folds: Int, candidate: CandidateBundle) throws -> OutOfFoldBase {
+        guard let headSHA = candidate.manifest.artifact(.fusionHead)?.sha256 else { throw VeilGardeFailure.missing("the candidate has no fusion head") }
+        for root in [candidate.root, parent] {
+            if let cached = try? JSONCoding.read(OutOfFoldBase.self, from: root.appendingPathComponent(OutOfFoldBase.file)),
+               cached.folds == folds, cached.headSHA256 == headSHA {
+                emit(.note("combiner: the out-of-fold base predictions cached in \(root.lastPathComponent), \(cached.predictions.count) rows"))
+                if root != candidate.root { try candidate.write(cached, as: OutOfFoldBase.file) }
+                return cached
+            }
+        }
+        let settings: FusionSettings
+        if let f = trainedFusion { settings = f } else if let m = try? JSONCoding.read(FusionMetrics.self, from: parent.appendingPathComponent("fusion/metrics.json")) {
+            settings = m.settings
+        } else {
+            throw VeilGardeFailure.missing("an out-of-fold combiner needs the fusion head's settings", hint: "train the fusion head in the same recipe, or name a parent candidate that trained one")
+        }
+        let dataset = try FusionDataset.assemble(FeatureStore(directory: store), settings: settings)
+        let predictions = try FusionTrainer.outOfFold(dataset, settings: settings, folds: folds, note: { self.emit(.note($0)) })
+        let oof = OutOfFoldBase(folds: folds, headSHA256: headSHA, settings: settings, predictions: predictions)
+        try candidate.write(oof, as: OutOfFoldBase.file)
+        return oof
     }
 }

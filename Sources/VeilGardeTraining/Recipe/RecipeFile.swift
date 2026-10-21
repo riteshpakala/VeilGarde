@@ -19,6 +19,7 @@
 //
 //            [combiner]
 //            reals_weight = 3.0
+//            out_of_fold = 5              # the base out-of-fold over 5 folds
 //
 //  PIN:  Each table is one model recipe (heads is one per kind); a table that is absent trains
 //        nothing; an unknown table or key is refused, never ignored.
@@ -32,7 +33,7 @@ public enum RecipeFile {
         "": ["id"],
         "fusion": ["mode", "add", "trees", "eta", "depth", "columns", "new_generator_weight", "preview_weight"],
         "heads": ["kinds", "C", "version"],
-        "combiner": ["reals_weight"],
+        "combiner": ["reals_weight", "out_of_fold"],
     ]
 
     public static func load(_ url: URL) throws -> TrainingRecipe {
@@ -87,6 +88,10 @@ public enum RecipeFile {
         if has("combiner") {
             var c = Combiner()
             if let w = v("combiner", "reals_weight")?.float { c = c.realsWeight(w) }
+            if let k = v("combiner", "out_of_fold")?.integer {
+                guard (2...20).contains(k) else { throw VeilGardeFailure.usage("recipe: [combiner] out_of_fold is 2 to 20 folds, not \(k)") }
+                c = c.outOfFold(folds: k)
+            }
             models.append(.combiner(c))
         }
         return TrainingRecipe(id: id, models: models)

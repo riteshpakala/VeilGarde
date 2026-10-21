@@ -84,6 +84,8 @@ public struct Combiner: Sendable, Equatable, Codable {
 
     private func with(_ change: (inout Combiner) -> Void) -> Combiner { var c = self; change(&c); return c }
     public func realsWeight(_ w: Double) -> Combiner { with { $0.settings.realsWeight = w } }
+    /// Fit on out-of-fold base predictions, `folds` heads refit each without one fold.
+    public func outOfFold(folds: Int = 5) -> Combiner { with { $0.settings.baseFolds = folds } }
     public func probes(_ p: [CombinerProbe]) -> Combiner { with { $0.settings.probes = p } }
 }
 

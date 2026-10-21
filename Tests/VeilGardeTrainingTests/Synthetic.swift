@@ -50,7 +50,7 @@ struct SyntheticArea {
         let categoryIndex = ["art": 0, "blur": 1, "human": 2, "cgi": 3, "preview": 4, "photo": 5]
         for (shardName, newGen) in [("base_a", false), ("scrape_20260101", true)] {
             var rows: [FeatureRow] = []
-            var columns: [FeatureColumn: [Float]] = Dictionary(uniqueKeysWithValues: FeatureColumn.allCases.map { ($0, [Float]()) })
+            var columns: [FeatureColumn: [Float]] = Dictionary(uniqueKeysWithValues: FeatureColumn.allCases.filter { $0 != .residual }.map { ($0, [Float]()) })   // no residual: these rows have no image
             var serial = 0
             for p in plan where !newGen || p.label == 1 {
                 let n = newGen ? p.count / 3 : p.count

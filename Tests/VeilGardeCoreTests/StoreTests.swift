@@ -81,4 +81,35 @@ struct StoreTests {
         let row = try JSONDecoder().decode(FeatureRow.self, from: Data(json.utf8))
         #expect(row.id == "a" && row.isGenerated)
     }
+
+    @Test("a column measured later lives in a side file bound to its shard's ids; one bound to other rows is refused")
+    func sideColumn() throws {
+        let dir = try tempDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var old = shard("seed", ids: ["a", "b"], label: 1)
+        old.columns[.residual] = nil
+        try old.write(to: dir)
+        let store = FeatureStore(directory: dir)
+        let before = try store.select(columns: [.residual])
+        let missing = before.vector(.residual, row: 0).allSatisfy { $0.isNaN }
+        #expect(missing, "no side file yet: the column reads as missing")
+        let values = (0..<(2 * 38)).map { Float($0) }
+        try FeatureShard.writeSide(.residual, values: values, for: "seed", in: dir)
+        #expect(throws: VeilGardeFailure.self, "a side file is written once") { try FeatureShard.writeSide(.residual, values: values, for: "seed", in: dir) }
+        let after = try store.select(columns: [.residual, .cap])
+        #expect(Array(after.vector(.residual, row: 1)) == Array(values[38..<76]) && store.shardNames() == ["seed"])
+        // The side file belongs to rows a, b: a shard whose rows changed refuses it.
+        var moved = shard("seed", ids: ["a", "c"], label: 1)
+        moved.columns[.residual] = nil
+        try moved.write(to: dir, replacing: true)
+        #expect(throws: VeilGardeFailure.self) { try FeatureShard.read("seed", in: dir, columns: [.residual]) }
+    }
+
+    @Test("the residual column is the 19 tile features' mean then spread, and the residual layout reads it after capture")
+    func residualColumn() {
+        #expect(FeatureColumn.residual.width == 38 && FeatureColumn.residualFeatures.count == 19)
+        #expect(FeatureColumn.residualNames.first == "FR_mean" && FeatureColumn.residualNames[19] == "FR_std" && FeatureColumn.residualNames.last == "nyq_R_std")
+        #expect(FusionLayout.bothReadingsResidual.width == 815 && FusionLayout.bothReadingsResidual.columns.last == .residual)
+        #expect(FusionLayout.bothReadingsResidual.names[777] == "res_FR_mean" && FusionLayout(width: 815) == .bothReadingsResidual)
+    }
 }

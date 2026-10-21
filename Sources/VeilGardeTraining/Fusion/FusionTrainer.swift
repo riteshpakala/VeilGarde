@@ -20,7 +20,9 @@
 //        scratch fit reports a held-out AUC. The written head trains on every training row; the
 //        twin is measurement only. A warm start needs a parent of the same width; recall and
 //        agreement against a parent are measured only when it reads the same columns. Missing
-//        values stay NaN and go right, as at inference.
+//        values stay NaN and go right, as at inference. For the combiner, `outOfFold` refits a
+//        scratch head k times, each without one fold of rows (StableSplit "fusion-oof:v1"), so
+//        every row's base is the prediction of a head that never trained on it.
 //
 
 import Foundation
@@ -127,7 +129,43 @@ public struct FusionReport: Codable, Sendable, Equatable {
     public var seconds: Double
 }
 
+/// Each fusion row's base from a head that never trained on it, by k folds.
+public struct OutOfFoldBase: Codable, Sendable, Equatable {
+    public static let file = "fusion/oof_base.json"
+    public static let salt = "fusion-oof:v1"
+    public var folds: Int
+    /// The SHA-256 of the head these folds stand in for.
+    public var headSHA256: String
+    public var settings: FusionSettings
+    public var predictions: [String: Double]
+
+    public static func fold(_ id: String, folds: Int) -> Int { min(folds - 1, Int(StableSplit.unit(id, salt: salt) * Double(folds))) }
+}
+
 public enum FusionTrainer {
+    /// Every row's prediction by a head refit, with `settings`, on the training rows outside the
+    /// row's fold. A scratch fit only: a warm start's parent saw every row.
+    public static func outOfFold(_ dataset: FusionDataset, settings: FusionSettings, folds: Int,
+                                 note: (String) -> Void = { _ in }) throws -> [String: Double] {
+        guard folds >= 2 else { throw VeilGardeFailure.usage("out-of-fold predictions need at least 2 folds, not \(folds)") }
+        guard case .scratch(let trees, let eta) = settings.mode else {
+            throw VeilGardeFailure.usage("out-of-fold base predictions need a scratch fusion head: a warm start's parent trained on every row")
+        }
+        var params = BoostParams(maxDepth: settings.maxDepth, subsample: settings.subsample, colsampleByTree: settings.colsample, seed: settings.seed)
+        params.trees = trees
+        params.eta = eta
+        let fold = dataset.ids.map { OutOfFoldBase.fold($0, folds: folds) }
+        var out: [String: Double] = [:]
+        out.reserveCapacity(dataset.ids.count)
+        for k in 0..<folds {
+            let training = dataset.subset { !dataset.isHeldOut[$0] && fold[$0] != k }
+            note("fusion: out-of-fold head \(k + 1) of \(folds) on \(training.count) rows")
+            let model = BoostTrainer.train(training, params: params, warmStart: nil, featureNames: []).model
+            for i in 0..<dataset.data.count where fold[i] == k { out[dataset.ids[i]] = Double(model.predict(dataset.data.row(i))) }
+        }
+        return out
+    }
+
     public static func train(_ dataset: FusionDataset, settings: FusionSettings, parent: GBDTModel?,
                              note: (String) -> Void = { _ in }) throws -> (model: GBDTModel, report: FusionReport) {
         let started = Date()

@@ -117,6 +117,11 @@
       "id": "amendment-23",
       "date": "2026-10-21",
       "text": "Is there truly something the dino embedding is missing to cover that AUC? Because, from what I have gathered the coverage from the fusion head and the specialist stack is around 0.8. Which is at a level that steers me to think that the marginal difference is recoverable through other means"
+    },
+    {
+      "id": "amendment-24",
+      "date": "2026-10-21",
+      "text": "1) The residual statistics: bring them in as fusion columns, with the code kept in the watermark as you said. first and test those. 2) A better combiner."
     }
   ],
   "answers": [
@@ -1176,6 +1181,13 @@
       "rejected": "choosing the bar after seeing the candidates",
       "reason": "the owner's bar (answer-27); the recipe gains columns and depth keys so each candidate is a recipe, and the engine's plan prints the recipe's own reals weight",
       "file": "Sources/VeilGardeTraining/Recipe/RecipeFile.swift"
+    },
+    {
+      "id": "decision-121",
+      "chose": "warp19 comes back inside VeilWatermark, its 19 tile features at the 512-px cap summarised as each feature's mean and spread, 38 numbers detection reads as the store's residual column and the 815-column fusion layout; older shards carry the column in side files bound to their rows' ids; the combiner can fit on 5-fold out-of-fold base predictions",
+      "rejected": "a warp model inside detection; rewriting the seed shards; the in-sample combiner for a high-capacity head",
+      "reason": "the pre-test picked the 38 statistics by its rule (0.8836 to 0.9009 AUC on final_mixed's split); the restored features equal the research's dumps value for value; an in-sample combiner gave a high-capacity head's heads no weight",
+      "file": "Sources/VeilWatermark/Residual/ResidualStatistics.swift"
     }
   ],
   "commands": [
@@ -2476,6 +2488,19 @@
       "lines": [
         "12 of 12 checkpoints; step 4 builds the row in the shipped head's layout, 393 columns"
       ]
+    },
+    {
+      "id": "command-113",
+      "phase": 17,
+      "date": "2026-10-21",
+      "cmd": "features residual (the backfill), train run residual-R-in.toml, train combiner --out-of-fold 5 at reals ×1–3 on the residual head and on F2, and the residual study's measurement, stopped by the owner after two candidates",
+      "exit": 0,
+      "lines": [
+        "the backfill: 49,056 of 138,267 store rows measured, 84,104 images gone, 5,107 changed, 0 failed; v197's 8,760 all measured",
+        "the residual head: twin AUC 0.9931 on 11,212 held-out rows, against 0.9909 for F2; out-of-fold combiners weigh the heads again (w_gen 0.15–0.42)",
+        "R-in and R-oof1: battery FAIL on HNUFoy2bcAA0vDW alone beside the two wildlife images the shipped bundle misses; final_mixed census 188 and 186 of 200; iPhone 437 of 438; unseen final_mixed reals 0.853 and 0.876, generated 0.566 and 0.520",
+        "the owner stopped the run: nothing ships, the shipped bundle stays"
+      ]
     }
   ],
   "assumptions": [
@@ -2868,6 +2893,16 @@
       "failed": 0,
       "skipped": 0,
       "note": "three new: both layouts' order and widths; a 777-column head through the engine at its depth; hand-built 777 and 393 heads routed through copies of the shipped bundle, each reading its own column 384; the route goldens unchanged"
+    },
+    {
+      "id": "test-28",
+      "phase": 17,
+      "date": "2026-10-21",
+      "suite": "all targets (scripts/test.sh, the GPU suites included), after warp19, the residual column and the out-of-fold combiner",
+      "passed": 139,
+      "failed": 0,
+      "skipped": 0,
+      "note": "warp19 equals the research's dumps value for value and a final_mixed image's research tiles; the FR pins and signatures unchanged; an 815-column head reads FR's mean at column 777"
     }
   ],
   "request_note": "Verbatim but for the research projects' names and the paths on the owner's Mac, which the owner asked to leave out of the project (amendment-4, item 1, and amendment-6); each bracket stands for a name or a path."

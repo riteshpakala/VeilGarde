@@ -62,7 +62,7 @@ final class FlywheelFixture {
         func gauss() -> Float { Float((-2 * log(max(1e-12, rng.unit()))).squareRoot() * cos(2 * .pi * rng.unit())) }
         let sources = ["civitai", "commons_native", "inat", "hf_faces", "wikimedia", "openverse"]
         var rows: [FeatureRow] = []
-        var columns: [FeatureColumn: [Float]] = Dictionary(uniqueKeysWithValues: FeatureColumn.allCases.map { ($0, [Float]()) })
+        var columns: [FeatureColumn: [Float]] = Dictionary(uniqueKeysWithValues: FeatureColumn.allCases.filter { $0 != .residual }.map { ($0, [Float]()) })   // no residual: these rows have no image
         let plan: [(String, Int, Int)] = [("art", 1, 120), ("art", 0, 90), ("blur", 1, 80), ("blur", 0, 60), ("human", 1, 120), ("human", 0, 150),
                                           ("cgi", 1, 70), ("cgi", 0, 60), ("photo", 0, 160)]
         var serial = 0

@@ -5,7 +5,8 @@
 //
 //  WHAT: The detector builds the fusion row in the layout its head's width names: a 777-column
 //        head reads the force-resized DINOv2 embedding after the plain one, and a 393-column head
-//        reads the capture values there. Each head is one hand-built tree split on one column, at
+//        reads the capture values there; an 815-column head reads the warp residual's statistics
+//        after capture. Each head is one hand-built tree split on one column, at
 //        a threshold between what the two layouts would put in that column, inside a copy of the
 //        shipped bundle.
 //
@@ -13,6 +14,7 @@
 import Foundation
 import Testing
 @testable import VeilGardeInference
+import VeilWatermark
 
 extension InferenceMLXSuites {
     @Suite("Fusion layouts", .serialized, .enabled(if: Fixture.weightsPresent))
@@ -52,6 +54,14 @@ extension InferenceMLXSuites {
                 let base = try #require(Detector.shared.detect(cgImage: cg, config: InferenceConfig(bundle: bundle)).result.routeDiagnostics?.baseP)
                 let want: Float = right < threshold ? 1 / (1 + Float(exp(2.0))) : 1 / (1 + Float(exp(-2.0)))
                 #expect(abs(base - want) < 1e-6, "\(layout.rawValue): base \(base), want \(want)")
+            }
+            // An 815-column head reads the warp residual's first statistic, FR's mean, at column 777.
+            let fr = try VeilWatermark.ResidualStatistics.measure(cg)[0]
+            for (threshold, want) in [(fr - 1e-4, 1 / (1 + Float(exp(-2.0)))), (fr + 1e-4, 1 / (1 + Float(exp(2.0))))] {
+                let (bundle, dir) = try Self.bundle(with: Self.oneSplit(on: 777, at: threshold, width: FusionLayout.bothReadingsResidual.width))
+                defer { try? FileManager.default.removeItem(at: dir) }
+                let base = try #require(Detector.shared.detect(cgImage: cg, config: InferenceConfig(bundle: bundle)).result.routeDiagnostics?.baseP)
+                #expect(abs(base - want) < 1e-6, "residual: base \(base), want \(want)")
             }
         }
     }

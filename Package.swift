@@ -105,7 +105,8 @@ let package = Package(
         ),
         .target(
             name: "VeilGardeInference",
-            dependencies: ["VeilGardeLens"],
+            // The watermark's residual statistics, which a fusion head of the residual layout reads.
+            dependencies: ["VeilGardeLens", "VeilWatermark"],
             // The shipped bundle: the shipped artifacts, by name, bound by manifest.json. Weights are
             // gitignored and resolved at run time (WeightLocator); copied into this folder they ship
             // inside the bundle.
@@ -126,6 +127,8 @@ let package = Package(
             name: "VeilGardeTraining",
             dependencies: [
                 "VeilGardeLens",
+                // The watermark's residual statistics, the store's residual column.
+                "VeilWatermark",
                 .product(name: "MLX", package: "Frigate"),
                 .product(name: "MLXNN", package: "Frigate"),
                 .product(name: "FrigateHub", package: "Frigate"),
@@ -150,9 +153,11 @@ let package = Package(
             name: "VeilWatermark",
             dependencies: [
                 "VeilGardeLens",
-                // The warp residual it reads: Frigate's warp tap tables, bicubic gathers and Gaussian blur.
+                // The warp residual it reads: Frigate's warp tap tables, bicubic gathers and Gaussian blur;
+                // the seams' rFFT for the 19 tile features detection summarises.
                 .product(name: "MLX", package: "Frigate"),
                 .product(name: "MLXAccelerate", package: "Frigate"),
+                .product(name: "MLXFFT", package: "Frigate"),
             ],
             swiftSettings: v5
         ),
@@ -171,7 +176,7 @@ let package = Package(
         ),
         .testTarget(name: "VeilGardeCoreTests", dependencies: ["VeilGardeCore"], exclude: ["Fixtures"]),
         .testTarget(name: "VeilGardeLensTests", dependencies: ["VeilGardeLens"], exclude: ["Fixtures"], swiftSettings: v5),
-        .testTarget(name: "VeilGardeInferenceTests", dependencies: ["VeilGardeInference"], exclude: ["Fixtures"], swiftSettings: v5),
+        .testTarget(name: "VeilGardeInferenceTests", dependencies: ["VeilGardeInference", "VeilWatermark"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeTrainingTests", dependencies: ["VeilGardeTraining"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeFlywheelTests", dependencies: ["VeilGardeFlywheel"], swiftSettings: v5),
         .testTarget(name: "VeilWatermarkTests", dependencies: ["VeilWatermark"], exclude: ["Fixtures"], swiftSettings: v5),

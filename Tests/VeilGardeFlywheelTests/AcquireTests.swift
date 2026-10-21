@@ -237,7 +237,7 @@ struct AcquireTests {
         var rng = SplitMix64(seed: 5)
         func gauss() -> Float { Float((-2 * log(max(1e-12, rng.unit()))).squareRoot() * cos(2 * .pi * rng.unit())) }
         var rows: [FeatureRow] = []
-        var columns: [FeatureColumn: [Float]] = Dictionary(uniqueKeysWithValues: FeatureColumn.allCases.map { ($0, [Float]()) })
+        var columns: [FeatureColumn: [Float]] = Dictionary(uniqueKeysWithValues: FeatureColumn.allCases.filter { $0 != .residual }.map { ($0, [Float]()) })   // no residual: these rows have no image
         for (k, (path, category, label)) in [("/data/atlas/photo/generated", "photo", 1), ("/data/atlas/art/real", "art", 0), ("/x/final_mixed/real", "v197", 0)].enumerated() {
             for i in 0..<40 {
                 rows.append(FeatureRow(id: "g\(k)-\(i)", path: "\(path)/\(i).jpg", label: label, category: category, source: "t"))

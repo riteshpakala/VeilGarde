@@ -79,6 +79,9 @@ struct RecipeTests {
         #expect(FusionHead().settings.resolvedLayout == .dinoCapture, "a recipe that names no columns means the 393-column row")
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[fusion]\ncolumns = \"dino_norm\"") }
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[fusion]\ndepth = 40") }
+        let oof = try RecipeFile.parse("id = \"o\"\n[fusion]\nmode = \"scratch\"\ncolumns = \"dino_fusion,dino_norm,cap,residual\"\n[combiner]\nreals_weight = 2.0\nout_of_fold = 5")
+        #expect(oof == TrainingRecipe(id: "o") { FusionHead().scratch().columns(.bothReadingsResidual); Combiner().realsWeight(2).outOfFold(folds: 5) })
+        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[combiner]\nout_of_fold = 1") }
         for retired in ["warp", "calibration", "noiseprint"] {
             #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[\(retired)]\nseed = 1") }
         }

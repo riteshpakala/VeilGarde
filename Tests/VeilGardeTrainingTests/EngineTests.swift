@@ -114,6 +114,31 @@ struct EngineTests {
         #expect(try engine.plan(warm).refusals.count == 1, "the parent's head reads 393 columns")
     }
 
+    @Test("an out-of-fold combiner refits the scratch head per fold, caches every row's base, and a later combiner on that candidate reuses it")
+    func outOfFold() throws {
+        let s = try SyntheticArea.make()
+        defer { s.remove() }
+        var lines: [String] = []
+        let engine = TrainingEngine(area: s.area, parent: s.parent, store: s.store) { if let l = $0.line { lines.append(l) } }
+        let first = try engine.train(TrainingRecipe(id: "oof") {
+            FusionHead().scratch(trees: 6, eta: 0.3)
+            Combiner().outOfFold(folds: 3)
+        }).candidate
+        let oof = try JSONCoding.read(OutOfFoldBase.self, from: first.root.appendingPathComponent(OutOfFoldBase.file))
+        let dataset = try FusionDataset.assemble(FeatureStore(directory: s.store), settings: FusionHead().scratch(trees: 6, eta: 0.3).settings)
+        #expect(oof.folds == 3 && oof.headSHA256 == first.manifest.artifact(.fusionHead)?.sha256 && Set(oof.predictions.keys) == Set(dataset.ids))
+        #expect(lines.filter { $0.contains("out-of-fold head") }.count == 3)
+        let metrics = try JSONSerialization.jsonObject(with: Data(contentsOf: first.root.appendingPathComponent("combiner/metrics.json"))) as! [String: Any]
+        #expect((metrics["note"] as? String ?? "").contains("out-of-fold"))
+        // A second combiner on that candidate reads the cached predictions and refits nothing.
+        lines.removeAll()
+        let again = TrainingEngine(area: s.area, parent: first.root, store: s.store) { if let l = $0.line { lines.append(l) } }
+        _ = try again.train(TrainingRecipe(id: "oof-2") { Combiner().realsWeight(2).outOfFold(folds: 3) })
+        #expect(!lines.contains { $0.contains("out-of-fold head") } && lines.contains { $0.contains("cached") })
+        // The shipped parent trained no scratch head here: the plan refuses.
+        #expect(try engine.plan(TrainingRecipe(id: "no") { Combiner().outOfFold(folds: 3) }).refusals.count == 1)
+    }
+
     @Test("a warm start keeps the parent's trees byte for byte and records the parent")
     func warmStart() throws {
         let s = try SyntheticArea.make()

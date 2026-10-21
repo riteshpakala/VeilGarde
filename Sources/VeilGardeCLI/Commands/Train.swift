@@ -155,10 +155,18 @@ struct TrainCommand: ParsableCommand {
     struct Combine: ParsableCommand {
         static let configuration = CommandConfiguration(commandName: "combiner", abstract: "Fit the stack combiner on the store's capture-absent rows under the parent's base and heads.")
         @Option(name: .customLong("reals-weight"), help: "The weight on real rows.") var realsWeight: Double = 3
+        @Option(name: .customLong("out-of-fold"), help: "Fit on out-of-fold base predictions over this many folds (the parent must be a candidate that trained a scratch fusion head).") var outOfFold: Int?
         @OptionGroup var options: TrainingOptions
 
         func run() throws {
-            guarded { try options.run(TrainingRecipe(id: options.candidateID("combiner")) { Combiner().realsWeight(realsWeight) }) }
+            guarded {
+                var c = Combiner().realsWeight(realsWeight)
+                if let outOfFold {
+                    guard (2...20).contains(outOfFold) else { throw VeilGardeFailure.usage("--out-of-fold is 2 to 20 folds, not \(outOfFold)") }
+                    c = c.outOfFold(folds: outOfFold)
+                }
+                try options.run(TrainingRecipe(id: options.candidateID("combiner")) { c })
+            }
         }
     }
 

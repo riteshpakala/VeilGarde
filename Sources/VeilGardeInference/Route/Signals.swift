@@ -5,14 +5,15 @@
 //
 //  WHAT: What every part of one detection shares, computed once: the image, the config, the
 //        flat-UI screenshot gate (cheap, eager: the domain detector reads it), and, lazily, the
-//        native capture signature and the two DINOv2 embeddings: the fusion head's plain one and
-//        the normalized one the heads read.
+//        native capture signature, the two DINOv2 embeddings (the fusion head's plain one and the
+//        normalized one the heads read), and the warp residual's statistics when the head reads them.
 //  PIN:  The reference's signals. The normalized embedding is always the 360×640 force-resize, the
 //        fusion embedding the plain 256/224 preprocessing, both at the config's DINOv2 variant.
 //
 
 import CoreGraphics
 import Foundation
+import VeilWatermark
 
 public final class DetectionSignals: @unchecked Sendable {
     public let cgImage: CGImage
@@ -23,6 +24,7 @@ public final class DetectionSignals: @unchecked Sendable {
     private var cachedCapture: CaptureSignature?
     private var cachedDinoNorm: [Float]?
     private var cachedDinoFusion: [Float]?
+    private var cachedResidual: [Float]?
 
     public init(cgImage: CGImage, config: InferenceConfig) {
         self.cgImage = cgImage
@@ -46,6 +48,14 @@ public final class DetectionSignals: @unchecked Sendable {
         let e = try SemanticLens.normalizedEmbedding(cgImage, variant: config.dinoVariant)
         cachedDinoNorm = e
         return e
+    }
+
+    /// The warp residual's 38 statistics at the 512-px cap (VeilWatermark's ResidualStatistics).
+    public func residual() throws -> [Float] {
+        if let r = cachedResidual { return r }
+        let r = try ResidualStatistics.measure(cgImage)
+        cachedResidual = r
+        return r
     }
 
     /// The plain DINOv2 embedding the fusion head reads.

@@ -9,7 +9,8 @@
 //        the screenshot head takes the verdict (or "real" without that head). Also the base
 //        probability with the capture-validity shortcut neutralized, which the preview tail asks for.
 //  PIN:  Column order is the layout's (FusionLayout.columns). The force-resized reading is the one
-//        the specialist heads read, cached in the signals, so the wider row costs no DINOv2 pass.
+//        the specialist heads read, cached in the signals, so the wider row costs no DINOv2 pass. The
+//        residual layout adds the warp residual's 38 statistics, measured by the watermark's code.
 //        The head and the band come from the config's bundle and decision rule. Neutralizing sets valid = 1 and native px =
 //        max(·, 576): invalid-capture rows were 85.5% generated in the 2026-07-17 measurement and
 //        taught the base "small ⇒ AI". The preview tail's cuts were set against the head before
@@ -27,6 +28,7 @@ public enum Fusion {
         switch layout {
         case .dinoCapture: return try s.dinoFusion() + cap
         case .bothReadings: return try s.dinoFusion() + s.dinoNorm() + cap
+        case .bothReadingsResidual: return try s.dinoFusion() + s.dinoNorm() + cap + s.residual()
         }
     }
 

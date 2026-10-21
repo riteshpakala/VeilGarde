@@ -270,7 +270,7 @@
      "entries": [
       {
        "scope": "TrainingEngine.trainCombiner(_:into:)",
-       "anchor": "let samples = try CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)",
+       "anchor": "samples = try CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)",
        "note": "Scores the store's capture-absent rows with the candidate's fusion head and heads, fits the combiner, and writes it in the shipped schema.",
        "link": "none"
       },

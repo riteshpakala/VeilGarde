@@ -80,13 +80,24 @@ public enum FeatureColumn: String, Codable, Sendable, CaseIterable {
     case dinoFusion = "dino_fusion"
     /// The nine capture values.
     case cap
+    /// The warp residual's 19 tile features at the 512-px cap, their mean then their spread over
+    /// the image's tiles (VeilWatermark's ResidualStatistics). Older shards carry it in a side file.
+    case residual
 
     public var width: Int {
         switch self {
         case .dinoNorm, .dinoFusion: return 384
         case .cap: return CaptureFeatures.count
+        case .residual: return 2 * Self.residualFeatures.count
         }
     }
+
+    /// The warp residual's 19 tile features, in the tile extractor's order.
+    public static let residualFeatures = ["FR", "LV", "CV", "CM", "CC", "CR", "SH", "SV", "SH_S", "SV_S", "xcorr_RG", "cfa_G",
+                                          "xcorr_BG", "xcorr_RB", "cfa_R", "cfa_B", "noise_ratio", "diag_axial", "nyq_R"]
+
+    /// The residual column's names: each feature's mean, then each feature's spread.
+    public static var residualNames: [String] { residualFeatures.map { "\($0)_mean" } + residualFeatures.map { "\($0)_std" } }
 
     /// The fusion head's columns for a layout, in its order: FusionLayout's columns.
     public static func fusion(_ layout: FusionLayout) -> [FeatureColumn] { layout.columns }
