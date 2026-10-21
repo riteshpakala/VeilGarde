@@ -116,7 +116,7 @@ public final class TrainingEngine {
                 ]
                 plans.append(p)
 
-            case .combiner:
+            case .combiner(let c):
                 var p = ModelPlan(model: model.name, stages: [], refusal: storeMissing)
                 let base = trainsFusion ? "the fusion head this recipe trains" : "the parent's fusion head"
                 // An art-pair head joins only when the recipe trains one or the parent carries one; the shipped bundle does not.
@@ -124,7 +124,7 @@ public final class TrainingEngine {
                 let heads = ([HeadKind.art, .blur, .human] + (pairHere ? [.artPair] : [])).map { trainedHeads.contains($0) ? "\($0.rawValue) (trained)" : "\($0.rawValue) (parent)" }.joined(separator: ", ")
                 p.stages = [
                     StageDecision(.data, runs: true, "capture-absent store rows (not golden or NSFW): base from \(base); heads \(heads)"),
-                    StageDecision(.fit, runs: true, "non-negative logistic, reals ×3, the rescue column zeroed (combiner v3)"),
+                    StageDecision(.fit, runs: true, "non-negative logistic, reals ×\(c.settings.realsWeight.formatted()), the rescue column zeroed (combiner v3)"),
                     StageDecision(.evaluate, runs: true, "the rescue sweep against \(CombinerProbe.userReals.count) protect-real probes; test AUC beside the base"),
                     StageDecision(.write, runs: true, "combiner/stack_combiner.json"),
                 ]

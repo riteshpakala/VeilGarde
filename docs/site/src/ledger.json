@@ -107,6 +107,16 @@
       "id": "amendment-21",
       "date": "2026-10-21",
       "text": "Time to make this even simpler.\nPhase 1) Make a new branch to backup the current repo into a branch named 2026-rnd\nPhase 2) Full simplification into 2 parallel lanes. Deepfake detection is only the fusion head and the specialist stack. And the flywheel is only meant to train and improve the fusion head and specialist stack\nPhase 3) Bring the warp model back to just FR JUST FOR THE WATERMARK only the watermark uses warp so keep it in there instead. and make sure the watermark/signature remains consistent passing all kill criteria\nPhase 4) Clean up all dead code afterwards update the site/docs and then update the trails in the code explorer. I expect the trails and guides to be easier to follow now after this session as well.\nIn regards to deepfake detection AUC changes after this, even if it drops, but the margin is negligible it should be fine, we will just begin the flywheel training soon to bring it back up."
+    },
+    {
+      "id": "amendment-22",
+      "date": "2026-10-21",
+      "text": "We might need to tune a new head for iphone cameras since the warp model was trained on iphone camera images. Or is there a specific feature you can notice around the missing pieces that a specialist head can train on"
+    },
+    {
+      "id": "amendment-23",
+      "date": "2026-10-21",
+      "text": "Is there truly something the dino embedding is missing to cover that AUC? Because, from what I have gathered the coverage from the fusion head and the specialist stack is around 0.8. Which is at a level that steers me to think that the marginal difference is recoverable through other means"
     }
   ],
   "answers": [
@@ -265,6 +275,42 @@
       "question_id": "question-16",
       "question": "The site's data cap: keep 3.5 MB, or restore 3 MB?",
       "answer": "Restored to 3 MB: with the warp's, the noiseprint's and the studies' sources gone the data measured 2.28 MB on 2026-10-21, under the old cap (decision-117)."
+    },
+    {
+      "id": "answer-25",
+      "date": "2026-10-21",
+      "question": "The lost calls are generated photoreal images with no capture signature, not iPhone cameras, and DINOv2 cannot separate them even on its own training rows; the warp residual's statistics can. Should a residual signal come back into detection?",
+      "answer": "Can we explore adding those statistics to the fusion head"
+    },
+    {
+      "id": "answer-26",
+      "date": "2026-10-21",
+      "question": "Where should the residual enter the verdict?",
+      "answer": "Measure both, keep the better (Recommended)"
+    },
+    {
+      "id": "answer-27",
+      "date": "2026-10-21",
+      "question": "What bar must a candidate clear before it ships, fixed before any number is measured?",
+      "answer": "Near the warp era (Recommended): the battery PASS with every HARD image right, at least 155 of 200 final_mixed census images right, at least 433 of 438 iPhone originals real"
+    },
+    {
+      "id": "answer-28",
+      "date": "2026-10-21",
+      "question": "Can the study also measure the combiner at reals ×1 and ×2 beside ×3?",
+      "answer": "Yes, measure ×1 and ×2 (Recommended)"
+    },
+    {
+      "id": "answer-29",
+      "date": "2026-10-21",
+      "question": "Which residual views should the build measure, given that the FR, LV and CV statistics add about +0.016 AUC and a 19-feature tile model +0.033?",
+      "answer": "The owner asked whether DINOv2 truly misses what covers that AUC (amendment-23); the plan then measured both DINOv2 readings and a bigger booster, without the residual"
+    },
+    {
+      "id": "answer-30",
+      "date": "2026-10-21",
+      "question": "If detection reads the residual again, where should its code live?",
+      "answer": "Stay in VeilWatermark (Recommended)"
     }
   ],
   "base": {
@@ -1116,6 +1162,20 @@
       "rejected": "keeping the old hero",
       "reason": "its generator read schema v2's majority and sensor keys, which no longer exist",
       "file": "README_Assets/src/build.py"
+    },
+    {
+      "id": "decision-119",
+      "chose": "The fusion row has two layouts, the plain DINOv2 CLS and capture, 393 columns, or both DINOv2 readings and capture, 777, and a head's width names its layout; the detector, the combiner trainer, agreement and the gap miner build the row in the head's own layout",
+      "rejected": "a second detector path for the wider head; replacing the 393-column row outright",
+      "reason": "the second reading is the specialist heads' cached embedding, so the wider row costs no DINOv2 pass, and a bundle of either kind keeps running; on 22,656 held-out store rows, both readings with a bigger booster lifted the photoreal corpus's AUC from 0.835 to 0.885–0.893 (command-107)",
+      "file": "Sources/VeilGardeCore/Features/FusionVector.swift"
+    },
+    {
+      "id": "decision-120",
+      "chose": "The fusion2 study's rules, fixed before any candidate was trained: a candidate ships only with the full battery PASS, at least 155 of 200 final_mixed census images right and at least 433 of 438 iPhone originals real; the grid F1–F3 with combiners at reals ×1, ×2 and ×3, and arm A; selection by final_mixed, then real false positives on the store-disjoint set, then file size",
+      "rejected": "choosing the bar after seeing the candidates",
+      "reason": "the owner's bar (answer-27); the recipe gains columns and depth keys so each candidate is a recipe, and the engine's plan prints the recipe's own reals weight",
+      "file": "Sources/VeilGardeTraining/Recipe/RecipeFile.swift"
     }
   ],
   "commands": [
@@ -2333,6 +2393,89 @@
       "lines": [
         "0 problems, 0 warnings, after two long sentences on 08-watermark.html and ml.html were shortened"
       ]
+    },
+    {
+      "id": "command-106",
+      "phase": 16,
+      "date": "2026-10-21",
+      "cmd": "read-only: the warp era's census and the two lanes' joined image by image; the lost calls' store rows looked up by SHA-1",
+      "exit": 0,
+      "lines": [
+        "36 final_mixed calls lost, 11 gained; 34 of the lost are generated images now called real, 34 of 36 with the capture signature absent; the iPhone originals 435 of 438 real",
+        "29 of the 36 are the fusion head's own training rows, in the store's v197 corpus; the warp era caught them through the warp score, 0.62–0.78, while its camera-sensor call said real on most",
+        "the census's 200 final_mixed: generated right 54 by the new base, 41 routed, 48 under the warp era's combiner weights; the warp era's base 73, routed 70"
+      ]
+    },
+    {
+      "id": "command-107",
+      "phase": 16,
+      "date": "2026-10-21",
+      "cmd": "read-only, CPU: linear and boosted probes on the store's v197 corpus and store-wide, with xgboost 3.2 and numpy",
+      "exit": 0,
+      "lines": [
+        "v197, linear, 2,930 held out: DINOv2 + capture AUC 0.839, recall at 5% real FPR 0.46; with the warp score 0.880 and 0.59",
+        "the shipped head on v197, its own training rows: AUC 0.895; a v197-only booster on both readings + capture, 2000 trees depth 8: 0.923 held out, 0.938 with the warp score",
+        "store-wide, 22,656 held out (2,930 v197): today's shape store AUC 0.981, v197 0.835; both readings 1000 trees depth 6: 0.990 and 0.885 (7.2 MB); depth 7: 0.990 and 0.886 (12.4 MB); 2000 trees depth 8: 0.991 and 0.893 (30.9 MB)",
+        "final_mixed's own split, boosted: DINOv2 + capture 0.852; with FR, LV and CV statistics 0.868; with a 19-feature tile model 0.885; with the shipped warp score 0.916, possibly in-sample"
+      ]
+    },
+    {
+      "id": "command-108",
+      "phase": 16,
+      "date": "2026-10-21",
+      "cmd": "train run <work area>/recipes/fusion2-F{1,2,3}-r1.toml, then train combiner --parent <candidate> --reals-weight 2|3, and train combiner --reals-weight 1|2 on the shipped bundle, release",
+      "exit": 0,
+      "lines": [
+        "F1 1000 trees depth 6: twin AUC 0.9899, real FPR 0.038, held-out new-generator recall 0.990, 6.7 MB, 90 s",
+        "F2 1000 trees depth 7: twin AUC 0.9909, real FPR 0.035, recall 0.992, 11.7 MB; F3 2000 trees depth 8: 0.9917, 0.034, 0.994, 31.3 MB, 325 s",
+        "the combiners were fitted on rows the heads trained on: the bigger heads read them near-perfectly in-sample, base AUC 0.9999 to 1.0000, and most of their combiners give the specialist heads zero weight"
+      ]
+    },
+    {
+      "id": "command-109",
+      "phase": 16,
+      "date": "2026-10-21",
+      "cmd": "flywheel battery --gate full, research census and research census <datasets>/iphone --label real, each with --bundle on the 11 candidates, release, one at a time",
+      "exit": 1,
+      "lines": [
+        "no candidate passes the battery: user_gen fails in all 11 on HNUFoy2bcAA0vDW, p 0.05–0.17; F1 and F3 call the real 2.JPG generated; F2 and others call wild_117757583 generated, a third miss under wildlife_real's 0.92 floor",
+        "the F heads call IMG_0291, IMG_0345 and IMG_0354 right, but for F2-r3 on IMG_0291",
+        "final_mixed census right of 200: F1 175–176, F2 185, F3 184–185, arm A 132–135; the iPhone originals 435–436 of 438 real",
+        "by the rules fixed before training, decision-120, nothing ships"
+      ]
+    },
+    {
+      "id": "command-110",
+      "phase": 16,
+      "date": "2026-10-21",
+      "cmd": "research census on the 3,217 final_mixed images in no store shard, on the shipped bundle and on fusion2-F2-r2, informational",
+      "exit": 0,
+      "lines": [
+        "151 of the census's 200 final_mixed images are store rows, so its numbers are mostly in-sample",
+        "shipped two lanes: reals 0.900, generated 0.345, accuracy 0.621, real FPR 0.100, routed AUC 0.674, base 0.709",
+        "F2-r2: reals 0.825, generated 0.563, accuracy 0.694, real FPR 0.174, routed AUC 0.753, base 0.773; the warp era was not measured on this set"
+      ]
+    },
+    {
+      "id": "command-111",
+      "phase": 16,
+      "date": "2026-10-21",
+      "cmd": "research compare --judge none for F1-r2, F2-r2, F3-r3 and A-r2, against the warp era's census and against the shipped two lanes",
+      "exit": 0,
+      "lines": [
+        "F2-r2 against the warp era: 42 of 300 calls moved, 31 to the right label, 11 to the wrong one; against the shipped two lanes 59 moved, 55 right, 4 wrong",
+        "A-r2 against the shipped two lanes: 3 moved, 1 right, 2 wrong"
+      ]
+    },
+    {
+      "id": "command-112",
+      "phase": 16,
+      "date": "2026-10-21",
+      "cmd": "Playground/run.sh, after the fusion row's two layouts",
+      "exit": 0,
+      "lines": [
+        "12 of 12 checkpoints; step 4 builds the row in the shipped head's layout, 393 columns"
+      ]
     }
   ],
   "assumptions": [
@@ -2449,6 +2592,10 @@
     {
       "id": "question-20",
       "text": "Detection lost 25 of 200 final_mixed calls against the warp era, 161 to 136, almost all of them generated photoreal images the warp score caught, so the drop is not negligible as amendment-21 asked. Keep the two lanes and recover through the flywheel, or restore a warp signal to detection?"
+    },
+    {
+      "id": "question-21",
+      "text": "No fusion2 candidate passed the bar (command-109). The closest, F2-r2, misses HNUFoy2bcAA0vDW, which every candidate misses, and wild_117757583; on unseen final_mixed it lifts generated recall from 0.345 to 0.563 at a real false-positive rate of 0.174 against 0.100. Next: a combiner fitted on held-out base predictions, since the in-sample fit gave the heads no weight; the residual views; a photoreal specialist; or keep the shipped bundle?"
     }
   ],
   "tests": [
@@ -2711,6 +2858,16 @@
       "failed": 0,
       "skipped": 0,
       "note": "13, 31, 4, 8, 23, 46 and 5 tests by target; ResidualTests, RouteGoldenTests and the combiner's sweep test, renamed to say the shipped rescue is the fallback, among them"
+    },
+    {
+      "id": "test-27",
+      "phase": 16,
+      "date": "2026-10-21",
+      "suite": "all targets (scripts/test.sh, the GPU suites included), after the fusion row's two layouts",
+      "passed": 133,
+      "failed": 0,
+      "skipped": 0,
+      "note": "three new: both layouts' order and widths; a 777-column head through the engine at its depth; hand-built 777 and 393 heads routed through copies of the shipped bundle, each reading its own column 384; the route goldens unchanged"
     }
   ],
   "request_note": "Verbatim but for the research projects' names and the paths on the owner's Mac, which the owner asked to leave out of the project (amendment-4, item 1, and amendment-6); each bracket stands for a name or a path."
