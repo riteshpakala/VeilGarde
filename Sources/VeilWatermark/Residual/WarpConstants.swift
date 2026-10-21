@@ -1,6 +1,6 @@
 //
 //  WarpConstants.swift
-//  VeilGardeLens
+//  VeilWatermark
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The residual's fixed probe: 32-px tiles, 16 homographies at two strengths, the

@@ -14,7 +14,7 @@
 //                       combiner), Bundle/ (artifacts, the manifest, SHA-256 binding), Result/
 //                       (InferenceResult, the schema-v3 JSON, the verdict law, route batches),
 //                       Store/ (the features-only store)
-//   VeilGardeLens       the extractors, in the order a pixel travels: Image/, Warp/, Capture/,
+//   VeilGardeLens       the extractors, in the order a pixel travels: Image/, Capture/,
 //                       Semantic/ (DINOv2, CLIP vision), Scoring/
 //                                                          (MLX through Frigate, Swift 5 mode)
 //   VeilGardeInference  the detector, in the order a verdict is built: Config/, Fusion/,
@@ -25,17 +25,18 @@
 //                       Artifacts/                                               (Swift 5 mode)
 //   VeilGardeFlywheel   the regime that grows the fusion head and the specialist stack: Area/,
 //                       Store/, Acquire/, Ingest/, Candidates/, Battery/, Promote/ (Swift 5 mode)
-//   VeilWatermark       the crop-robust signature on the warp residual: Signature/, Sections/,
-//                       Match/, Acceptance/                                      (Swift 5 mode)
+//   VeilWatermark       the crop-robust signature on the warp residual: Residual/ (the warp
+//                       round trip and the fragility rate), Signature/, Sections/, Match/,
+//                       Acceptance/                            (MLX through Frigate, Swift 5 mode)
 //   VeilGarde           the umbrella, and the doctor that checks every layer     (Swift 5 mode)
 //   VeilGardeCLI        the `veilgarde` executable                               (Swift 5 mode)
 //
 // Invariants PackageLayeringTests holds: exactly these four products; MLX only through Frigate
 // (no mlx-swift URL here, and every MLX or Frigate import sits in a target that lists that
 // product); Core imports Foundation and Crypto only; Training never imports Inference or the
-// Flywheel; VeilWatermark imports only Core and Lens; nothing under Sources/ imports MLXLLM,
-// MLXLMCommon, AppKit or UIKit; no type is named like a module; every Swift file opens with a
-// WHAT: header.
+// Flywheel; VeilWatermark imports Core, Lens and, for its residual, MLX and MLXAccelerate; nothing
+// under Sources/ imports MLXLLM, MLXLMCommon, AppKit or UIKit; no type is named like a module;
+// every Swift file opens with a WHAT: header.
 //
 // Frigate, the family's vendored MLX stack, is taken by path, as every consumer in the family
 // takes it: VEILGARDE_FRIGATE_DIR, else ../Frigate, else ../../rao/repositories/Frigate (this
@@ -147,7 +148,12 @@ let package = Package(
         ),
         .target(
             name: "VeilWatermark",
-            dependencies: ["VeilGardeLens"],
+            dependencies: [
+                "VeilGardeLens",
+                // The warp residual it reads: Frigate's warp tap tables, bicubic gathers and Gaussian blur.
+                .product(name: "MLX", package: "Frigate"),
+                .product(name: "MLXAccelerate", package: "Frigate"),
+            ],
             swiftSettings: v5
         ),
         .target(

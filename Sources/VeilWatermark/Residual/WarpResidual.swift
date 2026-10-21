@@ -1,9 +1,9 @@
 //
 //  WarpResidual.swift
-//  VeilGardeLens
+//  VeilWatermark
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The warp lens itself: warp every tile through the 16 homographies and back, average the
+//  WHAT: The warp residual itself: warp every tile through the 16 homographies and back, average the
 //        round-trip error over channels and trials, and keep its high frequencies. A camera tile's
 //        sensor noise and mosaic do not survive the round trip the way a generator's smooth
 //        output does; what is lost is the residual.

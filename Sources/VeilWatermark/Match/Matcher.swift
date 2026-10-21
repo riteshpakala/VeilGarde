@@ -45,8 +45,8 @@ public struct MatchResult: Codable, Sendable, Equatable {
     public var matched: Bool
 
     /// The signed-image pixel the image's top-left corresponds to (offset · 32 − phase).
-    public var pixelX: Int { offsetX * 32 - phaseX }
-    public var pixelY: Int { offsetY * 32 - phaseY }
+    public var pixelX: Int { offsetX * WarpConstants.tileSize - phaseX }
+    public var pixelY: Int { offsetY * WarpConstants.tileSize - phaseY }
 
     public static let none = MatchResult(offsetX: 0, offsetY: 0, phaseX: 0, phaseY: 0, score: 0, bitsCompared: 0, zScore: 0, matched: false)
 }

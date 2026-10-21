@@ -1,15 +1,16 @@
 //
 //  FragilityGrid.swift
-//  VeilGardeLens
+//  VeilWatermark
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The warp lens's fragility rate for every full 32-px tile of an image at its native
-//        resolution, from any tile origin: the per-tile pattern the watermark reads. Nothing is
+//  WHAT: The fragility rate for every full 32-px tile of an image at its native resolution, from
+//        any tile origin: the per-tile pattern the watermark reads. Nothing is
 //        resized, so a crop of the image sees the same tiles (shifted by whole tiles when the
 //        crop's origin is found).
-//  PIN:  The detector's own residual (WarpResidual.batch at both strengths, then fragility) on
-//        tiles cut from the native RGB plane starting at (originX, originY); only full tiles,
-//        no padding; chunked by the evaluation budget.
+//  PIN:  The residual (WarpResidual.batch at both strengths, then fragility) on tiles cut from the
+//        native RGB plane starting at (originX, originY); only full tiles, no padding; chunked by
+//        the evaluation budget. Until 2026-10-21 the detector's lens ran the same code; every
+//        signature since 2026-10-19 reads the same values (ResidualTests).
 //
 
 import CoreGraphics

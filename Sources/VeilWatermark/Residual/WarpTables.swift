@@ -1,6 +1,6 @@
 //
 //  WarpTables.swift
-//  VeilGardeLens
+//  VeilWatermark
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The residual's precomputed gathers. Every tile is 32×32 and the 16 homographies are

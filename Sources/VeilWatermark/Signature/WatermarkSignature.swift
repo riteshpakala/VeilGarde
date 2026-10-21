@@ -29,14 +29,14 @@ public struct WatermarkSignature: Sendable, Equatable {
 
     public init(grid: TileCodeGrid) {
         version = Self.currentVersion
-        tile = 32
+        tile = WarpConstants.tileSize
         section = Sectioning.side
         rows = grid.rows
         cols = grid.cols
         (codes, masks) = Sectioning.pack(grid)
     }
 
-    public init(version: Int = currentVersion, tile: Int = 32, section: Int = Sectioning.side, rows: Int, cols: Int, codes: [UInt64], masks: [UInt64]) {
+    public init(version: Int = currentVersion, tile: Int = WarpConstants.tileSize, section: Int = Sectioning.side, rows: Int, cols: Int, codes: [UInt64], masks: [UInt64]) {
         self.version = version
         self.tile = tile
         self.section = section
@@ -73,7 +73,7 @@ public struct WatermarkSignature: Sendable, Equatable {
         guard n == Sectioning.sectionRows(rows) * Sectioning.sectionCols(cols) else { throw VeilGardeFailure.data("a \(rows)×\(cols) grid has \(Sectioning.sectionRows(rows) * Sectioning.sectionCols(cols)) sections, not \(n)") }
         self.init(version: Int(b[4]), tile: Int(b[5]), section: Int(b[6]), rows: rows, cols: cols,
                   codes: (0..<n).map { u64(20 + 8 * $0) }, masks: (0..<n).map { u64(20 + 8 * (n + $0)) })
-        guard version == Self.currentVersion, tile == 32, section == Sectioning.side else { throw VeilGardeFailure.data("an unsupported watermark signature (version \(version), tile \(tile), section \(section))") }
+        guard version == Self.currentVersion, tile == WarpConstants.tileSize, section == Sectioning.side else { throw VeilGardeFailure.data("an unsupported watermark signature (version \(version), tile \(tile), section \(section))") }
     }
 
     public var cid: String { ContentHash.sha256Hex(binary) }

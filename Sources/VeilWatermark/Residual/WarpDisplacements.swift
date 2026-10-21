@@ -1,15 +1,14 @@
 //
 //  WarpDisplacements.swift
-//  VeilGardeLens
+//  VeilWatermark
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The 16 fixed homographies of the warp lens, as corner displacements in [−1, 1]: for trial
+//  WHAT: The 16 fixed homographies of the warp residual, as corner displacements in [−1, 1]: for trial
 //        t, corner c (top-left, top-right, bottom-right, bottom-left), axis (x, y). A tile's four
 //        corners move by displacement · strength · 32 px, at strength 0.025 and 0.05.
 //  PIN:  The exact output of numpy `np.random.default_rng(42).uniform(-1, 1, (16, 4, 2))`, which
 //        equals the 16 sequential (4, 2) draws the reference `_warp_noise` makes. A literal table, never
-//        regenerated: the trained model saw these warps and no others. Copied from Garde's padded
-//        fast-inference source byte for byte.
+//        regenerated: every signature ever written was read through these warps and no others.
 //
 
 enum WarpDisplacements {

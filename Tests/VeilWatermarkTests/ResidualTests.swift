@@ -17,7 +17,6 @@ import CoreGraphics
 import Foundation
 import Testing
 import VeilGardeCore
-@testable import VeilGardeLens
 @testable import VeilWatermark
 
 @Suite("The residual's fixed probe")
