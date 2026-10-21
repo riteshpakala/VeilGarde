@@ -90,14 +90,14 @@
      "entries": [
       {
        "scope": "FusionDataset.assemble(_:settings:)",
-       "anchor": "for column in FeatureColumn.fusion { x.append(contentsOf: selection.vector(column, row: i)) }",
-       "note": "Stacks each row's DINOv2 embedding and nine capture values in id order, with the trainer's row weights, and marks the held-out new-generator rows and the evaluation twin's rows. A refit without the warp score lost 0.0012 AUC on held-out store rows on 2026-10-19.",
+       "anchor": "for column in layout.columns { x.append(contentsOf: selection.vector(column, row: i)) }",
+       "note": "Stacks each row's columns in the recipe's layout, the plain DINOv2 embedding and the nine capture values or both DINOv2 readings and capture, in id order, with the trainer's row weights, and marks the held-out new-generator rows and the evaluation twin's rows. A refit without the warp score lost 0.0012 AUC on held-out store rows on 2026-10-19.",
        "cite": "ledger#command-53"
       },
       {
-       "scope": "FeatureColumn",
-       "anchor": "public static let fusion: [FeatureColumn] = [.dinoFusion, .cap]",
-       "note": "The store's three columns: dino_norm for the heads, dino_fusion and cap for the fusion head. An older shard's other columns are read past.",
+       "scope": "FusionLayout",
+       "anchor": "case bothReadings = \"dino_fusion,dino_norm,cap\"",
+       "note": "The fusion row's two layouts: the plain DINOv2 embedding and capture, 393 columns, or both DINOv2 readings and capture, 777. A head's width names its layout, so a bundle of either kind runs.",
        "cite": "ledger#decision-112",
        "link": "none"
       }
@@ -270,14 +270,14 @@
      "entries": [
       {
        "scope": "TrainingEngine.trainCombiner(_:into:)",
-       "anchor": "let samples = CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)",
+       "anchor": "let samples = try CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)",
        "note": "Scores the store's capture-absent rows with the candidate's fusion head and heads, fits the combiner, and writes it in the shipped schema.",
        "link": "none"
       },
       {
        "scope": "CombinerSample.captureAbsent(_:base:heads:pair:)",
        "anchor": "heads: heads.map { Double($0.pAI(norm)) }, pair: pair.map { Double($0.pAI(norm)) })",
-       "note": "One row per capture-absent image: the base on its 393 values, the three heads on its dino_norm, and an art-pair head's when the candidate trained one. The base is in-sample for a head trained on the same rows."
+       "note": "One row per capture-absent image: the base on its fusion row in the base's own layout, the three heads on its dino_norm, and an art-pair head's when the candidate trained one. The base is in-sample for a head trained on the same rows."
       },
       {
        "scope": "CombinerTrainer.train(_:settings:note:)",
@@ -402,8 +402,8 @@
       },
       {
        "scope": "Fusion.verdict(_:)",
-       "anchor": "let p = head.predict(try vector(s))",
-       "note": "Builds the 393 values, asks the head for P(AI) and labels it at 0.5 with a band of 0.04 either side.",
+       "anchor": "let p = head.predict(try vector(s, layout: FusionLayout.of(width: head.numFeatures)))",
+       "note": "Builds the row in the layout the head's width names, asks the head for P(AI) and labels it at 0.5 with a band of 0.04 either side.",
        "cite": "PIN:Sources/VeilGardeInference/Fusion/FusionInference.swift"
       },
       {
@@ -421,9 +421,9 @@
      ],
      "entries": [
       {
-       "scope": "Fusion.vector(_:)",
-       "anchor": "try s.dinoFusion() + CaptureLens.features(s.cgImage).asVector",
-       "note": "The 393 values: DINOv2-small's 384 and the nine capture values, in the order the store keeps them.",
+       "scope": "Fusion.vector(_:layout:capture:)",
+       "anchor": "case .bothReadings: return try s.dinoFusion() + s.dinoNorm() + cap",
+       "note": "The row: DINOv2-small's plain 384 and the nine capture values, or both DINOv2 readings and capture, in the order the store keeps them. The second reading is the one the specialist heads read, cached in the signals.",
        "cite": "ledger#decision-104"
       },
       {

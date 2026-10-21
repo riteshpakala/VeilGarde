@@ -62,6 +62,7 @@ public enum GapMiner {
     public static func mine(_ bundle: ModelBundle, store: FeatureStore, shards: [String]? = nil, targets: AcquireTargets) throws -> GapReport {
         guard let fusionURL = bundle.url(.fusionHead), let combinerURL = bundle.url(.combiner) else { throw VeilGardeFailure.missing("the bundle needs a fusion head and a combiner") }
         let fusion = try GBDTModel.load(fusionURL), combiner = try StackCombiner.load(combinerURL)
+        let columns = try FusionLayout.of(width: fusion.featureCount).columns
         let heads = try [HeadKind.art, .blur, .human].map { kind -> LinearHead in
             guard let url = bundle.url(.head, head: kind) else { throw VeilGardeFailure.missing("the bundle has no \(kind.rawValue) head") }
             return try LinearHead.load(url)
@@ -76,7 +77,7 @@ public enum GapMiner {
                     for k in (c * 1024)..<min(keep.count, (c + 1) * 1024) {
                         let i = keep[k]
                         var row = [Float]()
-                        for column in FeatureColumn.fusion { row.append(contentsOf: s.vector(column, row: i)) }
+                        for column in columns { row.append(contentsOf: s.vector(column, row: i)) }
                         let norm = Array(s.vector(.dinoNorm, row: i))
                         let p = fusion.predict(row)
                         b[k] = p

@@ -96,6 +96,24 @@ struct EngineTests {
         #expect(throws: VeilGardeFailure.self) { try engine.train(recipe()) }
     }
 
+    @Test("a both-readings recipe trains a 777-column head at its depth, its combiner reads that row, and a warm start onto the 393-column parent is refused")
+    func bothReadings() throws {
+        let s = try SyntheticArea.make()
+        defer { s.remove() }
+        let engine = TrainingEngine(area: s.area, parent: s.parent, store: s.store)
+        let wide = TrainingRecipe(id: "wide") {
+            FusionHead().scratch(trees: 6, eta: 0.3).columns(.bothReadings).depth(3)
+            Combiner()
+        }
+        let c = try engine.train(wide).candidate
+        try c.verify()
+        let head = try GBDTModel.load(c.url(.fusionHead)!)
+        #expect(head.featureCount == 777 && head.trees.count == 6 && head.trees.allSatisfy { $0.depth <= 3 })
+        #expect(try StackCombiner.load(c.url(.combiner)!).wGen.count == 3)
+        let warm = TrainingRecipe(id: "wide-warm") { FusionHead().warmStart(add: 2).columns(.bothReadings) }
+        #expect(try engine.plan(warm).refusals.count == 1, "the parent's head reads 393 columns")
+    }
+
     @Test("a warm start keeps the parent's trees byte for byte and records the parent")
     func warmStart() throws {
         let s = try SyntheticArea.make()

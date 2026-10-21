@@ -88,6 +88,6 @@ public enum FeatureColumn: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    /// The fusion head's columns, in its order: FusionVector's order.
-    public static let fusion: [FeatureColumn] = [.dinoFusion, .cap]
+    /// The fusion head's columns for a layout, in its order: FusionLayout's columns.
+    public static func fusion(_ layout: FusionLayout) -> [FeatureColumn] { layout.columns }
 }

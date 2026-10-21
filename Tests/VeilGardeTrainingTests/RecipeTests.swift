@@ -5,8 +5,9 @@
 //
 //  WHAT: The recipe DSL: the builder takes `if` and `for`, modifiers return changed copies, the
 //        engine's order is the dependency order (fusion, heads, combiner), recipes round-trip as
-//        JSON, and recipe.toml reads into the same values, refusing what it does not know (the
-//        retired warp, calibration and noiseprint tables among it).
+//        JSON, and recipe.toml reads into the same values, the fusion head's columns and depth
+//        among them, refusing what it does not know (the retired warp, calibration and noiseprint
+//        tables among it).
 //
 
 import Foundation
@@ -71,6 +72,13 @@ struct RecipeTests {
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[optimizer]\nlr = 1") }
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("[heads]\nkinds = [\"art\"]") }
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[heads]\nkinds = [\"faces\"]") }
+        let wide = try RecipeFile.parse("id = \"w\"\n[fusion]\nmode = \"scratch\"\ntrees = 1000\ndepth = 7\ncolumns = \"dino_fusion,dino_norm,cap\"")
+        #expect(wide == TrainingRecipe(id: "w") { FusionHead().scratch(trees: 1000, eta: 0.04).depth(7).columns(.bothReadings) })
+        guard case .fusion(let f) = wide.ordered[0] else { Issue.record("no fusion"); return }
+        #expect(f.settings.resolvedLayout.width == 777 && f.settings.maxDepth == 7)
+        #expect(FusionHead().settings.resolvedLayout == .dinoCapture, "a recipe that names no columns means the 393-column row")
+        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[fusion]\ncolumns = \"dino_norm\"") }
+        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[fusion]\ndepth = 40") }
         for retired in ["warp", "calibration", "noiseprint"] {
             #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[\(retired)]\nseed = 1") }
         }

@@ -38,6 +38,8 @@ public struct FusionHead: Sendable, Equatable, Codable {
     public func newGeneratorWeight(_ w: Double) -> FusionHead { with { $0.settings.newGeneratorWeight = w } }
     public func previewWeight(_ w: Double) -> FusionHead { with { $0.settings.previewWeight = w } }
     public func emphasize(_ ids: [String], weight: Double = 3) -> FusionHead { with { $0.settings.emphasize = ids; $0.settings.emphasizeWeight = weight } }
+    public func columns(_ layout: FusionLayout) -> FusionHead { with { $0.settings.layout = layout } }
+    public func depth(_ d: Int) -> FusionHead { with { $0.settings.maxDepth = d } }
 }
 
 /// One specialist head over the store's dino_norm column.

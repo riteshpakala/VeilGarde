@@ -4,9 +4,10 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The fusion head, the base verdict for every image without a capture signature: a
-//        boosted classifier over the 393-value row [dino_fusion(384) | cap(9)]. Trained from
-//        scratch, or (the flywheel's only base-moving step) continued from the live head by
-//        appending trees so the parent's trees stay byte for byte.
+//        boosted classifier over a FusionLayout's row, [dino_fusion(384) | cap(9)] = 393 or
+//        [dino_fusion(384) | dino_norm(384) | cap(9)] = 777. Trained from scratch, or (the
+//        flywheel's only base-moving step) continued from the live head by appending trees so the
+//        parent's trees stay byte for byte.
 //  PIN:  The reference's warm-start corpus and weights: every store row that is not golden, not
 //        NSFW and carries dino_fusion, ordered by id; weight w_new_gen on generated rows from
 //        new-generator shards (scrape_*, acquire_*), 0.7 on gen_family flux2-klein-4b, ×w_preview on
@@ -49,8 +50,12 @@ public struct FusionSettings: Codable, Sendable, Equatable {
     public var holdoutFraction = 0.3
     /// The share of rows the evaluation twin holds out (0 skips the twin).
     public var evaluationFraction = 0.1
+    /// The row's layout; nil is `.dinoCapture`, as every recipe written before 2026-10-21 meant.
+    public var layout: FusionLayout? = nil
 
     public init() {}
+
+    public var resolvedLayout: FusionLayout { layout ?? .dinoCapture }
 }
 
 public struct FusionDataset: Sendable {
@@ -62,15 +67,16 @@ public struct FusionDataset: Sendable {
     public var isEvaluation: [Bool]
 
     public static func assemble(_ store: FeatureStore, settings: FusionSettings) throws -> FusionDataset {
-        let selection = try store.select(columns: Set(FeatureColumn.fusion)) { !$0.golden && !$0.nsfw }
+        let layout = settings.resolvedLayout
+        let selection = try store.select(columns: Set(layout.columns)) { !$0.golden && !$0.nsfw }
         var order = (0..<selection.count).filter { selection.vector(.dinoFusion, row: $0).first?.isFinite ?? false }
         order.sort { selection.rows[$0].id < selection.rows[$1].id }
         let emphasized = Set(settings.emphasize)
         var x: [Float] = [], y: [Float] = [], w: [Float] = [], ids: [String] = [], newGen: [Bool] = [], held: [Bool] = [], eval: [Bool] = []
-        x.reserveCapacity(order.count * FusionVector.count)
+        x.reserveCapacity(order.count * layout.width)
         for i in order {
             let row = selection.rows[i]
-            for column in FeatureColumn.fusion { x.append(contentsOf: selection.vector(column, row: i)) }
+            for column in layout.columns { x.append(contentsOf: selection.vector(column, row: i)) }
             y.append(Float(row.label))
             let isNew = row.isGenerated && settings.newGeneratorShards.contains { selection.shards[i].hasPrefix($0) }
             var weight = isNew ? settings.newGeneratorWeight : (row.genFamily == "flux2-klein-4b" ? settings.fluxWeight : 1)
@@ -82,7 +88,7 @@ public struct FusionDataset: Sendable {
             held.append(isNew && StableSplit.isHoldout(row.id, salt: "fusion-held:v1", fraction: settings.holdoutFraction))
             eval.append(settings.evaluationFraction > 0 && StableSplit.isHoldout(row.id, salt: "fusion-eval:v1", fraction: settings.evaluationFraction))
         }
-        return FusionDataset(ids: ids, data: BoostDataset(x: x, y: y, weight: w, features: FusionVector.count),
+        return FusionDataset(ids: ids, data: BoostDataset(x: x, y: y, weight: w, features: layout.width),
                              isNewGenerator: newGen, isHeldOut: held, isEvaluation: eval)
     }
 

@@ -82,7 +82,7 @@
      "entries": [
       {
        "scope": "FusionVector",
-       "anchor": "public var asVector: [Float] { dino + capture.asVector }",
+       "anchor": "public var asVector: [Float] { dino + (dinoNorm ?? []) + capture.asVector }",
        "note": "The fusion head's row: DINOv2's 384-value embedding, then the nine capture values, 393 columns in the head's own order. A model trained on one column order and run on another would read the capture peak where it expects an embedding value.",
        "cite": "chapter:01-fusion.html#vector",
        "deeper": {
@@ -210,7 +210,7 @@
      "entries": [
       {
        "scope": "FusionDataset.assemble(_:settings:)",
-       "anchor": "for column in FeatureColumn.fusion { x.append(contentsOf: selection.vector(column, row: i)) }",
+       "anchor": "for column in layout.columns { x.append(contentsOf: selection.vector(column, row: i)) }",
        "note": "Takes every store row that is not golden, not NSFW and carries the fusion embedding, ordered by id, and stacks its DINOv2 and capture columns. An older shard's other columns are read past.",
        "cite": "PIN",
        "deeper": {

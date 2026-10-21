@@ -55,14 +55,16 @@ func run() throws {
     Show.line("the fusion view (short edge 256, centre crop 224): norm \(Show.f(l2(embedding), 2)), first values " + embedding.prefix(4).map { Show.f($0) }.joined(separator: " "))
     Show.line("the heads' view (force-resized to 360×640):          norm \(Show.f(l2(norm), 2)), first values " + norm.prefix(4).map { Show.f($0) }.joined(separator: " "))
 
-    // 4. The fusion head: the camera base expert.
-    let vector = embedding + capture.asVector
+    // 4. The fusion head: the camera base expert, its row in the layout its width names.
     let fusionHead = try TreeModelCache.shared.model(bundle.url(.fusionHead)!)
+    let layout = try FusionLayout.of(width: fusionHead.numFeatures)
+    let vector = embedding + (layout == .bothReadings ? norm : []) + capture.asVector
     let baseP = fusionHead.predict(vector)
     let routed = try Detector.shared.detect(cgImage: cg, config: config)
     let r = routed.result
     let shippedTrees = try GBDTModel.load(bundle.url(.fusionHead)!).trees.count
-    Show.step(4, "fusion", "DINOv2 CLS (384) ⊕ capture (9) = \(vector.count) columns through the fusion head (\(shippedTrees) trees)")
+    Show.step(4, "fusion", (layout == .bothReadings ? "DINOv2 CLS (384) ⊕ the heads' view (384) ⊕ capture (9)" : "DINOv2 CLS (384) ⊕ capture (9)")
+              + " = \(vector.count) columns through the fusion head (\(shippedTrees) trees)")
     Show.line("→ base P(AI) \(Show.f(baseP)) at 0.5 ± 0.04: \(config.decision.label(baseP))")
     checks.record("the fusion row built by hand gives the detector's base P(AI)", abs(baseP - (r.routeDiagnostics?.baseP ?? -1)) < 1e-6)
 
@@ -140,9 +142,11 @@ func run() throws {
                   untouched && warm.trees.count == shippedHead.trees.count + 2)
     // The candidate's head is XGBoost JSON Frigate's evaluator reads unchanged.
     let frigate = try TreeModelCache.shared.model(candidate.url(.fusionHead)!)
-    let storeRows = try FeatureStore(directory: Toy.store).select(columns: Set(FeatureColumn.fusion))
-    let flat = storeRows.matrix(FeatureColumn.fusion)
-    let fusionRows = (0..<storeRows.count).map { Array(flat[($0 * FusionVector.count)..<(($0 + 1) * FusionVector.count)]) }
+    let columns = try FusionLayout.of(width: warm.featureCount).columns
+    let width = columns.map(\.width).reduce(0, +)
+    let storeRows = try FeatureStore(directory: Toy.store).select(columns: Set(columns))
+    let flat = storeRows.matrix(columns)
+    let fusionRows = (0..<storeRows.count).map { Array(flat[($0 * width)..<(($0 + 1) * width)]) }
     checks.record("the candidate's fusion head reads back through Frigate's evaluator with identical predictions on \(fusionRows.count) store rows",
                   fusionRows.allSatisfy { frigate.predict($0) == warm.predict($0) })
 

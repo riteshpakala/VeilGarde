@@ -100,10 +100,11 @@ public struct CombinerSample: Sendable, Equatable {
 
 extension CombinerSample {
     /// The combiner's rows from a store selection: every capture-absent row that has both
-    /// embeddings, with `base` on its fusion vector (the head's prediction on rows it may have
-    /// trained on), and the three heads and the art-pair head on its dino_norm. Rows keep the
-    /// selection's order.
-    public static func captureAbsent(_ selection: StoreSelection, base: GBDTModel, heads: [LinearHead], pair: LinearHead?) -> [CombinerSample] {
+    /// embeddings, with `base` on its fusion vector in the base's own layout (the head's prediction
+    /// on rows it may have trained on), and the three heads and the art-pair head on its dino_norm.
+    /// Rows keep the selection's order.
+    public static func captureAbsent(_ selection: StoreSelection, base: GBDTModel, heads: [LinearHead], pair: LinearHead?) throws -> [CombinerSample] {
+        let columns = try FusionLayout.of(width: base.featureCount).columns
         var out = [CombinerSample?](repeating: nil, count: selection.count)
         out.withUnsafeMutableBufferPointer { slots in
             DispatchQueue.concurrentPerform(iterations: selection.count) { i in
@@ -112,7 +113,7 @@ extension CombinerSample {
                 let norm = Array(selection.vector(.dinoNorm, row: i)), fusion = Array(selection.vector(.dinoFusion, row: i))
                 guard norm.first?.isFinite == true, fusion.first?.isFinite == true else { return }
                 var row = [Float]()
-                for column in FeatureColumn.fusion { row.append(contentsOf: selection.vector(column, row: i)) }
+                for column in columns { row.append(contentsOf: selection.vector(column, row: i)) }
                 slots[i] = CombinerSample(id: selection.rows[i].id, label: selection.rows[i].label, base: Double(base.predict(row)),
                                           heads: heads.map { Double($0.pAI(norm)) }, pair: pair.map { Double($0.pAI(norm)) })
             }

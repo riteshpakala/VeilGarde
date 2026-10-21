@@ -11,6 +11,8 @@
 //            mode = "warm"                # warm | scratch
 //            add = 80
 //            eta = 0.03
+//            depth = 5
+//            columns = "dino_fusion,cap"  # or "dino_fusion,dino_norm,cap"
 //
 //            [heads]
 //            kinds = ["art", "blur", "human", "preview"]
@@ -28,7 +30,7 @@ import VeilGardeCore
 public enum RecipeFile {
     static let keys: [String: Set<String>] = [
         "": ["id"],
-        "fusion": ["mode", "add", "trees", "eta", "new_generator_weight", "preview_weight"],
+        "fusion": ["mode", "add", "trees", "eta", "depth", "columns", "new_generator_weight", "preview_weight"],
         "heads": ["kinds", "C", "version"],
         "combiner": ["reals_weight"],
     ]
@@ -55,6 +57,16 @@ public enum RecipeFile {
             case "warm": f = f.warmStart(add: v("fusion", "add")?.integer ?? 80, eta: v("fusion", "eta")?.float ?? 0.03)
             case "scratch": f = f.scratch(trees: v("fusion", "trees")?.integer ?? 500, eta: v("fusion", "eta")?.float ?? 0.04)
             case let other: throw VeilGardeFailure.usage("recipe: [fusion] mode is warm or scratch, not \(other)")
+            }
+            if let d = v("fusion", "depth")?.integer {
+                guard (1...12).contains(d) else { throw VeilGardeFailure.usage("recipe: [fusion] depth is 1 to 12, not \(d)") }
+                f = f.depth(d)
+            }
+            if let c = v("fusion", "columns")?.string {
+                guard let layout = FusionLayout(rawValue: c.replacingOccurrences(of: " ", with: "")) else {
+                    throw VeilGardeFailure.usage("recipe: [fusion] columns is one of \(FusionLayout.allCases.map { "\"\($0.rawValue)\"" }.joined(separator: ", ")), not \"\(c)\"")
+                }
+                f = f.columns(layout)
             }
             if let w = v("fusion", "new_generator_weight")?.float { f = f.newGeneratorWeight(w) }
             if let w = v("fusion", "preview_weight")?.float { f = f.previewWeight(w) }

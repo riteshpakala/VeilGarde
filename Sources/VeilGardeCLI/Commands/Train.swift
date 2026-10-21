@@ -107,11 +107,23 @@ struct TrainCommand: ParsableCommand {
         @Option(help: "Trees to add (warm) or to grow (scratch).") var trees: Int?
         @Option(help: "The learning rate.") var eta: Double?
         @Option(name: .customLong("new-generator-weight"), help: "The weight on new-generator rows.") var newGeneratorWeight: Double = 1.0
+        @Option(help: "The row's columns: dino_fusion,cap (393) or dino_fusion,dino_norm,cap (777).") var columns: String?
+        @Option(help: "The trees' depth (default 5).") var depth: Int?
         @OptionGroup var options: TrainingOptions
 
         func run() throws {
             guarded {
                 var f = FusionHead().newGeneratorWeight(newGeneratorWeight)
+                if let columns {
+                    guard let layout = FusionLayout(rawValue: columns.replacingOccurrences(of: " ", with: "")) else {
+                        throw VeilGardeFailure.usage("--columns is one of \(FusionLayout.allCases.map(\.rawValue).joined(separator: " or ")), not \(columns)")
+                    }
+                    f = f.columns(layout)
+                }
+                if let depth {
+                    guard (1...12).contains(depth) else { throw VeilGardeFailure.usage("--depth is 1 to 12, not \(depth)") }
+                    f = f.depth(depth)
+                }
                 switch mode {
                 case "warm": f = f.warmStart(add: trees ?? 80, eta: eta ?? 0.03)
                 case "scratch": f = f.scratch(trees: trees ?? 500, eta: eta ?? 0.04)

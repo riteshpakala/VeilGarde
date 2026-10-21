@@ -33,6 +33,21 @@ struct VerdictTests {
         #expect(flat.count == 393 && FusionVector.count == 393)
         #expect(flat[0] == 0.5 && flat[383] == 0.5 && flat[384] == 42 && flat[387] == 1024 && flat[392] == 0.2)
         #expect(FusionVector.names.count == 393 && FusionVector.names[384] == "cap_" + CaptureFeatures.names[0])
-        #expect(FeatureColumn.fusion.map(\.width).reduce(0, +) == FusionVector.count)
+        #expect(FusionLayout.dinoCapture.columns == [.dinoFusion, .cap] && FusionLayout.dinoCapture.width == FusionVector.count)
+        #expect(vector.layout == .dinoCapture)
+    }
+
+    @Test("both DINOv2 readings make a 777-column row: the plain CLS, the force-resized one, then capture; a head's width names its layout")
+    func bothReadings() throws {
+        let capture = CaptureFeatures(vector: [42, 1, 1, 1024, 3, 0.4, 0.5, 0.1, 0.2])
+        let vector = FusionVector(dino: [Float](repeating: 0.5, count: 384), dinoNorm: [Float](repeating: -1, count: 384), capture: capture)
+        let flat = vector.asVector
+        #expect(vector.layout == .bothReadings && flat.count == 777 && FusionLayout.bothReadings.width == 777)
+        #expect(flat[383] == 0.5 && flat[384] == -1 && flat[767] == -1 && flat[768] == 42 && flat[776] == 0.2)
+        #expect(FusionLayout.bothReadings.columns == [.dinoFusion, .dinoNorm, .cap])
+        let names = FusionLayout.bothReadings.names
+        #expect(names.count == 777 && names[384] == "dnorm0" && names[768] == "cap_" + CaptureFeatures.names[0])
+        #expect(try FusionLayout.of(width: 393) == .dinoCapture && FusionLayout.of(width: 777) == .bothReadings)
+        #expect(throws: VeilGardeFailure.self) { try FusionLayout.of(width: 397) }
     }
 }

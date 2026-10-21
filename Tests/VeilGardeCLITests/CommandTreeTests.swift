@@ -53,6 +53,7 @@ struct CommandTreeTests {
         ["features", "extract", "list.jsonl", "--shard", "s", "--columns", "dino_norm,cap", "--store", "/tmp/aux"],
         ["train", "plan", "--preset", "--store", "/tmp/s", "--parent", "live"], ["train", "plan", "--recipe", "r.toml"],
         ["train", "fusion", "--mode", "scratch", "--trees", "100", "--eta", "0.05", "--new-generator-weight", "2", "--id", "f1", "--replace", "--plan"],
+        ["train", "fusion", "--mode", "scratch", "--trees", "1000", "--depth", "7", "--columns", "dino_fusion,dino_norm,cap", "--plan"],
         ["train", "heads", "--kinds", "art,art-pair,preview"], ["train", "combiner", "--reals-weight", "3"], ["train", "all"],
         ["train", "run", "recipe.toml", "--work-area", "/tmp/vg"],
         ["flywheel", "init", "--work-area", "/tmp/vg"], ["flywheel", "init", "--battery"],

@@ -51,6 +51,7 @@ public enum Agreement {
             throw VeilGardeFailure.missing("the bundle needs a fusion head and a combiner")
         }
         let fusion = try GBDTModel.load(fusionURL)
+        let columns = try FusionLayout.of(width: fusion.featureCount).columns
         let combiner = try StackCombiner.load(combinerURL)
         let heads = try [HeadKind.art, .blur, .human].map { kind -> LinearHead in
             guard let url = bundle.url(.head, head: kind) else { throw VeilGardeFailure.missing("the bundle has no \(kind.rawValue) head") }
@@ -66,8 +67,8 @@ public enum Agreement {
                     for k in (c * 1024)..<min(keep.count, (c + 1) * 1024) {
                         let i = keep[k]
                         var row = [Float]()
-                        row.reserveCapacity(FusionVector.count)
-                        for column in FeatureColumn.fusion { row.append(contentsOf: s.vector(column, row: i)) }
+                        row.reserveCapacity(fusion.featureCount)
+                        for column in columns { row.append(contentsOf: s.vector(column, row: i)) }
                         let norm = Array(s.vector(.dinoNorm, row: i))
                         let p = fusion.predict(row)
                         b[k] = p

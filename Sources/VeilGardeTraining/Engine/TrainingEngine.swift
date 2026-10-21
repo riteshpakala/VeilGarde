@@ -78,21 +78,22 @@ public final class TrainingEngine {
                 let parentWidth: Int? = parentBundle.manifest.artifact(.fusionHead).flatMap {
                     try? GBDTModel.load(parentBundle.root.appendingPathComponent($0.file)).featureCount
                 }
+                let layout = f.settings.resolvedLayout
                 let mode: String
                 switch f.settings.mode {
                 case .warmStart(let add, let eta):
                     mode = "warm start: +\(add) trees at η \(eta) onto the parent's fusion head \(parentBundle.sha256(.fusionHead)?.prefix(12) ?? "?")"
-                    if let w = parentWidth, w != FusionVector.count {
-                        p.refusal = "the parent's fusion head reads \(w) features, the store's fusion rows \(FusionVector.count): train it from scratch"
+                    if let w = parentWidth, w != layout.width {
+                        p.refusal = "the parent's fusion head reads \(w) features, the recipe's fusion rows \(layout.width): train it from scratch"
                     }
                 case .scratch(let trees, let eta):
                     mode = "from scratch: \(trees) trees at η \(eta)"
-                    if let w = parentWidth, w != FusionVector.count {
+                    if let w = parentWidth, w != layout.width {
                         p.notes.append("the parent's fusion head reads \(w) features: no parent recall or agreement will be reported")
                     }
                 }
                 p.stages = [
-                    StageDecision(.data, runs: true, "\(usable.count) store rows that are not golden or NSFW (those carrying dino_fusion), \(newGen) of them new-generator rows; \(FusionVector.count) columns, DINOv2 and capture"),
+                    StageDecision(.data, runs: true, "\(usable.count) store rows that are not golden or NSFW (those carrying dino_fusion), \(newGen) of them new-generator rows; \(layout.width) columns, \(layout.columns.map(\.rawValue).joined(separator: ", "))"),
                     StageDecision(.fit, runs: true, mode + ", depth \(f.settings.maxDepth), subsample \(f.settings.subsample), colsample \(f.settings.colsample)"),
                     StageDecision(.evaluate, runs: true, "recall on the \(Int(f.settings.holdoutFraction * 100))% of new-generator rows held out, agreement with the parent when it reads the same columns, and an evaluation twin's AUC on a \(Int(f.settings.evaluationFraction * 100))% hash holdout"),
                     StageDecision(.write, runs: true, "fusion/fusion_head.xgb.json"),
@@ -246,7 +247,7 @@ public final class TrainingEngine {
         let heads = try [HeadKind.art, .blur, .human].map(head)
         let pair = try? head(.artPair)
         let selection = try FeatureStore(directory: store).select(columns: Set(FeatureColumn.allCases)) { !$0.golden && !$0.nsfw }
-        let samples = CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)
+        let samples = try CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)
         emit(.stage(model: name, .fit))
         let (file, report) = try CombinerTrainer.train(samples, settings: c.settings, note: { self.emit(.note($0)) })
         emit(.stage(model: name, .evaluate))

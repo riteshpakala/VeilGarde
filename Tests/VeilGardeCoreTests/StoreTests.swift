@@ -52,11 +52,11 @@ struct StoreTests {
         let store = FeatureStore(directory: dir)
         #expect(store.shardNames() == ["a_first", "b_second"])
         #expect(try store.select(columns: [.cap]).rows.map(\.id) == ["x", "y", "y", "z"])
-        let all = try store.select(columns: Set(FeatureColumn.fusion), dedup: true)
+        let all = try store.select(columns: Set(FusionLayout.bothReadings.columns), dedup: true)
         #expect(all.rows.map(\.id) == ["x", "y", "z"])
         #expect(all.shards == ["a_first", "a_first", "b_second"])
-        let fusion = all.matrix(FeatureColumn.fusion)
-        #expect(fusion.count == 3 * 393 && FeatureColumn.fusion.map(\.width).reduce(0, +) == 393)
+        let fusion = all.matrix(FusionLayout.dinoCapture.columns)
+        #expect(fusion.count == 3 * 393 && all.matrix(FusionLayout.bothReadings.columns).count == 3 * 777)
         #expect(fusion[0] == 0.5)                 // x's first dino_fusion value
         #expect(fusion[384] == 0.5)               // x's first capture value
         #expect(fusion[393 * 2] == 384)           // z's first dino_fusion value (row 1 of b_second)
