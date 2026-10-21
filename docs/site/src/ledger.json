@@ -122,6 +122,12 @@
       "id": "amendment-24",
       "date": "2026-10-21",
       "text": "1) The residual statistics: bring them in as fusion columns, with the code kept in the watermark as you said. first and test those. 2) A better combiner."
+    },
+    {
+      "id": "amendment-25",
+      "date": "2026-10-21",
+      "text": "After the testing is done we should update the trails in the explorer. \"Decode\" trail, \"Shared Signals\" trail, \"Domain\" trail, \"Base\" trail, that all route into each other and then eventually \"Revisions\" trail, \"Result\" trail. This is just for the detection part of the explorer. Add the stack trail in its order after the base.",
+      "edited": true
     }
   ],
   "answers": [
@@ -1188,6 +1194,13 @@
       "rejected": "a warp model inside detection; rewriting the seed shards; the in-sample combiner for a high-capacity head",
       "reason": "the pre-test picked the 38 statistics by its rule (0.8836 to 0.9009 AUC on final_mixed's split); the restored features equal the research's dumps value for value; an in-sample combiner gave a high-capacity head's heads no weight",
       "file": "Sources/VeilWatermark/Residual/ResidualStatistics.swift"
+    },
+    {
+      "id": "decision-122",
+      "chose": "Detection in the code explorer is seven stage trails that hand off to each other: Decode, Shared Signals, Domain, Base, Stack, Revisions and Result; the warp residual's statistics sit under Shared Signals as numbers from the watermark's code",
+      "rejected": "two inference trails, the fusion base and the specialist stack",
+      "reason": "the owner reads detection as one chain of stages (amendment-25); the training and watermark trails stay as they were",
+      "file": "docs/site/src/trails.json"
     }
   ],
   "commands": [

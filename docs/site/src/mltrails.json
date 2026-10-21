@@ -96,7 +96,7 @@
         }
        ],
        "code": [
-        "fusion-inference-3"
+        "base-2"
        ]
       }
      ]
@@ -120,7 +120,7 @@
         "cite": "chapter:01-fusion.html#depicts"
        },
        "code": [
-        "fusion-inference-3"
+        "shared-signals-4"
        ]
       },
       {
@@ -156,7 +156,7 @@
        "note": "The fusion head's embedding: the CLS after the plain preprocessing, the short edge to 256 and a centre crop of 224. The fusion head reads this path and every linear head the force-resized one, two embeddings of one image that the store keeps apart.",
        "cite": "PIN:Sources/VeilGardeLens/Semantic/Dinov2Preprocess.swift",
        "code": [
-        "fusion-inference-3"
+        "shared-signals-4"
        ]
       },
       {
@@ -181,7 +181,7 @@
        "note": "The signature the verdict reads: the spectral peak, whether the image is large enough to measure, its native short side, and whether the peak is present.",
        "cite": "PIN:Sources/VeilGardeLens/Capture/CaptureLens.swift",
        "code": [
-        "fusion-inference-3"
+        "shared-signals-4"
        ]
       },
       {
@@ -194,7 +194,7 @@
        "anchor": "public let present: Bool",
        "note": "The four fields every result carries under capture, and the store's rows carry as nine values with the measurements behind them.",
        "code": [
-        "specialist-inference-1"
+        "stack-1"
        ]
       }
      ]
@@ -291,7 +291,7 @@
        "note": "Calls the head's probability at 0.5 with a band of 0.04 either side. When the flat-UI gate fires, the screenshot head takes the verdict instead, because the camera-anchored base would read a screenshot as generated.",
        "cite": "chapter:01-fusion.html#booster",
        "code": [
-        "fusion-inference-2"
+        "base-1"
        ]
       },
       {
@@ -315,7 +315,7 @@
         }
        ],
        "code": [
-        "specialist-inference-3"
+        "stack-3"
        ]
       }
      ]
@@ -355,7 +355,7 @@
         "cite": "chapter:02-specialists.html#why"
        },
        "code": [
-        "specialist-inference-2"
+        "stack-2"
        ]
       }
      ]
@@ -375,7 +375,7 @@
        "note": "The heads' embedding: the CLS token after the image is force-resized to 360 by 640. Every head was trained on this embedding, and the store keeps it as its own column, dino_norm, apart from the fusion's.",
        "cite": "chapter:02-specialists.html#head",
        "code": [
-        "specialist-inference-2"
+        "stack-2"
        ]
       },
       {
@@ -405,7 +405,7 @@
        "note": "Computes P(AI) as the sigmoid of the coefficients times the standardized embedding plus the intercept, in Float and in index order, as the reference does. Every specialist is this one primitive with its own numbers.",
        "cite": "WHAT",
        "code": [
-        "specialist-inference-2"
+        "stack-2"
        ]
       },
       {
@@ -531,7 +531,7 @@
         }
        ],
        "code": [
-        "specialist-inference-3"
+        "stack-3"
        ]
       },
       {
@@ -619,7 +619,7 @@
        "note": "Picks the domain, runs that domain's base expert, then compounds capture and the pooled specialists, the frame seam and the semantic chain on it, and keeps the state before the semantic chain so a route can be replayed.",
        "cite": "PIN",
        "code": [
-        "fusion-inference-1"
+        "domain-1"
        ]
       },
       {
@@ -645,7 +645,7 @@
        "note": "A hint wins; otherwise the screenshot gate decides between the screenshot domain and the camera domain.",
        "cite": "PIN:Sources/VeilGardeInference/Route/Domain.swift",
        "code": [
-        "fusion-inference-1"
+        "domain-1"
        ]
       },
       {
@@ -653,7 +653,7 @@
        "anchor": "verdict = base.prediction",
        "note": "The route starts from the base's probability and label, the first row of the stack.",
        "code": [
-        "fusion-inference-4"
+        "base-4"
        ]
       }
      ]
@@ -672,7 +672,7 @@
        "note": "Consults the capture signature first, then pools the art, blur and human priors onto the base when it is absent.",
        "cite": "WHAT",
        "code": [
-        "specialist-inference-1"
+        "stack-1"
        ]
       },
       {
@@ -685,7 +685,7 @@
         "cite": "chapter:02-specialists.html#why"
        },
        "code": [
-        "specialist-inference-3"
+        "stack-3"
        ]
       }
      ]
@@ -708,7 +708,7 @@
         "cite": "ledger#command-52"
        },
        "code": [
-        "specialist-inference-4"
+        "revisions-1"
        ]
       },
       {
@@ -721,7 +721,7 @@
         "cite": "ledger#decision-106"
        },
        "code": [
-        "specialist-inference-5"
+        "revisions-3"
        ]
       }
      ]
@@ -740,7 +740,7 @@
        "anchor": "imageWidth: base.imageWidth, imageHeight: base.imageHeight, captureSignature: capture,",
        "note": "Joins the base's operating point and image size with the router's verdict and its evidence.",
        "code": [
-        "specialist-inference-6"
+        "result-1"
        ]
       },
       {
@@ -749,7 +749,7 @@
        "note": "Writes exactly schema v3's keys, each block only when the result holds it.",
        "cite": "ledger#decision-103",
        "code": [
-        "specialist-inference-6"
+        "result-1"
        ]
       }
      ]

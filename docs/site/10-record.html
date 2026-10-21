@@ -354,6 +354,21 @@ git checkout main</code></pre>
 </div>
 <p>The wider head catches more generated images on unseen data, at more real false positives. Its combiners were fitted on rows the head had trained on and read near-perfectly, so they gave the specialist heads no weight. What follows is the owner's question-21.</p>
 
+<h2 id="residual-study">The residual as fusion columns</h2>
+<p>The owner asked next for the residual's statistics in the fusion head, with the code kept in the watermark, and a combiner fitted on predictions the head never trained on. A rule fixed first picked the statistics: each warp19 feature's mean and spread, 38 numbers.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Candidate</th><th class="n">final_mixed right, of 200</th><th class="n">iPhone real, of 438</th><th class="n">Unseen reals right</th><th class="n">Unseen generated right</th><th>Battery</th></tr></thead>
+<tbody>
+<tr><td>The two lanes as shipped</td><td class="n">136</td><td class="n">435</td><td class="n">90.0%</td><td class="n">34.5%</td><td>fails four hard images</td></tr>
+<tr><td>Both readings, no residual</td><td class="n">185</td><td class="n">435</td><td class="n">82.5%</td><td class="n">56.3%</td><td>fails two images</td></tr>
+<tr><td>With the residual</td><td class="n">188</td><td class="n">437</td><td class="n">85.3%</td><td class="n">56.6%</td><td>fails HNUFoy2bcAA0vDW only</td></tr>
+<tr><td>With the residual, out-of-fold combiner</td><td class="n">186</td><td class="n">437</td><td class="n">87.6%</td><td class="n">52.0%</td><td>fails HNUFoy2bcAA0vDW only</td></tr>
+</tbody>
+</table>
+</div>
+<p>The owner stopped the run after two of seven candidates, and nothing shipped. The residual helped every gated number, and one generated battery image still stands between the wider head and the bar.</p>
+
 <h2 id="sources">Where the numbers come from</h2>
 <div class="scroll">
 <table class="data">
@@ -390,6 +405,7 @@ git checkout main</code></pre>
 <tr><td>The three heads, their twins and their combiners</td><td><a href="index.html#command-108">Ledger command-108</a></td><td>2026-10-21</td></tr>
 <tr><td>The bar, the battery, the census and the iPhone originals for 11 candidates</td><td><a href="index.html#decision-120">Ledger decision-120</a> and <a href="index.html#command-109">command-109</a></td><td>2026-10-21</td></tr>
 <tr><td>The 3,217 unseen final_mixed images</td><td><a href="index.html#command-110">Ledger command-110</a></td><td>2026-10-21</td></tr>
+<tr><td>The residual statistics, the backfill and the two residual candidates</td><td><a href="index.html#decision-121">Ledger decision-121</a> and <a href="index.html#command-113">command-113</a></td><td>2026-10-21</td></tr>
 </tbody>
 </table>
 </div>

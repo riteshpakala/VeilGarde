@@ -396,7 +396,7 @@ def explore(page):
     root = page.query_selector("#explorer")
     if not root:
         return ["the explorer did not mount"]
-    info = page.evaluate("""() => { const m = VeilGarde.model(), t = m.trailById['fusion-inference'], e = t.steps[0].entries[0], sc = m.scopes[e.scope];
+    info = page.evaluate("""() => { const m = VeilGarde.model(), t = m.trailById['shared-signals'], e = t.steps[0].entries[0], sc = m.scopes[e.scope];
         return { steps: t.steps.map(s => s.entries.length), id: sc.id, path: sc.file.path, sig: sc.sig, from: sc.from, to: sc.to,
                  body: VeilGarde.linesOf(sc.file).slice(sc.decl - 1, sc.to).join('\\n') }; }""")
     box = page.query_selector("#explorer textarea")
@@ -414,15 +414,15 @@ def explore(page):
     page.wait_for_timeout(200)
     if "Detector.detect" not in (root.get_attribute("data-scope") or ""):
         errors.append(f"Enter on the first match selected {root.get_attribute('data-scope')!r}")
-    page.click('#explorer .xp-trails button[data-trail="fusion-inference"]')
+    page.click('#explorer .xp-trails button[data-trail="base"]')
     page.wait_for_timeout(200)
     page.click('#explorer .xp-steps button[data-step="3"]')
     page.wait_for_timeout(200)
-    want = page.evaluate("VeilGarde.explorer.trailFile('fusion-inference', 3)")
-    if root.get_attribute("data-file") != want or root.get_attribute("data-step") != "3" or root.get_attribute("data-trail") != "fusion-inference":
-        errors.append(f"fusion inference step 3 opened {root.get_attribute('data-file')}, not {want}")
-    for target, attr, value in [(f"{info['path']}:{info['sig']}", "data-scope", info["id"]), ("trail-fusion-inference-4", "data-step", "4"), (info["id"], "data-scope", info["id"]),
-                                ("trail-fusion-inference-3;n=2", "data-pos", "1"), ("trail-specialist-training-2", "data-trail", "specialist-training"),
+    want = page.evaluate("VeilGarde.explorer.trailFile('base', 3)")
+    if root.get_attribute("data-file") != want or root.get_attribute("data-step") != "3" or root.get_attribute("data-trail") != "base":
+        errors.append(f"base step 3 opened {root.get_attribute('data-file')}, not {want}")
+    for target, attr, value in [(f"{info['path']}:{info['sig']}", "data-scope", info["id"]), ("trail-base-4", "data-step", "4"), (info["id"], "data-scope", info["id"]),
+                                ("trail-shared-signals-4;n=2", "data-pos", "1"), ("trail-specialist-training-2", "data-trail", "specialist-training"),
                                 ("q=WarpResidual.batch", "data-scope", None), ("README.md:3", "data-line", "3")]:
         page.evaluate("t => { location.hash = t; }", target)
         page.wait_for_timeout(250)
@@ -449,16 +449,16 @@ def explore(page):
     # across; Enter picks the cell.
     page.focus('#explorer .tg-cell[data-trail="fusion-training"]')
     visited = []
-    for key in ("ArrowRight", "ArrowDown", "ArrowDown", "ArrowUp", "ArrowLeft"):
+    for key in ("ArrowDown", "ArrowDown", "ArrowDown", "ArrowUp"):
         page.keyboard.press(key)
         visited.append(page.evaluate("() => document.activeElement && document.activeElement.getAttribute('data-trail')"))
     page.keyboard.press("Enter")
     page.wait_for_timeout(250)
-    want = ["fusion-inference", "specialist-inference", "watermark-matching", "specialist-inference", "specialist-training"]
-    if visited != want or root.get_attribute("data-trail") != "specialist-training":
+    want = ["specialist-training", "decode", "shared-signals", "decode"]
+    if visited != want or root.get_attribute("data-trail") != "decode":
         errors.append(f"the arrows walked the trail grid through {visited} and Enter left {root.get_attribute('data-trail')!r}")
     # Walking a trail with ] reaches every entry once, in order, and stops at the last.
-    page.evaluate("() => { location.hash = 'trail-fusion-inference-1;n=1'; }")
+    page.evaluate("() => { location.hash = 'trail-shared-signals-1;n=1'; }")
     page.wait_for_timeout(250)
     page.focus("#explorer pre")
     walked = [(root.get_attribute("data-step"), root.get_attribute("data-pos"))]
@@ -469,13 +469,13 @@ def explore(page):
         walked.append((root.get_attribute("data-step"), root.get_attribute("data-pos")))
     expected = [(str(s + 1), str(k)) for s, n in enumerate(info["steps"]) for k in range(n)]
     if walked[:total] != expected or walked[total] != walked[total - 1]:
-        errors.append(f"walking fusion inference with ] visited {len(set(walked))} places, not the {total} entries once each, in order")
+        errors.append(f"walking shared signals with ] visited {len(set(walked))} places, not the {total} entries once each, in order")
     page.keyboard.press("[")
     page.wait_for_timeout(60)
     if (root.get_attribute("data-step"), root.get_attribute("data-pos")) != expected[-2]:
         errors.append("[ did not step back to the entry before the last")
     # A body pasted from the editor, reindented, lands on its declaration.
-    page.evaluate("() => { location.hash = 'trail-fusion-inference-4'; }")
+    page.evaluate("() => { location.hash = 'trail-base-4'; }")
     page.wait_for_timeout(250)
     reindented = "\n".join("\t  " + line.strip() for line in info["body"].split("\n"))
     box.evaluate("(e, t) => { e.focus(); e.value = t; e.dispatchEvent(new Event('paste', { bubbles: true })); e.dispatchEvent(new Event('input', { bubbles: true })); }", reindented)

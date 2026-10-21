@@ -45,7 +45,7 @@ Playground/run.sh
 
 ## VeilGarde docsite
 
-A site that explains each layer and shows every file this build changed, verbatim, with each Swift declaration's calls and callers, and the run's ledger of commands, tests and decisions. Six trails walk the code in the order it runs: how the fusion head and the specialist stack are trained, how each feeds the final verdict at inference, and how the watermark signs an image and matches a crop of it. A grid picks them, a row for each flow and a column for each kind. Double-click scripts/site.command, or open [docs/site/index.html](docs/site/index.html); it is plain HTML with no build step. [docs/site/README.md](docs/site/README.md) says how it is rebuilt and checked.
+A site that explains each layer and shows every file this build changed, verbatim, with each Swift declaration's calls and callers, and the run's ledger of commands, tests and decisions. Eleven trails walk the code in the order it runs: how the fusion head and the specialist stack are trained, detection stage by stage from Decode through Shared Signals, Domain, Base, Stack and Revisions to Result, and how the watermark signs an image and matches a crop of it. A grid picks them, a row for each flow and a column for each kind. Double-click scripts/site.command, or open [docs/site/index.html](docs/site/index.html); it is plain HTML with no build step. [docs/site/README.md](docs/site/README.md) says how it is rebuilt and checked.
 
 The site's chat asks Mistral about what you are reading. On a Mac that holds a Mistral key in its key store, `scripts/site.command` hands the site that key; anyone else is asked for their own key in a dialog when the chat opens, and it stays in their browser.
 

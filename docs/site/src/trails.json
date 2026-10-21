@@ -1,24 +1,71 @@
 {
  "picker": [
   {
-   "title": "The verdict",
+   "title": "Training",
    "kinds": [
-    "training",
-    "inference"
+    "training"
    ],
    "rows": [
     {
      "label": "Fusion head",
      "trails": [
-      "fusion-training",
-      "fusion-inference"
+      "fusion-training"
      ]
     },
     {
      "label": "Specialist stack",
      "trails": [
-      "specialist-training",
-      "specialist-inference"
+      "specialist-training"
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Detection, stage by stage",
+   "kinds": [
+    "inference"
+   ],
+   "rows": [
+    {
+     "label": "Decode",
+     "trails": [
+      "decode"
+     ]
+    },
+    {
+     "label": "Shared Signals",
+     "trails": [
+      "shared-signals"
+     ]
+    },
+    {
+     "label": "Domain",
+     "trails": [
+      "domain"
+     ]
+    },
+    {
+     "label": "Base",
+     "trails": [
+      "base"
+     ]
+    },
+    {
+     "label": "Stack",
+     "trails": [
+      "stack"
+     ]
+    },
+    {
+     "label": "Revisions",
+     "trails": [
+      "revisions"
+     ]
+    },
+    {
+     "label": "Result",
+     "trails": [
+      "result"
      ]
     }
    ]
@@ -276,8 +323,14 @@
       },
       {
        "scope": "CombinerSample.captureAbsent(_:base:heads:pair:)",
-       "anchor": "heads: heads.map { Double($0.pAI(norm)) }, pair: pair.map { Double($0.pAI(norm)) })",
-       "note": "One row per capture-absent image: the base on its fusion row in the base's own layout, the three heads on its dino_norm, and an art-pair head's when the candidate trained one. The base is in-sample for a head trained on the same rows."
+       "anchor": "let columns = try FusionLayout.of(width: base.featureCount).columns",
+       "note": "One row per capture-absent image: the base on its fusion row in the head's own layout, the three heads on its dino_norm. In-sample, the base is near-perfect for a high-capacity head; the out-of-fold form below fixes that."
+      },
+      {
+       "scope": "CombinerSample.captureAbsent(_:outOfFold:heads:pair:)",
+       "anchor": "captureAbsent(selection, heads: heads, pair: pair) { outOfFold[selection.rows[$0].id] }",
+       "note": "The same rows, each base read from out-of-fold predictions: a head refit without the row's fold, five folds, cached in the candidate.",
+       "link": "none"
       },
       {
        "scope": "CombinerTrainer.train(_:settings:note:)",
@@ -340,58 +393,269 @@
    ]
   },
   {
-   "id": "fusion-inference",
-   "mark": "FI",
+   "id": "decode",
+   "mark": "DE",
    "kind": "inference",
-   "title": "Fusion inference",
-   "subtitle": "an image to the fusion base",
-   "say": "From an image to the base the stack builds on: the router picks the domain, the camera expert is the fusion head, DINOv2 and the capture signature make its 393 values, and its probability starts the route.",
+   "title": "Decode",
+   "subtitle": "a file to the pixels every model saw",
+   "say": "The first stage of detection: the command reads one image, through the one loader the command line has, NSImage first and ImageIO after, and hands the pixels to the Shared Signals stage.",
    "steps": [
     {
      "n": 1,
-     "title": "The command hands the image to the detector",
+     "title": "The command takes one image",
      "chapters": [
       "03-router.html"
      ],
      "entries": [
       {
        "scope": "RouteCommand.run()",
-       "anchor": "let routed = try LensRuntime.withDevice(cpu: cpu) { try Detector.shared.detect(cgImage: cg, config: config, hint: domainHint) }",
-       "note": "veilgarde route decodes the image once and hands it to the detector, then prints the verdict, the base and the stack, or writes the schema-v3 JSON with --json.",
+       "anchor": "let cg = try loadImage(image)",
+       "note": "veilgarde route reads the image once, then hands it to the detector; the decoded pixels are what every later stage reads.",
        "cite": "PIN:Sources/VeilGardeCLI/Commands/Route.swift"
-      },
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "One loader for the command line",
+     "chapters": [
+      "03-router.html"
+     ],
+     "entries": [
       {
        "scope": "loadImage(_:)",
        "anchor": "try ImageDecoding.cgImage(contentsOf: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))",
-       "note": "The command line's one way to read an image."
-      },
+       "note": "Every command reads images this one way, so a route, a census and a battery see the same pixels."
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "NSImage first, then ImageIO",
+     "chapters": [
+      "03-router.html"
+     ],
+     "entries": [
       {
        "scope": "ImageDecoding.cgImage(contentsOf:)",
        "anchor": "if let image = NSImage(contentsOf: url), let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) { return cg }",
-       "note": "Decodes through NSImage first, then ImageIO: the pixels every shipped model was trained on. On rotated iPhone JPEGs the two paths differ.",
+       "note": "Decodes through NSImage, the path every shipped model was trained on; on rotated iPhone JPEGs ImageIO's pixels differ. The image goes on to the Shared Signals stage.",
        "cite": "PIN"
-      },
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "shared-signals",
+   "mark": "SG",
+   "kind": "inference",
+   "title": "Shared Signals",
+   "subtitle": "everything later stages read, computed once",
+   "say": "The second stage: one object holds what every later stage reads, each computed once on first use: the screenshot gate, the capture signature, the two DINOv2 readings, and the warp residual's statistics, measured by the watermark's code. The Domain stage reads the gate first.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "One object, built once an image",
+     "chapters": [
+      "03-router.html"
+     ],
+     "entries": [
       {
-       "scope": "Detector.detect(cgImage:config:hint:)",
-       "anchor": "let domain = picker.detect(s, hint: hint)",
-       "note": "Computes the shared signals once, picks the domain, runs that domain's base expert, then compounds the capture prior and the pooled specialists, the frame seam and the semantic chain in a fixed order.",
-       "cite": "PIN"
-      },
-      {
-       "scope": "DefaultDomainDetector.detect(_:hint:)",
-       "anchor": "return s.gate.isScreenshot ? .screenshot : .camera",
-       "note": "A hint wins; otherwise the screenshot gate sends a flat UI to the screenshot domain and everything else to the camera domain. Routing is never by size.",
-       "cite": "PIN:Sources/VeilGardeInference/Route/Domain.swift",
+       "scope": "DetectionSignals.init(cgImage:config:)",
+       "anchor": "self.gate = ScreenshotLens.gate(cgImage)",
+       "note": "Holds the image and the config; the gate is computed now, every other signal lazily and once.",
+       "cite": "WHAT",
        "link": "none"
       }
      ]
     },
     {
      "n": 2,
-     "title": "The camera expert is the fusion head",
+     "title": "The screenshot gate",
+     "chapters": [
+      "03-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "ScreenshotLens.gate(_:)",
+       "anchor": "guard W >= 32, H >= 32 else { return .none }",
+       "note": "A cheap measure of flat UI: few colours, hard edges and text-like rows, read on a capped copy of the image.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "The capture signature",
+     "chapters": [
+      "01-fusion.html"
+     ],
+     "entries": [
+      {
+       "scope": "DetectionSignals.capture()",
+       "anchor": "let c = CaptureLens.signature(cgImage)",
+       "note": "The native-resolution capture signature, cached for the base and the stack.",
+       "link": "none"
+      },
+      {
+       "scope": "CaptureLens.signature(_:)",
+       "anchor": "return features.signature",
+       "note": "The Nyquist peak of the native pixels: present at 30 or more on a short side of at least 512, invalid below that size.",
+       "cite": "PIN:Sources/VeilGardeLens/Capture/CaptureLens.swift"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "DINOv2, read two ways",
      "chapters": [
       "01-fusion.html",
+      "02-specialists.html"
+     ],
+     "entries": [
+      {
+       "scope": "DetectionSignals.dinoFusion()",
+       "anchor": "let e = try SemanticLens.fusionEmbedding(cgImage, variant: config.dinoVariant)",
+       "note": "The plain reading, short edge 256 and a centre crop of 224, which the fusion head reads.",
+       "link": "none"
+      },
+      {
+       "scope": "SemanticLens.fusionEmbedding(_:variant:)",
+       "anchor": "try shared.vit(variant)(Dinov2Preprocess.input(cg)).reshaped(-1).asArray(Float.self)",
+       "note": "DINOv2-small's CLS embedding of the plain input.",
+       "cite": "WHAT:Sources/VeilGardeLens/Semantic/SemanticLens.swift"
+      },
+      {
+       "scope": "DetectionSignals.dinoNorm()",
+       "anchor": "let e = try SemanticLens.normalizedEmbedding(cgImage, variant: config.dinoVariant)",
+       "note": "The force-resized reading, 360 by 640, which the specialist heads read and the wider fusion rows add.",
+       "link": "none"
+      },
+      {
+       "scope": "SemanticLens.normalizedEmbedding(_:variant:normW:normH:)",
+       "anchor": "Dinov2Preprocess.inputNormalized(cg, normW: normW, normH: normH)",
+       "note": "The same backbone after a forced resize, so a phone screenshot's size cannot leak into the heads' embedding."
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The warp base, from VeilWatermark",
+     "chapters": [
+      "07-residual.html"
+     ],
+     "entries": [
+      {
+       "scope": "DetectionSignals.residual()",
+       "anchor": "let r = try ResidualStatistics.measure(cgImage)",
+       "note": "The warp residual's 38 statistics, measured only when the fusion head's layout reads them; the shipped head does not.",
+       "link": "none"
+      },
+      {
+       "scope": "ResidualStatistics.measure(_:)",
+       "anchor": "summarize(TileFeatures.measure(try TilePlane(cg)))",
+       "note": "The watermark's code measures; detection reads only these numbers.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "TilePlane.init(_:maxDim:)",
+       "anchor": "let real = try ImageLoading.rgbPixels(cg, width: w, height: h)",
+       "note": "The image capped at 512 on its longest edge and padded to whole 32-pixel tiles, as the research's tiles were cut.",
+       "cite": "PIN:Sources/VeilWatermark/Residual/TileFeatures.swift"
+      },
+      {
+       "scope": "TileFeatures.measure(_:quantizeLikeCV2:)",
+       "anchor": "let FR = WarpResidual.fragility(low: Rl, high: Rh)",
+       "note": "warp19: each tile's fragility, variances, mirror correlation, seams and demosaic columns, through the same residual the signature reads."
+      },
+      {
+       "scope": "ResidualStatistics.summarize(_:)",
+       "anchor": "let spread = (0..<f).map { max(0, squares[$0] / N - mean[$0] * mean[$0]).squareRoot() }",
+       "note": "Each feature's mean, then its spread, over the tiles: the store's residual column.",
+       "cite": "PIN"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "domain",
+   "mark": "DO",
+   "kind": "inference",
+   "title": "Domain",
+   "subtitle": "which base expert reads the image",
+   "say": "The third stage: the detector builds the signals, the domain detector picks camera or screenshot from a hint or the gate, never from size, and the domain's head becomes the Base stage.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The detector's one entry point",
+     "chapters": [
       "03-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "Detector.detect(cgImage:config:hint:)",
+       "anchor": "let domain = picker.detect(s, hint: hint)",
+       "note": "Builds the shared signals, picks the domain, then runs the base, the stack and the revisions in a fixed order.",
+       "cite": "PIN",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "A hint, else the gate",
+     "chapters": [
+      "03-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "DefaultDomainDetector.detect(_:hint:)",
+       "anchor": "return s.gate.isScreenshot ? .screenshot : .camera",
+       "note": "A caller's hint wins; otherwise the screenshot gate sends flat UI to the screenshot domain and everything else to the camera domain.",
+       "cite": "PIN:Sources/VeilGardeInference/Route/Domain.swift",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Each domain's base expert",
+     "chapters": [
+      "03-router.html",
+      "01-fusion.html"
+     ],
+     "entries": [
+      {
+       "scope": "Detector.init()",
+       "anchor": "register(CameraFusionHead())",
+       "note": "The camera domain's expert is the fusion head, the screenshot domain's the content head; a domain without its own falls back to camera.",
+       "link": "none"
+      },
+      {
+       "scope": "ScreenshotContentHead.verdict(_:)",
+       "anchor": "let emb = try s.dinoNorm()",
+       "note": "The screenshot head on the force-resized embedding, the screenshot domain's base.",
+       "link": "none"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "base",
+   "mark": "BA",
+   "kind": "inference",
+   "title": "Base",
+   "subtitle": "the fusion head's P(AI)",
+   "say": "The fourth stage: the fusion head reads a row built in the layout its width names, gives P(AI) at 0.5 with a band of 0.04, and that number starts the route the Stack stage pools onto.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The camera expert",
+     "chapters": [
+      "01-fusion.html"
      ],
      "entries": [
       {
@@ -403,78 +667,62 @@
       {
        "scope": "Fusion.verdict(_:)",
        "anchor": "let p = head.predict(try vector(s, layout: FusionLayout.of(width: head.numFeatures)))",
-       "note": "Builds the row in the layout the head's width names, asks the head for P(AI) and labels it at 0.5 with a band of 0.04 either side.",
+       "note": "Builds the row in the head's layout and calls its probability at 0.5 with the band.",
        "cite": "PIN:Sources/VeilGardeInference/Fusion/FusionInference.swift"
       },
       {
        "scope": "Fusion.screenshotGuard(_:)",
        "anchor": "guard s.gate.isScreenshot, let sv = ScreenshotSpecialist.verdict(s.cgImage, config: s.config) else { return nil }",
-       "note": "A flat UI that reached the camera domain is read by the screenshot head instead, because a head trained on camera rows reads a screenshot as generated."
+       "note": "A flat UI that reached the camera domain is read by the screenshot head instead."
       }
      ]
     },
     {
-     "n": 3,
-     "title": "DINOv2 and the capture signature make the row",
+     "n": 2,
+     "title": "A head's width names its row",
      "chapters": [
       "01-fusion.html"
      ],
      "entries": [
       {
+       "scope": "FusionLayout.of(width:)",
+       "anchor": "guard let layout = FusionLayout(width: width) else {",
+       "note": "393 columns read DINOv2 and capture, 777 add the second reading, 815 add the residual statistics; any other width is refused.",
+       "cite": "WHAT:Sources/VeilGardeCore/Features/FusionVector.swift"
+      },
+      {
        "scope": "Fusion.vector(_:layout:capture:)",
-       "anchor": "case .bothReadings: return try s.dinoFusion() + s.dinoNorm() + cap",
-       "note": "The row: DINOv2-small's plain 384 and the nine capture values, or both DINOv2 readings and capture, in the order the store keeps them. The second reading is the one the specialist heads read, cached in the signals.",
-       "cite": "ledger#decision-104"
-      },
-      {
-       "scope": "DetectionSignals.dinoFusion()",
-       "anchor": "let e = try SemanticLens.fusionEmbedding(cgImage, variant: config.dinoVariant)",
-       "note": "The plain DINOv2 embedding, computed once per image and shared."
-      },
-      {
-       "scope": "SemanticLens.fusionEmbedding(_:variant:)",
-       "anchor": "try shared.vit(variant)(Dinov2Preprocess.input(cg)).reshaped(-1).asArray(Float.self)",
-       "note": "DINOv2-small's CLS embedding of the plain input, the one the fusion head was trained on.",
-       "cite": "WHAT:Sources/VeilGardeLens/Semantic/SemanticLens.swift"
-      },
-      {
-       "scope": "Dinov2Preprocess.input(_:target:shortEdge:)",
-       "anchor": "ctx.draw(cg, in: CGRect(x: -cropX, y: -cropY, width: sw, height: sh))",
-       "note": "Scales the short edge to 256, centre-crops 224 and normalizes by ImageNet's mean and deviation, drawn through CoreGraphics so row 0 is the image's top.",
-       "cite": "PIN:Sources/VeilGardeLens/Semantic/Dinov2Preprocess.swift"
-      },
-      {
-       "scope": "Dinov2ViT.callAsFunction(_:)",
-       "anchor": "tokens(pixels)[0..., 0..<1, 0...].squeezed(axis: 1).asType(.float32)",
-       "note": "The frozen backbone's CLS token, in float32.",
-       "link": "none"
-      },
-      {
-       "scope": "CaptureLens.features(_:)",
-       "anchor": "compute(cgImage) ?? .zero",
-       "note": "The nine capture values at native resolution, zeros when the image cannot be measured.",
-       "cite": "PIN:Sources/VeilGardeLens/Capture/CaptureLens.swift"
+       "anchor": "case .bothReadingsResidual: return try s.dinoFusion() + s.dinoNorm() + cap + s.residual()",
+       "note": "Concatenates the shared signals in the layout's order, nothing measured twice."
       }
      ]
     },
     {
-     "n": 4,
-     "title": "The head's probability starts the route",
+     "n": 3,
+     "title": "The booster",
      "chapters": [
-      "01-fusion.html",
-      "02-specialists.html"
+      "01-fusion.html"
      ],
      "entries": [
       {
        "scope": "TreeModelCache.model(_:)",
        "anchor": "let m = try XGBoostTreeModel(url: url)",
-       "note": "Loads the head's XGBoost JSON once into Frigate's evaluator and keeps it while the file is unchanged.",
+       "note": "Loads the head's XGBoost JSON once into Frigate's evaluator.",
        "cite": "WHAT:Sources/VeilGardeLens/Scoring/TreeModelCache.swift"
-      },
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The base starts the route",
+     "chapters": [
+      "02-specialists.html"
+     ],
+     "entries": [
       {
        "scope": "RouteState.init(base:)",
        "anchor": "stack = [SpecialistContribution(name: base.scorer, pAI: base.p, verdict: base.prediction, weight: 1.0)]",
-       "note": "The route's state begins at the base: its p and its label, and the first row of the stack.",
+       "note": "The route's state begins at the base's p and label, the first row of the stack; the Stack stage pools onto it.",
        "link": "none"
       }
      ]
@@ -482,19 +730,18 @@
    ]
   },
   {
-   "id": "specialist-inference",
-   "mark": "SI",
+   "id": "stack",
+   "mark": "SK",
    "kind": "inference",
-   "title": "Specialist inference",
-   "subtitle": "the fusion base to the final verdict",
-   "say": "From the fusion base to the final verdict: a present capture signature first, then the specialist heads pooled by the combiner, the frame seam, the semantic chain with its preview tail, and the schema-v3 result the battery reads.",
+   "title": "Stack",
+   "subtitle": "capture first, then the specialist heads pooled",
+   "say": "The fifth stage: a present capture signature silences the generated-side heads; otherwise the art, blur and human heads read the force-resized embedding and a non-negative combiner pools their evidence onto the base, which the Revisions stage then reads.",
    "steps": [
     {
      "n": 1,
      "title": "Capture comes first",
      "chapters": [
-      "02-specialists.html",
-      "03-router.html"
+      "02-specialists.html"
      ],
      "entries": [
       {
@@ -508,7 +755,7 @@
     },
     {
      "n": 2,
-     "title": "The heads read the force-resized embedding",
+     "title": "The heads",
      "chapters": [
       "02-specialists.html"
      ],
@@ -522,11 +769,6 @@
        "scope": "AtlasPriors.prior(_:_:_:)",
        "anchor": "let p = head.pAI(emb)",
        "note": "One head's P(AI) on the 360×640 embedding, a row in the stack whatever it reads."
-      },
-      {
-       "scope": "DetectionSignals.dinoNorm()",
-       "anchor": "let e = try SemanticLens.normalizedEmbedding(cgImage, variant: config.dinoVariant)",
-       "note": "DINOv2 after the 360×640 force-resize, the embedding every head was trained on, computed once per image and shared."
       },
       {
        "scope": "LinearHead.pAI(_:)",
@@ -561,9 +803,19 @@
        "cite": "ledger#command-57"
       }
      ]
-    },
+    }
+   ]
+  },
+  {
+   "id": "revisions",
+   "mark": "RV",
+   "kind": "inference",
+   "title": "Revisions",
+   "subtitle": "two mechanisms that act only on decisive evidence",
+   "say": "The sixth stage: the frame seam reruns the stack on a dark frame's interior, the semantic chain reads DINOv2's token map, and the preview tail flips a small image to real only when two reads agree; the Result stage writes what they leave.",
+   "steps": [
     {
-     "n": 4,
+     "n": 1,
      "title": "A dark frame hiding the content",
      "chapters": [
       "03-router.html"
@@ -585,8 +837,8 @@
      ]
     },
     {
-     "n": 5,
-     "title": "The semantic chain and the preview tail",
+     "n": 2,
+     "title": "The semantic-tile map",
      "chapters": [
       "03-router.html"
      ],
@@ -602,7 +854,16 @@
        "scope": "SemanticTiles.map(_:config:)",
        "anchor": "let p = head.pAI(Array(toks.values[(t * d)..<((t + 1) * d)]))",
        "note": "The semtile head on each of DINOv2's 256 patch tokens: a 16×16 map of P(AI) and the share of tokens above 0.5."
-      },
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "The preview tail",
+     "chapters": [
+      "03-router.html"
+     ],
+     "entries": [
       {
        "scope": "PreviewTail.apply(_:_:_:capture:semanticMajority:canDecide:)",
        "anchor": "let fires = phv >= 0 && phv <= 0.45 && (pn ?? 1.0) <= 0.30",
@@ -616,13 +877,22 @@
        "cite": "ledger#decision-107"
       }
      ]
-    },
+    }
+   ]
+  },
+  {
+   "id": "result",
+   "mark": "RS",
+   "kind": "inference",
+   "title": "Result",
+   "subtitle": "one verdict, schema v3",
+   "say": "The last stage: the routed result joins the base's operating point with the router's verdict and the evidence around it, and is written as schema-v3 JSON with sorted keys.",
+   "steps": [
     {
-     "n": 6,
-     "title": "The final verdict",
+     "n": 1,
+     "title": "The routed result",
      "chapters": [
-      "03-router.html",
-      "04-bundle.html"
+      "03-router.html"
      ],
      "entries": [
       {
@@ -630,7 +900,16 @@
        "anchor": "InferenceResult(scorer: base.scorer, prediction: prediction, p: p, threshold: base.threshold, band: base.band,",
        "note": "The routed result: the base expert's scorer, operating point and image size, the router's verdict, and the stack, the map and the trace around it.",
        "link": "none"
-      },
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "Schema v3",
+     "chapters": [
+      "03-router.html"
+     ],
+     "entries": [
       {
        "scope": "ResultJSON.encode(_:times:device:route:)",
        "anchor": "options: [.sortedKeys]",
@@ -642,6 +921,21 @@
        "scope": "ResultJSON.object(_:times:device:route:)",
        "anchor": "\"schema_version\": schemaVersion,",
        "note": "Writes exactly the keys of schema v3, each block only when the result holds it."
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Printed or written",
+     "chapters": [
+      "03-router.html"
+     ],
+     "entries": [
+      {
+       "scope": "RouteCommand.run()",
+       "anchor": "try emitJSON(try ResultJSON.encode(r, times: [], device: \"route\", route: routed.domain.rawValue), to: \"-\")",
+       "note": "veilgarde route prints the verdict, the base and the stack, or the JSON with --json.",
+       "link": "none"
       }
      ]
     }

@@ -1,8 +1,8 @@
 /*
  * The explorers, one engine for two trail sets. On code.html, the change explorer: every file the run changed,
  * verbatim, before and after, with each Swift file's declarations, the trails that tell each flow in the order the
- * code runs (training and inference for the fusion head and the specialist stack, signing and matching for the
- * watermark), picked from one grid with a row a flow and a column a kind,
+ * code runs (training for the fusion head and the specialist stack, detection in seven stages, signing and matching for
+ * the watermark), picked from one grid with a row a flow and a column a kind,
  * and calls matched by name and argument labels when the page was built (src/build.py). On ml.html
  * (body[data-trails="ml"]), the ML explorer: the same files and declarations, walked by the models' trails
  * (src/mltrails.json), with each step's primer, a deeper line, live facts from the shipped bundle, the code-trail
@@ -29,7 +29,7 @@
       name: "code", page: "code.html", storage: "explorer:", overviewSteps: true, depth: false, unit: "function",
       pickerLabel: "The trails through the code", lead: "The reader is on the change explorer, looking at ", told: "told in the order it runs",
       mapTrails: "The trails through the code, each in the order it runs:", extraTools: [],
-      expect: ["fusion-training", "specialist-training", "fusion-inference", "specialist-inference", "watermark-signing", "watermark-matching"],
+      expect: ["fusion-training", "specialist-training", "decode", "shared-signals", "domain", "base", "stack", "revisions", "result", "watermark-signing", "watermark-matching"],
       voice: {
         reading: ["You can read the whole change. The map below lists every file and every trail, and your tools read any declaration, file or line of text.",
                   "Start from what the reader has selected. When a question reaches past it, read what you need before you answer, and name what you read. " +
@@ -1384,8 +1384,8 @@
     bad = idx.edges.filter(function (e) { return !m.scopes[e[0]] || !m.scopes[e[1]] || !(e[2] >= 0 && e[2] <= 2) || !(e[3] >= 1); });
     check("every call edge joins two declarations, with a tier and a line", !bad.length, V.fmt.int(idx.edges.length) + " edges");
     var trails = m.trails, pages = V.pages.map(function (p) { return p.file; }), code = m.sets.code, P = policy();
-    check("six trails: the fusion head and the specialist stack trained and run, and the watermark signed and matched, each with a mark of its own and its steps numbered from 1",
-          code.trails.length === 6 && SETS.code.expect.every(function (id) { return code.trailById[id]; }) &&
+    check("eleven trails: the fusion head and the specialist stack trained, detection in seven stages from decode to result, and the watermark signed and matched, each with a mark of its own and its steps numbered from 1",
+          code.trails.length === 11 && SETS.code.expect.every(function (id) { return code.trailById[id]; }) &&
           code.trails.every(function (t, i) { return t.mark && code.trails.findIndex(function (u) { return u.mark === t.mark; }) === i; }) &&
           code.trails.every(function (t) { return t.steps.length >= 3 && t.steps.length <= 9 && t.steps.every(function (st, i) { return st.n === i + 1 && st.entries.length > 0; }); }),
           code.trails.map(function (t) { return t.mark + " " + t.steps.length; }).join(" · "));

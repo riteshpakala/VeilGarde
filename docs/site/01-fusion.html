@@ -13,7 +13,7 @@
 <div class="shell">
 <nav class="side" aria-label="Chapters"></nav>
 <main class="page" id="main">
-<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 1 of 10</span><a href="code.html#trail-fusion-inference-3">Walk the fusion in the explorer</a></header>
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 1 of 10</span><a href="code.html#trail-base-2">Walk the fusion in the explorer</a></header>
 
 <h1 id="ch-fusion">How does the fusion head read an image?</h1>
 <p class="lede"><em>On the camera base expert: what the image depicts and how it was captured, in one row, read by one booster.</em></p>
@@ -25,6 +25,20 @@
 <p>Every image becomes one row. The first numbers are DINOv2-small's embedding of the whole image, its short edge resized to 256 and its centre cropped to 224. The last nine are the capture signature, measured on the native pixels.</p>
 <p>The order is the booster's and the store's, and it never changes. A model trained on one order and run on another would read the capture peak where it expects an embedding value. The head the bundle ships reads <span data-fact="boosters.fusionHead.features">393</span> columns.</p>
 <div class="code" data-excerpt="Sources/VeilGardeCore/Features/FusionVector.swift:FusionVector"></div>
+
+<h2 id="layouts">Three rows a head can read</h2>
+<p>A fusion head's width names its row, so a bundle of any of them runs. The shipped head reads the first; the other two were trained and measured, and none passed the battery yet.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th class="n">Columns</th><th>Row</th></tr></thead>
+<tbody>
+<tr><td class="n">393</td><td>DINOv2's plain reading and the nine capture values: the shipped head</td></tr>
+<tr><td class="n">777</td><td>both DINOv2 readings, the plain one and the heads' force-resized one, and capture</td></tr>
+<tr><td class="n">815</td><td>those and the warp residual's 38 statistics, measured by the watermark's code</td></tr>
+</tbody>
+</table>
+</div>
+<div class="code" data-excerpt="Sources/VeilGardeCore/Features/FusionVector.swift:FusionLayout"></div>
 
 <h2 id="depicts">What the image depicts</h2>
 <p>DINOv2 was trained to describe images, not to judge them. Its embedding places a portrait near other portraits and a watercolour near other watercolours. That is an axis no measurement of a camera can see: a generator's typical subjects and styles.</p>

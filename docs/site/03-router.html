@@ -13,7 +13,7 @@
 <div class="shell">
 <nav class="side" aria-label="Chapters"></nav>
 <main class="page" id="main">
-<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 3 of 10</span><a href="code.html#trail-fusion-inference-1">Walk the router in the explorer</a></header>
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 3 of 10</span><a href="code.html#trail-domain-1">Walk the router in the explorer</a></header>
 
 <h1 id="ch-router">How does the detector reach one verdict?</h1>
 <p class="lede"><em>On the one entry point of the full detector, the order in which its evidence compounds, and the result it writes.</em></p>
@@ -26,6 +26,24 @@
 <p>Routing is never by image size. A small image is still a camera image, and the preview tail of chapter 2 handles what size does to the base.</p>
 <div class="code" data-excerpt="Sources/VeilGardeInference/Route/Domain.swift:DefaultDomainDetector.detect(_:hint:)"></div>
 <p>The camera domain's expert is the fusion head of chapter 1. The screenshot domain's expert is a content head trained on screenshots alone.</p>
+
+<h2 id="stages">Seven stages, one after another</h2>
+<p>Detection is a chain of stages, each handing its output to the next. The change explorer walks each one as a trail of its own.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th class="n">#</th><th>Stage</th><th>What it does</th><th>Trail</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td>Decode</td><td>The file to the pixels every model saw: NSImage first, then ImageIO.</td><td><a href="code.html#trail-decode-1">DE</a></td></tr>
+<tr><td class="n">2</td><td>Shared Signals</td><td>Computed once: the screenshot gate, the capture signature, both DINOv2 readings, and the warp residual's statistics measured by the watermark's code.</td><td><a href="code.html#trail-shared-signals-1">SG</a></td></tr>
+<tr><td class="n">3</td><td>Domain</td><td>A hint, else the gate: camera or screenshot, never by size.</td><td><a href="code.html#trail-domain-1">DO</a></td></tr>
+<tr><td class="n">4</td><td>Base</td><td>The fusion head's P(AI), its row in the layout its width names.</td><td><a href="code.html#trail-base-1">BA</a></td></tr>
+<tr><td class="n">5</td><td>Stack</td><td>Capture first, then the specialist heads pooled onto the base.</td><td><a href="code.html#trail-stack-1">SK</a></td></tr>
+<tr><td class="n">6</td><td>Revisions</td><td>The frame seam, the semantic chain and the preview tail, each only on decisive evidence.</td><td><a href="code.html#trail-revisions-1">RV</a></td></tr>
+<tr><td class="n">7</td><td>Result</td><td>One verdict, written as schema-v3 JSON.</td><td><a href="code.html#trail-result-1">RS</a></td></tr>
+</tbody>
+</table>
+</div>
+<p>The warp residual crosses into detection only as numbers. Its code lives in the watermark, and the shipped fusion head does not read it.</p>
 
 <h2 id="order">The order of the steps</h2>
 <div class="code" data-excerpt="Sources/VeilGardeInference/Route/Detector.swift:Detector.detect(cgImage:config:hint:)"></div>

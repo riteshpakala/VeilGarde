@@ -18,7 +18,7 @@
 <h1 id="ch-overview">VeilGarde: an AI-image detector as one Swift package</h1>
 <p class="lede"><em>On what this run built, in the order the code runs, and what was checked.</em></p>
 <p>VeilGarde is a detector for AI-generated images and a crop-robust watermark, in one Swift and MLX package, in two lanes. The detector is a fusion head over what an image depicts and how it was captured, then a stack of specialist heads, and one verdict comes out. The watermark reads the warp residual off an image's own pixels and matches a crop or a re-encode against it.</p>
-<p>Six trails walk the code in the order it runs. Two follow the fusion head, trained and run; two follow the specialist stack, trained and run, to the final verdict. Two follow the watermark, signing an image and matching a crop of it. The flywheel trains and improves the two detection lanes and nothing else.</p>
+<p>Eleven trails walk the code in the order it runs. Two train the fusion head and the specialist stack. Seven follow detection stage by stage, each handing off to the next: Decode, Shared Signals, Domain, Base, Stack, Revisions and Result. Two follow the watermark, signing an image and matching a crop of it.</p>
 <p><a href="ml.html">The ML explorer</a> tells the same flows as machine learning: what each model learns from and why its algorithm was chosen. It also follows how the base, the stack and two revisions reach one verdict. Its steps link back to these trails. The research that led here, the warp model, the noiseprint and the studies, is in <a href="10-record.html">the record</a> and on the 2026-rnd branch.</p>
 
 <div id="request"></div>
