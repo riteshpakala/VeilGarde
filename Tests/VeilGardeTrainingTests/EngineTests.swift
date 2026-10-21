@@ -5,10 +5,10 @@
 //
 //  WHAT: A whole recipe through the engine on a synthetic work area: the plan reads without
 //        training, a refusal stops the run before a candidate exists, and the run writes a
-//        candidate bundle that verifies, whose warp model is its own sensor model with a
-//        calibration bound to it, whose fusion head keeps the parent's 940 trees byte for byte,
-//        and whose heads and combiner load as the detector loads them. A masked warp model stays
-//        19 wide, splits only on its mask, and calibrates as any warp model does.
+//        candidate bundle that verifies, whose fusion head is a from-scratch fit over the 393
+//        fusion columns with its evaluation twin reported, and whose heads and combiner load as
+//        the detector loads them. A warm start keeps the parent's trees byte for byte; a parent of
+//        another width cannot be warm-started.
 //
 
 import Foundation
@@ -18,12 +18,10 @@ import VeilGardeCore
 
 @Suite("Training engine", .serialized)
 struct EngineTests {
-    func recipe(_ s: SyntheticArea, id: String = "toy") -> TrainingRecipe {
+    func recipe(id: String = "toy") -> TrainingRecipe {
         TrainingRecipe(id: id) {
             Combiner()
-            WarpTileModel(dataset: s.dataset).trees(12).depth(3)
-            SensorCalibration()
-            FusionHead().warmStart(add: 3, eta: 0.03).allowMixedWarp(false)
+            FusionHead().scratch(trees: 12, eta: 0.1)
             for kind in [HeadKind.art, .blur, .human, .cgi, .artPair, .preview] { DinoHead(kind) }
         }
     }
@@ -33,26 +31,24 @@ struct EngineTests {
         let s = try SyntheticArea.make()
         defer { s.remove() }
         let engine = TrainingEngine(area: s.area, parent: s.parent, store: s.store)
-        let plan = try engine.plan(recipe(s))
+        let plan = try engine.plan(recipe())
         #expect(plan.refusals.isEmpty, "\(plan.refusals)")
-        #expect(plan.models.map(\.model) == ["warp-tile", "sensor-calibration", "fusion-head", "head:art", "head:blur", "head:human", "head:cgi", "head:art-pair", "head:preview", "combiner"])
-        let warp = plan.models[0]
-        #expect(warp.stages.first?.stage == .tiles && warp.stages.first?.runs == false, "the tiles are cached")
-        #expect(plan.summary.contains("deployed: 12 trees, depth 3"))
+        #expect(plan.models.map(\.model) == ["fusion-head", "head:art", "head:blur", "head:human", "head:cgi", "head:art-pair", "head:preview", "combiner"])
+        #expect(plan.summary.contains("from scratch: 12 trees"))
+        #expect(plan.summary.contains("393 columns"))
         #expect(!FileManager.default.fileExists(atPath: plan.candidate.path))
     }
 
     @Test("a refusal stops the run before a candidate exists")
     func refusals() throws {
-        let s = try SyntheticArea.make(mixedWarp: true)
+        let s = try SyntheticArea.make()
         defer { s.remove() }
         let engine = TrainingEngine(area: s.area, parent: s.parent, store: s.store)
-        let bad = TrainingRecipe(id: "bad") { DinoHead(.semtile); FusionHead() }
+        let bad = TrainingRecipe(id: "bad") { DinoHead(.semtile) }
         let plan = try engine.plan(bad)
-        #expect(plan.refusals.count == 2, "semtile has no tokens; the store mixes warp models")
+        #expect(plan.refusals.count == 1, "semtile has no tokens in the store")
         #expect(throws: VeilGardeFailure.self) { try engine.train(bad) }
         #expect(!FileManager.default.fileExists(atPath: plan.candidate.path))
-        #expect(try engine.plan(TrainingRecipe(id: "ok") { FusionHead().allowMixedWarp() }).refusals.isEmpty)
         #expect(throws: VeilGardeFailure.self) { try engine.plan(TrainingRecipe(id: "a/b") { Combiner() }) }
     }
 
@@ -62,85 +58,65 @@ struct EngineTests {
         defer { s.remove() }
         var lines: [String] = []
         let engine = TrainingEngine(area: s.area, parent: s.parent, store: s.store) { if let l = $0.line { lines.append(l) } }
-        let outcome = try engine.train(recipe(s))
+        let outcome = try engine.train(recipe())
         let c = outcome.candidate
         try c.verify()
         let parent = try ModelBundle.load(s.parent)
 
-        // The warp model is its own sensor model, and the calibration is bound to it.
-        let warp = try #require(c.manifest.artifact(.warpTile)), sensor = try #require(c.manifest.artifact(.warpMajoritySensor))
-        #expect(warp.sha256 == sensor.sha256 && warp.file == "warp/warp_tile32.xgb.json")
-        #expect(warp.sha256 != parent.sha256(.warpTile))
-        let model = try GBDTModel.load(c.url(.warpTile)!)
-        #expect(model.trees.count == 12 && model.featureNames == WarpFeatures.names)
-        let calibration = try Data(contentsOf: c.url(.sensorCalibration)!)
-        let contract = try SensorCalibrationContract.decode(calibration, expectedModelSHA256: warp.sha256, expectedSensorVariant: "warp19")
-        #expect(contract.transform == .cuts, "the engine writes the fitted contract as two cuts on the vote")
-
-        // The fusion head continues the parent's: 940 trees untouched, 3 appended, the parent recorded.
+        // The fusion head: a scratch fit over the 393 columns, no parent, the evaluation twin reported.
         let fusion = try #require(c.manifest.artifact(.fusionHead))
-        #expect(fusion.parent == parent.sha256(.fusionHead))
-        let head = try GBDTModel.load(c.url(.fusionHead)!), before = try GBDTModel.load(parent.url(.fusionHead)!)
-        #expect(head.trees.count == before.trees.count + 3)
-        for i in 0..<before.trees.count { #expect(head.trees[i].raw == before.trees[i].raw) }
+        #expect(fusion.parent == nil && fusion.file == "fusion/fusion_head.xgb.json")
+        let head = try GBDTModel.load(c.url(.fusionHead)!)
+        #expect(head.trees.count == 12 && head.featureCount == FusionVector.count)
+        let metrics = try JSONSerialization.jsonObject(with: Data(contentsOf: c.root.appendingPathComponent("fusion/metrics.json"))) as! [String: Any]
+        let report = try #require(metrics["report"] as? [String: Any])
+        #expect((report["evaluationRows"] as? Int ?? 0) > 0 && report["evaluationAUC"] is Double)
+        #expect(report["parentComparable"] as? Bool == true, "the shipped head reads the same 393 columns")
 
         // Heads and the combiner load as the detector loads them.
         for kind in [HeadKind.art, .blur, .human, .cgi, .artPair, .preview] {
             let url = try #require(c.url(.head, head: kind))
             #expect(url.path.hasSuffix("heads/\(kind.rawValue)/head.json"))
             #expect(try LinearHead.load(url).coef.count == 384)
-            #expect(FileManager.default.fileExists(atPath: c.root.appendingPathComponent("heads/\(kind.rawValue)/metrics.json").path))
         }
-        let combiner = try JSONDecoder().decode(StackCombiner.self, from: Data(contentsOf: c.url(.combiner)!))
-        #expect(combiner.wBase >= 0)
+        let combiner = try StackCombiner.load(c.url(.combiner)!)
+        #expect(combiner.wBase >= 0 && combiner.wGen.count == 3)
         #expect(combiner.pairAdjudicates == true, "this recipe trained an art-pair head, so its combiner adjudicates; the shipped recipe trains none")
+        #expect(c.manifest.artifact(.combiner)?.file == "combiner/stack_combiner.json")
         // What the recipe did not name is the parent's, byte for byte.
         #expect(c.manifest.artifact(.head, head: .screenshot)?.sha256 == parent.sha256(.head, head: .screenshot))
-        #expect(c.manifest.artifact(.fusionReference)?.sha256 == parent.sha256(.fusionReference))
         #expect(c.manifest.weights == parent.manifest.weights)
         // The record of the run.
         let runs = try String(contentsOf: c.root.appendingPathComponent("runs.jsonl"), encoding: .utf8).split(separator: "\n")
-        #expect(runs.count > 20)
+        #expect(runs.count > 10)
         #expect(lines.contains { $0.hasPrefix("candidate toy verified") })
-        #expect(outcome.metrics.keys.sorted() == ["combiner", "fusion-head", "head:art", "head:art-pair", "head:blur", "head:cgi", "head:human", "head:preview", "sensor-calibration", "warp-tile"])
-        #expect(try JSONDecoder().decode(TrainingRecipe.self, from: Data(contentsOf: c.root.appendingPathComponent("recipe.json"))) == recipe(s))
+        #expect(outcome.metrics.keys.sorted() == ["combiner", "fusion-head", "head:art", "head:art-pair", "head:blur", "head:cgi", "head:human", "head:preview"])
+        #expect(try JSONDecoder().decode(TrainingRecipe.self, from: Data(contentsOf: c.root.appendingPathComponent("recipe.json"))) == recipe())
         // A second run under the same id is refused.
-        #expect(throws: VeilGardeFailure.self) { try engine.train(recipe(s)) }
+        #expect(throws: VeilGardeFailure.self) { try engine.train(recipe()) }
     }
 
-    @Test("a masked warp candidate is 19 wide, splits only on its mask, and gets a bound calibration")
-    func maskedWarp() throws {
+    @Test("a warm start keeps the parent's trees byte for byte and records the parent")
+    func warmStart() throws {
         let s = try SyntheticArea.make()
         defer { s.remove() }
         let engine = TrainingEngine(area: s.area, parent: s.parent, store: s.store)
-        let r = try TrainingRecipe(id: "trio") {
-            try WarpTileModel(dataset: s.dataset).trees(12).depth(3).features(["FR", "LV", "CV"])
-            SensorCalibration()
-        }
-        #expect(try engine.plan(r).summary.contains("splits on 3 of 19 features (FR, LV, CV)"))
-        let c = try engine.train(r).candidate
-        try c.verify()
-        let warp = try #require(c.manifest.artifact(.warpTile)), sensor = try #require(c.manifest.artifact(.warpMajoritySensor))
-        #expect(warp.sha256 == sensor.sha256)
-        let model = try GBDTModel.load(c.url(.warpTile)!)
-        #expect(model.featureCount == WarpFeatures.count && model.featureNames == WarpFeatures.names)
-        #expect(model.trees.allSatisfy { t in (0..<t.nodeCount).allSatisfy { t.leftChildren[$0] == -1 || t.splitIndices[$0] <= 2 } })
-        let contract = try SensorCalibrationContract.decode(Data(contentsOf: c.url(.sensorCalibration)!), expectedModelSHA256: warp.sha256, expectedSensorVariant: "warp19")
-        #expect(contract.transform == .cuts)
-        let recorded = try JSONDecoder().decode(TrainingRecipe.self, from: Data(contentsOf: c.root.appendingPathComponent("recipe.json")))
-        guard case .warpTile(let w) = recorded.ordered[0] else { Issue.record("no warp in the recorded recipe"); return }
-        #expect(w.params.allowedColumns == [0, 1, 2])
+        let c = try engine.train(TrainingRecipe(id: "warm") { FusionHead().warmStart(add: 3, eta: 0.03) }).candidate
+        let parent = try ModelBundle.load(s.parent)
+        #expect(c.manifest.artifact(.fusionHead)?.parent == parent.sha256(.fusionHead))
+        let head = try GBDTModel.load(c.url(.fusionHead)!), before = try GBDTModel.load(parent.url(.fusionHead)!)
+        #expect(head.trees.count == before.trees.count + 3)
+        for i in 0..<before.trees.count { #expect(head.trees[i].raw == before.trees[i].raw) }
     }
 
-    @Test("a warp model retrained without its calibration drops the parent's contract")
-    func warpAlone() throws {
+    @Test("a parent of another width cannot be warm-started")
+    func widthRefused() throws {
         let s = try SyntheticArea.make()
         defer { s.remove() }
-        let engine = TrainingEngine(area: s.area, parent: s.parent, store: s.store)
-        let r = TrainingRecipe(id: "warp-only") { WarpTileModel(dataset: s.dataset).trees(4).depth(2) }
-        #expect(try engine.plan(r).models[0].notes.contains { $0.contains("falls back to identity") })
-        let c = try engine.train(r).candidate
-        #expect(c.manifest.artifact(.sensorCalibration) == nil)
-        try c.verify()
+        let dataset = try FusionDataset.assemble(FeatureStore(directory: s.store), settings: FusionSettings())
+        var settings = FusionSettings()
+        settings.mode = .warmStart(add: 2, eta: 0.03)
+        let narrow = GBDTModel(trees: [], baseScoreProbability: 0.5, featureCount: 5)
+        #expect(throws: VeilGardeFailure.self) { try FusionTrainer.train(dataset, settings: settings, parent: narrow) }
     }
 }

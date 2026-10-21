@@ -3,8 +3,8 @@
 //  VeilGardePlayground
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The images the playground runs: the two parity crops whose results Garde wrote on
-//        2026-10-19 (the goldens every step checks against), and, when the T9 is mounted, a seeded
+//  WHAT: The images the playground runs: the two parity crops and VeilGarde's own route goldens for
+//        them (written 2026-10-21 with the shipped bundle), and, when the T9 is mounted, a seeded
 //        sample of iPhone originals and generated images from final_mixed (read only).
 //
 
@@ -16,8 +16,8 @@ struct PlaygroundImage {
     let url: URL
     /// 0 real, 1 generated, nil unknown.
     let label: Int?
-    /// Garde's route JSON for this image, when it is a parity crop.
-    let gardeRoute: URL?
+    /// VeilGarde's route golden for this image, when it is a parity crop.
+    let golden: URL?
 }
 
 enum Images {
@@ -27,13 +27,13 @@ enum Images {
         return url.deletingLastPathComponent()
     }()
 
-    static let goldens = repoRoot.appendingPathComponent("Tests/VeilGardeInferenceTests/Fixtures/garde")
+    static let goldens = repoRoot.appendingPathComponent("Tests/VeilGardeInferenceTests/Fixtures/crops")
     /// final_mixed under VEILGARDE_DATASETS (else the work area's datasets/), for the optional labelled sample.
     static let finalMixed = (WorkArea.datasets() ?? URL(fileURLWithPath: "datasets", isDirectory: true)).appendingPathComponent("final_mixed")
 
     static var parityCrops: [PlaygroundImage] {
         ["crop_ben", "crop_fox"].map {
-            PlaygroundImage(name: "\($0).png", url: goldens.appendingPathComponent("\($0).png"), label: nil, gardeRoute: goldens.appendingPathComponent("\($0).route.json"))
+            PlaygroundImage(name: "\($0).png", url: goldens.appendingPathComponent("\($0).png"), label: nil, golden: goldens.appendingPathComponent("\($0).route.json"))
         }
     }
 
@@ -47,7 +47,7 @@ enum Images {
             guard !names.isEmpty else { continue }
             let step = max(1, names.count / perClass)
             for name in names.enumerated().filter({ $0.offset % step == 0 }).prefix(perClass).map(\.element) {
-                out.append(PlaygroundImage(name: name, url: dir.appendingPathComponent(name), label: label, gardeRoute: nil))
+                out.append(PlaygroundImage(name: name, url: dir.appendingPathComponent(name), label: label, golden: nil))
             }
         }
         return out

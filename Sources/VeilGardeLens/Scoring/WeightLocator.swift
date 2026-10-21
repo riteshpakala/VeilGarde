@@ -3,11 +3,10 @@
 //  VeilGardeLens
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: Where the neural weights are found. Only the noiseprint's ships in git, in the shipped
-//        bundle's resources, so each is looked up by file name: an override folder a host sets, then
-//        VEILGARDE_WEIGHTS, then the folders registered at start-up (the work area's weights/ and the
-//        shipped bundle's resources).
-//  PIN:  Garde's weight-override contract, generalized to an ordered search. The first folder
+//  WHAT: Where the neural weights are found. None ships in git, so each is looked up by file name:
+//        an override folder a host sets, then VEILGARDE_WEIGHTS, then the folders registered at
+//        start-up (the work area's weights/ and the shipped bundle's resources).
+//  PIN:  The reference's weight-override contract, generalized to an ordered search. The first folder
 //        that holds the file wins; nothing is downloaded here (`veilgarde weights` does that).
 //
 
@@ -17,7 +16,6 @@ public enum WeightFile: String, CaseIterable, Sendable {
     case dinov2Small = "dinov2_small.safetensors"
     case dinov2XSmall = "dinov2_small_xsmall.safetensors"
     case dinov2XXSmall = "dinov2_small_xxsmall.safetensors"
-    case noiseprint = "noiseprint_v1.safetensors"
     case clipVision = "clip_vit_b32_vision.safetensors"
 
     public var role: ArtifactRole {
@@ -25,7 +23,6 @@ public enum WeightFile: String, CaseIterable, Sendable {
         case .dinov2Small: return .dinov2Small
         case .dinov2XSmall: return .dinov2XSmall
         case .dinov2XXSmall: return .dinov2XXSmall
-        case .noiseprint: return .noiseprint
         case .clipVision: return .clipVision
         }
     }

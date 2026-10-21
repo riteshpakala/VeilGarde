@@ -5,19 +5,15 @@
 //
 //  WHAT: What training a recipe would do, before anything trains: per model, which stages run
 //        and why, what it reads and what it will write, or why it is refused. A plan reads the
-//        work area, the dataset manifest, the tile cache and the store's row lists; it never
-//        touches MLX, so it is cheap to ask for and safe to show.
+//        parent bundle and the store's row lists; it trains nothing, so it is cheap to ask for and
+//        safe to show.
 //
 
 import Foundation
 import VeilGardeCore
 
 public enum TrainingStage: String, Codable, Sendable, CaseIterable {
-    /// Cut the dataset's images into the tile cache (MLX, the warp lens).
-    case tiles
-    /// Cut images into the noiseprint's patch cache (CPU).
-    case patches
-    /// Read the training rows (tiles, or the store's columns).
+    /// Read the training rows (the store's columns).
     case data
     /// Fit the model.
     case fit

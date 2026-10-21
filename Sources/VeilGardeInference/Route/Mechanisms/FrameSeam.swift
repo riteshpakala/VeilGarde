@@ -26,7 +26,7 @@ enum FrameSeam {
         cfg.skipFrameCheck = true
         guard let interior = ImageLoading.renderCrop(s.cgImage, interiorRect) else { return }
         let sub = try detector.detect(cgImage: interior, config: cfg, hint: hint)
-        let pi = sub.result.weightedScore
+        let pi = sub.result.p
         let decisive = pi >= 0.70 && (pi - state.p) >= 0.20
         state.stack.append(SpecialistContribution(name: "frame-seam", pAI: pi, verdict: decisive ? "generated" : "unconfirmed", weight: decisive ? 1.0 : 0.25))
         if decisive {

@@ -3,8 +3,7 @@
 //  VeilGardeTraining
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The splits the trainers hold data out by: the source-disjoint head split, and the
-//        stratified hash folds the calibration's cross-fitted gate runs on.
+//  WHAT: The source-disjoint split the heads are held out by.
 //  PIN:  The head split is atlas_heads_store.py's, draw for draw: with at least four distinct
 //        (non-empty) sources among the usable rows, the sorted sources are shuffled by CPython's
 //        random.Random(0) and the first max(1, n // 4) are the test sources; otherwise the sorted
@@ -66,18 +65,4 @@ public enum HeadSplit {
 
     /// Python's str ordering: by code point.
     static func pythonOrder(_ a: String, _ b: String) -> Bool { a.unicodeScalars.lexicographicallyPrecedes(b.unicodeScalars) }
-}
-
-public enum HashFolds {
-    /// `k` folds, stratified by label: within each label the rows are ordered by the hash of their
-    /// key and dealt round-robin, so every fold holds both classes in proportion.
-    public static func stratified(keys: [String], labels: [Int], k: Int, salt: String) -> [Int] {
-        var fold = [Int](repeating: 0, count: keys.count)
-        for label in Set(labels) {
-            let members = keys.indices.filter { labels[$0] == label }
-                .sorted { StableSplit.unit(keys[$0], salt: salt) < StableSplit.unit(keys[$1], salt: salt) }
-            for (position, i) in members.enumerated() { fold[i] = position % k }
-        }
-        return fold
-    }
 }

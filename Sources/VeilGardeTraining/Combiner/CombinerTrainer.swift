@@ -5,18 +5,18 @@
 //
 //  WHAT: The stack combiner, the pooled verdict on the capture-absent branch: a non-negative
 //        logistic over the base's capped logit, the heads' bounded generated evidence (the art
-//        logit adjudicated by the art-pair head), the consensus rescue and noiseprint's camera
-//        evidence. Heads add evidence; none can auto-win and none can invert.
-//  PIN:  atlas_combiner.py (v3) line for line. Features: lb = clip(logit(clip(base, 1e−4)), ±4);
-//        each head's logit capped at ±2, the art logit min(l_art, l_pair) (a missing pair reads
-//        1.0, no adjudication); gen = relu(head logits); rescue = relu(−max head logit) and
-//        np_ev = relu(logit(P(camera))) (missing reads 0.5), both only while base < 0.75; the
-//        columns are [lb, gen_art, gen_blur, gen_human, −rescue, −np_ev]. The fit weights reals ×3
-//        and zeroes the rescue column (the corpus cannot teach it). The rescue weight is then
-//        chosen against the protect-real probes: the first of 0.5, 0.8, 1.0, 1.3 under which every
-//        probe reads ≤ 0.5 and none above 0.42, else 1.0 (the reference loop never keeps 0.0, so the
-//        shipped 0.5 is what it picks on the shipped weights; CombinerTests). A noiseprint weight
-//        that fits below 0.05 is set to 0.8. Caps 4 and 2 and the 0.75 gate are fixed.
+//        logit adjudicated by the art-pair head) and the consensus rescue. Heads add evidence; none
+//        can auto-win and none can invert.
+//  PIN:  The reference's atlas combiner (v3), line for line, without the noiseprint column it
+//        carried until 2026-10-21. Features: lb = clip(logit(clip(base, 1e−4)), ±4); each head's
+//        logit capped at ±2, the art logit min(l_art, l_pair) (a missing pair reads 1.0, no
+//        adjudication); gen = relu(head logits); rescue = relu(−max head logit), only while
+//        base < 0.75; the columns are [lb, gen_art, gen_blur, gen_human, −rescue]. The fit weights
+//        reals ×3 and zeroes the rescue column (the corpus cannot teach it). The rescue weight is
+//        then chosen against the protect-real probes: the first of 0.5, 0.8, 1.0, 1.3 under which
+//        every probe reads ≤ 0.5 and none above 0.42, else 1.0 (the reference loop never keeps
+//        0.0). Caps 4 and 2 and the 0.75 gate are fixed. The base is the fusion head's prediction
+//        on store rows it may have trained on, so the base's test numbers are in-sample for it.
 //
 
 import Foundation
@@ -26,7 +26,7 @@ public enum CombinerFeatures {
     public static let capBase = 4.0
     public static let capHead = 2.0
     public static let gateCeiling = 0.75
-    public static let count = 6
+    public static let count = 5
 
     static func logit(_ p: Double, cap: Double) -> Double {
         let c = min(max(p, 1e-4), 1 - 1e-4)
@@ -34,17 +34,15 @@ public enum CombinerFeatures {
     }
 
     /// One row's columns from the base probability, the three heads' P(generated) (art, blur,
-    /// human), the art-pair head's P(AI art) and noiseprint's P(camera).
-    public static func row(base: Double, heads: [Double], pair: Double?, noiseprint: Double?) -> [Double] {
+    /// human) and the art-pair head's P(AI art).
+    public static func row(base: Double, heads: [Double], pair: Double?) -> [Double] {
         let lb = logit(base, cap: capBase)
         var lh = heads.map { logit($0, cap: capHead) }
         lh[0] = min(lh[0], logit(pair ?? 1.0, cap: capHead))
         let gen = lh.map { max($0, 0) }
         let maxHead = lh.max() ?? 0
         let rescue = base < gateCeiling ? max(-maxHead, 0) : 0
-        let npl = max(logit(noiseprint ?? 0.5, cap: capHead), 0)
-        let npEvidence = base < gateCeiling ? npl : 0
-        return [lb] + gen + [-rescue, -npEvidence]
+        return [lb] + gen + [-rescue]
     }
 }
 
@@ -54,25 +52,23 @@ public struct CombinerProbe: Codable, Sendable, Equatable {
     public var base: Double
     public var heads: [Double]
     public var pair: Double?
-    public var noiseprint: Double?
 
-    public init(name: String, base: Double, heads: [Double], pair: Double? = nil, noiseprint: Double? = nil) {
+    public init(name: String, base: Double, heads: [Double], pair: Double? = nil) {
         self.name = name
         self.base = base
         self.heads = heads
         self.pair = pair
-        self.noiseprint = noiseprint
     }
 
     /// The reference USER_REALS (atlas_combiner.py, 2026-07-13: "1" relabeled generated and removed).
     public static let userReals: [CombinerProbe] = [
-        CombinerProbe(name: "2", base: 0.27, heads: [0.95, 0.94, 0.08], noiseprint: 0.13),
-        CombinerProbe(name: "3", base: 0.52, heads: [0.99, 0.93, 0.04], noiseprint: 0.78),
-        CombinerProbe(name: "4", base: 0.24, heads: [0.01, 0.00, 0.00], noiseprint: 0.46),
-        CombinerProbe(name: "5", base: 0.28, heads: [0.06, 0.30, 0.00], noiseprint: 0.68),
-        CombinerProbe(name: "6", base: 0.18, heads: [0.94, 0.90, 0.00], noiseprint: 0.56),
-        CombinerProbe(name: "7", base: 0.35, heads: [0.02, 0.02, 0.00], noiseprint: 0.42),
-        CombinerProbe(name: "D72", base: 0.11, heads: [0.03, 0.00, 0.00], pair: 0.91, noiseprint: 0.50),
+        CombinerProbe(name: "2", base: 0.27, heads: [0.95, 0.94, 0.08]),
+        CombinerProbe(name: "3", base: 0.52, heads: [0.99, 0.93, 0.04]),
+        CombinerProbe(name: "4", base: 0.24, heads: [0.01, 0.00, 0.00]),
+        CombinerProbe(name: "5", base: 0.28, heads: [0.06, 0.30, 0.00]),
+        CombinerProbe(name: "6", base: 0.18, heads: [0.94, 0.90, 0.00]),
+        CombinerProbe(name: "7", base: 0.35, heads: [0.02, 0.02, 0.00]),
+        CombinerProbe(name: "D72", base: 0.11, heads: [0.03, 0.00, 0.00], pair: 0.91),
     ]
 }
 
@@ -81,8 +77,6 @@ public struct CombinerSettings: Codable, Sendable, Equatable {
     public var rescueSweep = [0.0, 0.5, 0.8, 1.0, 1.3]
     public var rescueFallback = 1.0
     public var maxProbe = 0.42
-    public var noiseprintFloor = 0.05
-    public var noiseprintSet = 0.8
     public var probes = CombinerProbe.userReals
 
     public init() {}
@@ -94,22 +88,21 @@ public struct CombinerSample: Sendable, Equatable {
     public var base: Double
     public var heads: [Double]
     public var pair: Double?
-    public var noiseprint: Double?
 
-    public init(id: String, label: Int, base: Double, heads: [Double], pair: Double?, noiseprint: Double?) {
+    public init(id: String, label: Int, base: Double, heads: [Double], pair: Double?) {
         self.id = id
         self.label = label
         self.base = base
         self.heads = heads
         self.pair = pair
-        self.noiseprint = noiseprint
     }
 }
 
 extension CombinerSample {
     /// The combiner's rows from a store selection: every capture-absent row that has both
-    /// embeddings, with `base` on its fusion vector, the three heads and the art-pair head on its
-    /// dino_norm, and its stored noiseprint. Rows keep the selection's order.
+    /// embeddings, with `base` on its fusion vector (the head's prediction on rows it may have
+    /// trained on), and the three heads and the art-pair head on its dino_norm. Rows keep the
+    /// selection's order.
     public static func captureAbsent(_ selection: StoreSelection, base: GBDTModel, heads: [LinearHead], pair: LinearHead?) -> [CombinerSample] {
         var out = [CombinerSample?](repeating: nil, count: selection.count)
         out.withUnsafeMutableBufferPointer { slots in
@@ -120,10 +113,8 @@ extension CombinerSample {
                 guard norm.first?.isFinite == true, fusion.first?.isFinite == true else { return }
                 var row = [Float]()
                 for column in FeatureColumn.fusion { row.append(contentsOf: selection.vector(column, row: i)) }
-                let np = selection.vector(.noiseprint, row: i).first ?? .nan
                 slots[i] = CombinerSample(id: selection.rows[i].id, label: selection.rows[i].label, base: Double(base.predict(row)),
-                                          heads: heads.map { Double($0.pAI(norm)) }, pair: pair.map { Double($0.pAI(norm)) },
-                                          noiseprint: np.isFinite ? Double(np) : nil)
+                                          heads: heads.map { Double($0.pAI(norm)) }, pair: pair.map { Double($0.pAI(norm)) })
             }
         }
         return out.compactMap { $0 }
@@ -137,16 +128,16 @@ public struct CombinerReport: Codable, Sendable, Equatable {
     public var fitted: [Double]
     public var sweep: [SweepRow]
     public var rescue: Double
-    public var noiseprintFloored: Bool
     public var probes: [String: Double]
     public var testAUCBase: Double?
     public var testAUCCombined: Double?
     public var testRealFPRBase: Double?
     public var testRealFPRCombined: Double?
+    public var note: String
 }
 
 public enum CombinerTrainer {
-    /// The bounded fit on feature rows: (w0, the six weights) with the rescue column zeroed.
+    /// The bounded fit on feature rows: (w0, the five weights) with the rescue column zeroed.
     public static func fitWeights(features: [[Double]], labels: [Int], realsWeight: Double) -> (w0: Double, w: [Double]) {
         let m = CombinerFeatures.count
         var flat = [Double]()
@@ -164,7 +155,7 @@ public enum CombinerTrainer {
 
     public static func probeScores(_ w0: Double, _ w: [Double], _ probes: [CombinerProbe]) -> [String: Double] {
         Dictionary(uniqueKeysWithValues: probes.map { probe in
-            (probe.name, probability(w0, w, CombinerFeatures.row(base: probe.base, heads: probe.heads, pair: probe.pair, noiseprint: probe.noiseprint)))
+            (probe.name, probability(w0, w, CombinerFeatures.row(base: probe.base, heads: probe.heads, pair: probe.pair)))
         })
     }
 
@@ -191,14 +182,12 @@ public enum CombinerTrainer {
         guard train.count >= 50, Set(train.map { samples[$0].label }).count == 2 else {
             throw VeilGardeFailure.data("the combiner needs ≥ 50 capture-absent rows of both classes to fit; have \(train.count)")
         }
-        let features = samples.map { CombinerFeatures.row(base: $0.base, heads: $0.heads, pair: $0.pair, noiseprint: $0.noiseprint) }
+        let features = samples.map { CombinerFeatures.row(base: $0.base, heads: $0.heads, pair: $0.pair) }
         note("combiner: \(train.count) train rows, \(test.count) test rows, reals ×\(settings.realsWeight)")
         let fit = fitWeights(features: train.map { features[$0] }, labels: train.map { samples[$0].label }, realsWeight: settings.realsWeight)
         var w = fit.w
         let (rescue, sweep) = chooseRescue(w0: fit.w0, w: w, settings: settings)
         w[4] = rescue
-        let floored = w[5] < settings.noiseprintFloor
-        if floored { w[5] = settings.noiseprintSet }
 
         var aucBase: Double? = nil, aucCombined: Double? = nil, fprBase: Double? = nil, fprCombined: Double? = nil
         if !test.isEmpty {
@@ -214,15 +203,16 @@ public enum CombinerTrainer {
         }
         // The art-pair adjudicates only when the candidate trained one; the shipped recipe does not.
         let adjudicated = samples.contains { $0.pair != nil }
-        var file = CombinerFile(w0: fit.w0, wBase: w[0], wGen: Array(w[1...3]), wRescue: w[4], wNp: w[5],
+        var file = CombinerFile(w0: fit.w0, wBase: w[0], wGen: Array(w[1...3]), wRescue: w[4],
                                 note: "VeilGarde v3 asymmetric evidence pooling (capture-absent branch only), fitted on the features-only store: "
                                     + "non-negative weights, reals ×\(settings.realsWeight), "
                                     + (adjudicated ? "the art logit adjudicated by the art-pair head, " : "")
-                                    + "the rescue weight chosen against the protect-real probes, noiseprint P(camera) as bounded real evidence.")
+                                    + "the rescue weight chosen against the protect-real probes.")
         file.pairAdjudicates = adjudicated
         let report = CombinerReport(train: train.count, test: test.count, fitted: [fit.w0] + fit.w, sweep: sweep, rescue: rescue,
-                                    noiseprintFloored: floored, probes: probeScores(fit.w0, w, settings.probes),
-                                    testAUCBase: aucBase, testAUCCombined: aucCombined, testRealFPRBase: fprBase, testRealFPRCombined: fprCombined)
+                                    probes: probeScores(fit.w0, w, settings.probes),
+                                    testAUCBase: aucBase, testAUCCombined: aucCombined, testRealFPRBase: fprBase, testRealFPRCombined: fprCombined,
+                                    note: "the test rows are a 20% hash holdout of the combiner's rows (StableSplit combiner:v1); the base is the fusion head's prediction, in-sample for the head on rows it trained on")
         return (file, report)
     }
 }

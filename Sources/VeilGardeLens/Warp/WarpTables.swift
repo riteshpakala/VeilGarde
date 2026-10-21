@@ -3,7 +3,7 @@
 //  VeilGardeLens
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The warp lens's precomputed gathers. Every tile is 32×32 and the 16 homographies are
+//  WHAT: The residual's precomputed gathers. Every tile is 32×32 and the 16 homographies are
 //        constants, so each warp's sample indices and bicubic weights are content-independent:
 //        built once (host-side, float64) as Frigate WarpTapTables, then every tile batch warps in
 //        16 large gathers. The inverse warp's indices are offset per trial so it samples the
@@ -24,19 +24,12 @@ public struct WarpTables {
     public let lowBack: WarpTapTable
     public let highForward: WarpTapTable
     public let highBack: WarpTapTable
-    /// The 2×2 box (local variance) and 9×9 box (circular variance) kernels.
-    public let localVarianceKernel: MLXArray
-    public let circularVarianceKernel: MLXArray
     public let quantizeLikeCV2: Bool
 
     public init(quantizeLikeCV2: Bool) {
         self.quantizeLikeCV2 = quantizeLikeCV2
         (lowForward, lowBack) = Self.build(scale: WarpConstants.lowStrengthD, quantizeLikeCV2: quantizeLikeCV2)
         (highForward, highBack) = Self.build(scale: WarpConstants.highStrengthD, quantizeLikeCV2: quantizeLikeCV2)
-        let lv = WarpConstants.localVarianceKernel, cv = WarpConstants.circularVarianceKernel
-        localVarianceKernel = MLXArray([Float](repeating: 1.0 / Float(lv * lv), count: lv * lv), [lv, lv])
-        circularVarianceKernel = MLXArray([Float](repeating: 1.0 / Float(cv * cv), count: cv * cv), [cv, cv])
-        MLX.eval(localVarianceKernel, circularVarianceKernel)
     }
 
     /// The (forward, inverse) tap tables for the 16 trials at strength `s`.

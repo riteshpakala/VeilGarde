@@ -1,62 +1,18 @@
 {
   "artifacts": [
     {
-      "bytes": 5679982,
-      "file": "warp_tile32.xgb.json",
-      "role": "warp-tile",
-      "sha256": "516119c92d364dda3dba41dcfc42e06edf0f42e45efd3b54c44ab620f7eefe3d",
-      "source": "garde@dbc6277"
-    },
-    {
-      "bytes": 5679982,
-      "file": "warp_majority_tile32.xgb.json",
-      "role": "warp-majority-sensor",
-      "sha256": "516119c92d364dda3dba41dcfc42e06edf0f42e45efd3b54c44ab620f7eefe3d",
-      "source": "garde@dbc6277"
-    },
-    {
-      "bytes": 849,
-      "file": "warp_sensor_calibration.json",
-      "role": "sensor-calibration",
-      "sha256": "8ab4e50eb9f4c9ddd5b18f2a393c108886a5b8d42f1fdf33ef3063120111f8b7",
-      "source": "veilgarde: two cuts on the tile vote, derived from garde@dbc6277's Platt contract"
-    },
-    {
-      "bytes": 3672117,
-      "file": "fusion_head.xgb.json",
-      "parent": "a66bccec13ec8b5ab840032d19096909e19276e7a2a3db287405a03ee3ca1474",
-      "role": "fusion-head",
-      "sha256": "730e99f21a9a968261103a2177acdc3801f5eefb95a50d843fb1f1cd8010fd5b",
-      "source": "garde@dbc6277"
-    },
-    {
-      "bytes": 3506660,
-      "file": "fusion_ref.xgb.json",
-      "role": "fusion-reference",
-      "sha256": "a66bccec13ec8b5ab840032d19096909e19276e7a2a3db287405a03ee3ca1474",
-      "source": "garde@dbc6277"
-    },
-    {
-      "bytes": 817,
-      "file": "stack_combiner_v2.json",
+      "bytes": 666,
+      "file": "stack_combiner_v3.json",
       "role": "combiner",
-      "sha256": "c6d138f537b82ea6c1d0d3053030ee00853cf7e9ac7964829b548da20b781d16",
-      "source": "veilgarde: garde@dbc6277's combiner without the art-pair adjudicator"
+      "sha256": "cdd0cb2e40fe7127482a0c66c3cb26df814dee26db297985f50ea5fe93d99f52",
+      "source": "candidates/fusion-20261021"
     },
     {
-      "bytes": 80339,
-      "file": "xdomain_centroids_v0.json",
-      "role": "xdomain-centroids",
-      "sha256": "1144de5a8221bf4b640097f2191d1f7db53780987c576f2b8faaf654ef0973da",
-      "source": "garde@dbc6277"
-    },
-    {
-      "bytes": 23797,
-      "file": "screenshot_dinov2_v1.10.json",
-      "head": "screenshot",
-      "role": "head",
-      "sha256": "51603722d775d0b792ddff0d8e811b315daa0f8efbdc7d21ab3a3248449c6012",
-      "source": "garde@dbc6277"
+      "bytes": 1873810,
+      "file": "fusion_head.xgb.json",
+      "role": "fusion-head",
+      "sha256": "b142e661c609070a7838fb015ae47a8b9ccce2ab1d539c3dac29afadc48b8f9e",
+      "source": "candidates/fusion-20261021"
     },
     {
       "bytes": 24189,
@@ -83,27 +39,27 @@
       "source": "garde@dbc6277"
     },
     {
-      "bytes": 24333,
-      "file": "semtile_dinov2_v1.json",
-      "head": "semtile",
-      "role": "head",
-      "sha256": "014dd30aee5091399131b736db6995362342880ffc3d000bce70d1b70783bf88",
-      "source": "garde@dbc6277"
-    },
-    {
-      "bytes": 23962,
-      "file": "cgi_dinov2_v1.json",
-      "head": "cgi",
-      "role": "head",
-      "sha256": "811fd01a2032395f787b95e0aa6fd87a0ab3eef1c0c7addf143ac9b5c2b93160",
-      "source": "garde@dbc6277"
-    },
-    {
       "bytes": 24326,
       "file": "preview_dinov2_v1.json",
       "head": "preview",
       "role": "head",
       "sha256": "ab7ad0c4e9737bc3f88e73e77780d032f5e51d68f151c3a23674b0c3b6d9cc42",
+      "source": "garde@dbc6277"
+    },
+    {
+      "bytes": 23797,
+      "file": "screenshot_dinov2_v1.10.json",
+      "head": "screenshot",
+      "role": "head",
+      "sha256": "51603722d775d0b792ddff0d8e811b315daa0f8efbdc7d21ab3a3248449c6012",
+      "source": "garde@dbc6277"
+    },
+    {
+      "bytes": 24333,
+      "file": "semtile_dinov2_v1.json",
+      "head": "semtile",
+      "role": "head",
+      "sha256": "014dd30aee5091399131b736db6995362342880ffc3d000bce70d1b70783bf88",
       "source": "garde@dbc6277"
     }
   ],
@@ -130,6 +86,28 @@
       "note": "the art-pair adjudicator taken out of the combiner, and its head out of the bundle (the owner's answer to question-4)",
       "slot": "combiner",
       "to_sha256": "c6d138f537b82ea6c1d0d3053030ee00853cf7e9ac7964829b548da20b781d16"
+    },
+    {
+      "date": "2026-10-21T00:00:00Z",
+      "kind": "seed",
+      "note": "the warp leaves detection and survives only in the watermark: the warp tile model and its sensor copy, the sensor calibration, the fusion reference, the x-domain centroids, the cgi head and the noiseprint removed; the fusion head and the combiner are refit next",
+      "slot": "bundle"
+    },
+    {
+      "date": "2026-10-21T00:00:00Z",
+      "from_sha256": "b142e661c609070a7838fb015ae47a8b9ccce2ab1d539c3dac29afadc48b8f9e",
+      "kind": "promote",
+      "note": "a scratch fit over [dino_fusion | cap] (393 columns): 500 trees, depth 5, eta 0.04, seed 0, on the store's 113,195 rows; its evaluation twin's AUC 0.9817 on 11,212 held-out rows",
+      "slot": "base",
+      "to_sha256": "b142e661c609070a7838fb015ae47a8b9ccce2ab1d539c3dac29afadc48b8f9e"
+    },
+    {
+      "date": "2026-10-21T00:00:00Z",
+      "from_sha256": "cdd0cb2e40fe7127482a0c66c3cb26df814dee26db297985f50ea5fe93d99f52",
+      "kind": "promote",
+      "note": "refit on the new head's capture-absent store rows: five inputs (no noiseprint term), reals x3, the rescue weight 1.0 by the sweep's fallback",
+      "slot": "combiner",
+      "to_sha256": "cdd0cb2e40fe7127482a0c66c3cb26df814dee26db297985f50ea5fe93d99f52"
     }
   ],
   "weights": [
@@ -152,13 +130,6 @@
       "file": "dinov2_small_xxsmall.safetensors",
       "role": "dinov2-xxsmall",
       "sha256": "ee89f1a73d252cf2875544f1658a255e522c64c653b55d4b07e36ede6c84dbd3",
-      "source": "garde WeightOverride"
-    },
-    {
-      "bytes": 133580,
-      "file": "noiseprint_v1.safetensors",
-      "role": "noiseprint",
-      "sha256": "a891b9ae60b12c2c1e99121e25e8508bf71077140cbcba17fcf6c1a08b104821",
       "source": "garde WeightOverride"
     }
   ]

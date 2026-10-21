@@ -5,7 +5,7 @@
 //
 //  WHAT: The daily acquisition: collector jobs (a source, the class it fills, its queries) run
 //        against the sources, every image fetched into memory, gated, routed, measured into the
-//        store's six columns under the live models, and dropped. What lands on disk is one new
+//        store's three columns, and dropped. What lands on disk is one new
 //        shard of features and each source's cursor; no image is ever written.
 //  PIN:  flywheel_scrape.py and atlas_collect.py's engine: per job max(50, budget / jobs) images
 //        unless told otherwise; queries are comma-separated and run in order; an item id is
@@ -15,7 +15,7 @@
 //        next run.
 //        The router files generated images by CLIP and flags NSFW by margin; reals keep their
 //        job's category. Rows land in acquire_<date>[_n] with their provenance (source id and
-//        URL, licence, native size, dHash, route scores, the warp model's tag).
+//        URL, licence, native size, dHash, route scores) and the shard records what measured it.
 //
 
 import CoreGraphics
@@ -182,7 +182,7 @@ public final class Acquirer {
                             let f = try extractor.extract(cg)
                             rows.append(FeatureRow(id: id, path: "/acquired/\(source.name)/\(sid)", label: label == "generated" ? 1 : 0, category: category,
                                                    source: source.name, nsfw: route?.nsfw ?? false, genFamily: item.meta["baseModel"] ?? item.meta["genFamily"],
-                                                   warpModel: extractor.warpModelTag, sourceID: sid, sourceURL: item.url?.absoluteString,
+                                                   sourceID: sid, sourceURL: item.url?.absoluteString,
                                                    license: item.meta["license"].flatMap { $0.isEmpty ? nil : $0 }, width: cg.width, height: cg.height,
                                                    dhash: String(format: "%016llx", dhash), route: route?.scores))
                             for column in FeatureColumn.allCases { columns[column]! += f.values(column) }
@@ -211,7 +211,7 @@ public final class Acquirer {
         if !rows.isEmpty {
             let name = shard ?? shardName()
             try FeatureShard(name: name, rows: rows, columns: columns,
-                             metadata: ["warp_model_sha256_prefix": extractor.warpModelTag, "acquired": FlywheelArea.stamp(started)]).write(to: area.store)
+                             metadata: extractor.provenance.merging(["acquired": FlywheelArea.stamp(started)]) { _, new in new }).write(to: area.store)
             report.shard = name
             report.rows = rows.count
         }

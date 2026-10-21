@@ -3,8 +3,9 @@
 //  VeilGardeCoreTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The shipped bundle is exactly the bytes its manifest names; a moved file is refused; the
-//        frozen roles are the ones the flywheel may never promote over.
+//  WHAT: The shipped bundle is exactly the bytes its manifest names (the fusion head and the combiner
+//        trained here on 2026-10-21, six heads); a moved file is refused; the frozen roles are the
+//        weights, which the flywheel may never promote over.
 //
 
 import Foundation
@@ -16,14 +17,15 @@ struct BundleTests {
     @Test("the shipped bundle's manifest verifies every artifact")
     func shippedBundleVerifies() throws {
         let bundle = try ModelBundle.load(Fixture.resources)
-        #expect(bundle.manifest.artifacts.count == 14)
-        #expect(bundle.manifest.weights.count == 4)
-        #expect(bundle.sha256(.warpTile) == "516119c92d364dda3dba41dcfc42e06edf0f42e45efd3b54c44ab620f7eefe3d")
-        #expect(bundle.sha256(.warpTile) == bundle.sha256(.warpMajoritySensor))
-        #expect(bundle.manifest.artifact(.fusionHead)?.parent == bundle.sha256(.fusionReference))
-        for head in HeadKind.allCases where head != .artPair { #expect(bundle.url(.head, head: head) != nil, "no \(head.rawValue) head") }
+        #expect(bundle.manifest.artifacts.count == 8)
+        #expect(bundle.manifest.weights.count == 3)
+        #expect(bundle.sha256(.fusionHead) == "b142e661c609070a7838fb015ae47a8b9ccce2ab1d539c3dac29afadc48b8f9e")
+        #expect(bundle.sha256(.combiner) == "cdd0cb2e40fe7127482a0c66c3cb26df814dee26db297985f50ea5fe93d99f52")
+        #expect(bundle.manifest.artifact(.fusionHead)?.parent == nil, "a scratch fit continues no parent")
+        for head in [HeadKind.screenshot, .art, .blur, .human, .semtile, .preview] { #expect(bundle.url(.head, head: head) != nil, "no \(head.rawValue) head") }
         #expect(bundle.url(.head, head: .artPair) == nil, "the art-pair head left the bundle with its adjudicator")
-        #expect(bundle.manifest.history.map(\.slot).suffix(2) == ["calibration", "combiner"], "the two cuts and the combiner without the art-pair, recorded")
+        #expect(bundle.url(.head, head: .cgi) == nil, "the cgi head left the bundle with the render arbiter")
+        #expect(bundle.manifest.history.map(\.slot).suffix(3) == ["bundle", "base", "combiner"], "the warp's removal and the two refits, recorded")
     }
 
     @Test("a file that moved under its manifest is refused")
@@ -39,10 +41,10 @@ struct BundleTests {
         #expect(throws: VeilGardeFailure.self) { try ModelBundle.load(dir) }
     }
 
-    @Test("frozen roles are the warp models, the fusion reference, noiseprint and the backbones")
+    @Test("frozen roles are the weights")
     func frozenRoles() {
         let frozen = Set(ArtifactRole.allCases.filter(\.isFrozen))
-        #expect(frozen == [.warpTile, .warpMajoritySensor, .fusionReference, .noiseprint, .dinov2Small, .dinov2XSmall, .dinov2XXSmall, .clipVision])
+        #expect(frozen == [.dinov2Small, .dinov2XSmall, .dinov2XXSmall, .clipVision])
         #expect(!ArtifactRole.fusionHead.isFrozen && !ArtifactRole.head.isFrozen && !ArtifactRole.combiner.isFrozen)
     }
 }

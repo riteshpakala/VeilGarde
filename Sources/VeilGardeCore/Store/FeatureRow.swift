@@ -9,7 +9,8 @@
 //  PIN:  The <shard>_meta.json row (store_ingest.py) read and written as is, so a shard written
 //        here opens in the Python feature store and the seed store's 138,247 rows open here. Schema v2 adds
 //        optional provenance (source id and URL, licence, native size, dHash, the CLIP route
-//        scores, the warp model that produced the `warp` column); a seed row simply lacks them.
+//        scores); a seed row simply lacks them. A row written before 2026-10-21 may also name the
+//        warp model that measured its old `warp` column (`warp_model`): that key is ignored now.
 //        label: 1 generated, 0 real.
 //
 
@@ -26,9 +27,6 @@ public struct FeatureRow: Codable, Sendable, Equatable {
     public var split: String?
     public var relabel: String?
     public var weak: Bool?
-    /// The first 12 hex of the warp model that computed the `warp` column (the seed rows: absent,
-    /// computed with optimal_6; FusionDataset refuses to mix them unless told to).
-    public var warpModel: String?
     public var sourceID: String?
     public var sourceURL: String?
     public var license: String?
@@ -41,7 +39,7 @@ public struct FeatureRow: Codable, Sendable, Equatable {
 
     public init(id: String, path: String, label: Int, category: String, source: String?, nsfw: Bool = false, golden: Bool = false,
                 genFamily: String? = nil, generator: String? = nil, split: String? = nil, relabel: String? = nil, weak: Bool? = nil,
-                warpModel: String? = nil, sourceID: String? = nil, sourceURL: String? = nil, license: String? = nil,
+                sourceID: String? = nil, sourceURL: String? = nil, license: String? = nil,
                 width: Int? = nil, height: Int? = nil, dhash: String? = nil, route: [Float]? = nil) {
         self.id = id
         self.path = path
@@ -55,7 +53,6 @@ public struct FeatureRow: Codable, Sendable, Equatable {
         self.split = split
         self.relabel = relabel
         self.weak = weak
-        self.warpModel = warpModel
         self.sourceID = sourceID
         self.sourceURL = sourceURL
         self.license = license
@@ -68,7 +65,6 @@ public struct FeatureRow: Codable, Sendable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, path, label, category, source, nsfw, golden, generator, split, relabel, weak, license, width, height, dhash, route
         case genFamily = "gen_family"
-        case warpModel = "warp_model"
         case sourceID = "src_id"
         case sourceURL = "src_url"
     }
@@ -84,22 +80,14 @@ public enum FeatureColumn: String, Codable, Sendable, CaseIterable {
     case dinoFusion = "dino_fusion"
     /// The nine capture values.
     case cap
-    /// The warp lens's weighted score.
-    case warp
-    /// The three sharpness values.
-    case sharp
-    /// Noiseprint's P(camera).
-    case noiseprint
 
     public var width: Int {
         switch self {
         case .dinoNorm, .dinoFusion: return 384
         case .cap: return CaptureFeatures.count
-        case .warp, .noiseprint: return 1
-        case .sharp: return SharpnessFeatures.count
         }
     }
 
-    /// The fusion head's columns, in its order.
-    public static let fusion: [FeatureColumn] = [.warp, .dinoFusion, .cap, .sharp]
+    /// The fusion head's columns, in its order: FusionVector's order.
+    public static let fusion: [FeatureColumn] = [.dinoFusion, .cap]
 }

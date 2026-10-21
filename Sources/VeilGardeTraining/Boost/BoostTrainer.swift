@@ -12,10 +12,7 @@
 //        default base_score is XGBoost 3.2's: the weighted label mean when scale_pos_weight is 1,
 //        one Newton step from margin 0 otherwise (measured against xgboost 3.2.0 on 2026-10-19).
 //        Row subsample and column sample per tree draw from SplitMix64(seed ^ tree index), so they
-//        differ from XGBoost's generator but repeat exactly here. A column mask draws the column
-//        sample from its own columns, ⌊colsample · mask⌋ of them by the same permutation over the
-//        mask's count, and the model keeps the data's width: a masked fit grows, node for node,
-//        the trees a refit on only those columns would grow. Early stopping keeps the first
+//        differ from XGBoost's generator but repeat exactly here. Early stopping keeps the first
 //        best round and truncates the model to it. A warm start never touches the inherited trees:
 //        they keep their JSON text and encode back byte for byte.
 //
@@ -59,9 +56,6 @@ public enum BoostTrainer {
                              warmStart: GBDTModel? = nil, featureNames: [String] = [],
                              progress: (BoostRound) -> Void = { _ in }) -> BoostResult {
         let n = train.count, f = train.features
-        let pool = params.allowedColumns ?? Array(0..<f)
-        precondition(!pool.isEmpty && pool.allSatisfy { (0..<f).contains($0) } && zip(pool, pool.dropFirst()).allSatisfy { $0 < $1 },
-                     "allowedColumns must be distinct ascending columns of the \(f)-column data, not \(pool)")
         let cuts = BinMatrix.cuts(for: train, maxBin: params.maxBin, seed: params.seed)
         let matrix = BinMatrix(train, cuts: cuts)
 
@@ -121,10 +115,10 @@ public enum BoostTrainer {
             } else {
                 rows = (0..<n).map { Int32($0) }
             }
-            var features = pool
+            var features = Array(0..<f)
             if params.colsampleByTree < 1 {
-                let k = max(1, Int(params.colsampleByTree * Double(pool.count)))
-                features = rng.permutation(pool.count).prefix(k).map { pool[$0] }.sorted()
+                let k = max(1, Int(params.colsampleByTree * Double(f)))
+                features = Array(rng.permutation(f).prefix(k)).sorted()
             }
 
             let grower = TreeGrower(matrix: matrix, params: params, features: features)

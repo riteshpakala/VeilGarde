@@ -3,9 +3,9 @@
 //  VeilGardeCoreTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: GBDTModel against the shipped boosters: decoding then encoding writes each file's exact
-//        bytes; predictions match xgboost 3.2's on seeded rows; the fusion head is its frozen
-//        reference plus warm-start trees; a fresh model encodes and decodes to itself.
+//  WHAT: GBDTModel against the shipped fusion head: decoding then encoding writes the file's exact
+//        bytes; the head is a from-scratch fit over the 393 fusion columns; a fresh model encodes and
+//        decodes to itself. (The trainer's parity with xgboost 3.2 is BoostTrainerTests'.)
 //
 
 import Foundation
@@ -14,48 +14,20 @@ import Testing
 
 @Suite("Boost codec and evaluator")
 struct BoostTests {
-    @Test("each shipped booster round-trips to its exact bytes", arguments: ["warp_tile32.xgb.json", "fusion_head.xgb.json", "fusion_ref.xgb.json"])
-    func byteIdentity(name: String) throws {
-        let data = try Data(contentsOf: Fixture.resource(name))
+    @Test("the shipped fusion head round-trips to its exact bytes")
+    func byteIdentity() throws {
+        let data = try Data(contentsOf: Fixture.resource("fusion_head.xgb.json"))
         let model = try GBDTModel.decode(xgboostJSON: data)
         let encoded = model.encodeXGBoostJSON()
-        #expect(encoded == data, "\(name): \(encoded.count) bytes vs \(data.count)")
+        #expect(encoded == data, "\(encoded.count) bytes vs \(data.count)")
     }
 
-    @Test("the warp tile model is 200 trees of depth 8 over 19 features")
-    func warpShape() throws {
-        let model = try GBDTModel.load(Fixture.resource("warp_tile32.xgb.json"))
-        #expect(model.trees.count == 200)
-        #expect(model.featureCount == 19)
-        #expect(model.trees.map(\.depth).max() == 8)
-        #expect(model.baseScore == "[5.11784E-1]")
-    }
-
-    @Test("predictions match xgboost 3.2 on the warp and fusion boosters")
-    func matchesXGBoost() throws {
-        let reference = try Fixture.json("boost_reference.json")
-        for (key, file) in [("warp", "warp_tile32.xgb.json"), ("fusion", "fusion_head.xgb.json")] {
-            let model = try GBDTModel.load(Fixture.resource(file))
-            let block = reference[key] as! [String: Any]
-            let rows = (block["rows"] as! [[NSNumber]]).map { $0.map(\.floatValue) }
-            let expected = floats(block["p"])
-            let got = model.scoreBatch(rows)
-            let worst = zip(got, expected).map { abs($0 - $1) }.max() ?? 0
-            #expect(worst < 2e-6, "\(key): max |Δp| \(worst)")
-        }
-    }
-
-    @Test("the fusion head is the frozen reference plus 40 warm-start trees")
-    func fusionLineage() throws {
+    @Test("the shipped fusion head is 500 trees of depth at most 5 over the 393 fusion columns")
+    func fusionShape() throws {
         let head = try GBDTModel.load(Fixture.resource("fusion_head.xgb.json"))
-        let reference = try GBDTModel.load(Fixture.resource("fusion_ref.xgb.json"))
-        #expect(head.trees.count == 940)
-        #expect(reference.trees.count == 900)
-        #expect(head.featureCount == 397)
-        let shared = zip(head.trees.prefix(900), reference.trees).allSatisfy { a, b in
-            a.leftChildren == b.leftChildren && a.splitIndices == b.splitIndices && a.splitConditions == b.splitConditions && a.baseWeights == b.baseWeights
-        }
-        #expect(shared)
+        #expect(head.trees.count == 500)
+        #expect(head.featureCount == FusionVector.count && FusionVector.count == 393)
+        #expect((head.trees.map(\.depth).max() ?? 0) <= 5)
     }
 
     @Test("a fresh model encodes, decodes and predicts as built")

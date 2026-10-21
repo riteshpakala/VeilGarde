@@ -23,9 +23,9 @@ public struct CandidatesOutcome: Sendable {
 }
 
 public enum WeeklyCandidates {
-    public static func recipe(id: String, allowMixedWarp: Bool = false) -> TrainingRecipe {
+    public static func recipe(id: String) -> TrainingRecipe {
         TrainingRecipe(id: id) {
-            FusionHead().warmStart(add: 80, eta: 0.03).newGeneratorWeight(1.0).allowMixedWarp(allowMixedWarp)
+            FusionHead().warmStart(add: 80, eta: 0.03).newGeneratorWeight(1.0)
             for kind in HeadKind.flywheelCategories { DinoHead(kind).version("weekcand") }
         }
     }

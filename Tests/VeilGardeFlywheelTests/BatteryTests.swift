@@ -4,7 +4,7 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The battery's spec and rules: the shipped spec and floors are the pinned v2 bytes and
-//        decode (the atlas groups retired, v1's floors kept); `{IMAGES}` resolves from the
+//        decode (the atlas groups retired, the floors re-recorded on 2026-10-21); `{IMAGES}` resolves from the
 //        environment, then the work area; a newer pair replaces an older one without losing it; a
 //        group's files resolve as the Python battery's glob, filters and order resolve them; every
 //        mode gates the way run_full gates; the input-set hash equals Python's.
@@ -32,9 +32,11 @@ struct BatteryTests {
         let retired = (raw["retired"] as? [String: Any])?["groups"] as? [String] ?? []
         #expect(retired.count == 12 && retired.allSatisfy { $0.hasPrefix("atlas_") })
         let b = try JSONDecoder().decode([String: BatteryGroupResult].self, from: floors)
+        // The floors re-recorded on 2026-10-21 by `flywheel battery --rebaseline` on the detector without the warp.
         #expect(b["user_real"]?.acc == 1.0 && b["user_real"]?.mode == .hard)
-        #expect(b["wildlife_real"]?.acc == 1.0 && b["wildlife_real"]?.semAcc == 0.9230769230769231, "v1's floor, unchanged")
+        #expect(b["wildlife_real"]?.acc == 24.0 / 26.0 && b["wildlife_real"]?.semAcc == 24.0 / 26.0)
         #expect(b["gen_semantic"]?.acc == 1.0 && b["gen_semantic"]?.semAcc == 1.0)
+        #expect(b["flux_anchor"]?.acc == 0.5 && b["user_gen"]?.acc == 10.0 / 13.0, "the two HARD groups that still fail, as recorded")
         #expect(Set(b.keys).isSubset(of: Set(s.groups.map(\.name))), "no floor for a retired group")
     }
 
@@ -114,7 +116,7 @@ struct BatteryTests {
                                      verdicts: CannedVerdicts(resolved, failures: fail), rebaseline: rebaseline)
     }
 
-    static func v(_ w: String, sem: Double? = nil) -> BatteryVerdict { BatteryVerdict(weighted: w, weightedScore: w == "real" ? 0.2 : 0.8, semanticScore: sem, capturePresent: false) }
+    static func v(_ w: String, sem: Double? = nil) -> BatteryVerdict { BatteryVerdict(prediction: w, p: w == "real" ? 0.2 : 0.8, semanticScore: sem, capturePresent: false) }
 
     @Test("HARD, HARD_SEM, RATCHET, RATCHET_SEM and TAXONOMY gate as run_full gates")
     func modes() throws {
@@ -174,31 +176,32 @@ struct BatteryTests {
     @Test("the input-set hash is Python's json_hash, escapes included")
     func inputSetHash() {
         let rows = [
-            BatteryImageRow(path: "/a/b/2.JPG", inputSHA256: String(repeating: "00", count: 32), group: "user_real", want: "real", weightedPred: "real", weightedP: 0.1, semScore: nil, capPresent: false),
+            BatteryImageRow(path: "/a/b/2.JPG", inputSHA256: String(repeating: "00", count: 32), group: "user_real", want: "real", prediction: "real", p: 0.1, semScore: nil, capPresent: false),
             BatteryImageRow(path: "/data/atlas/anchors/art/real/Été \"quoted\" 👍.jpg", inputSHA256: String(repeating: "ab", count: 32),
-                            group: "atlas_art_real", want: "real", weightedPred: "real", weightedP: 0.1, semScore: nil, capPresent: false),
+                            group: "atlas_art_real", want: "real", prediction: "real", p: 0.1, semScore: nil, capPresent: false),
         ]
         #expect(BatteryRunner.inputSetHash(rows) == "80fdc1ebfcdb179465b8f2ee9eaf993ff62681761b416a64cba7b77b88f1d2b9")   // Python 3: json.dumps(…, sort_keys=True, separators=(",", ":"))
     }
 
-    @Test("a result JSON reads as the route backend reads it")
+    @Test("a schema-v3 result JSON reads as the battery reads it")
     func verdictFromJSON() throws {
-        let json = #"{"verdict":{"weighted":{"prediction":"generated","score":0.7},"majority":{"prediction":"real","score":0.1}},"semantic_tiles":[[0.9,0.2],[0.8,0.7]],"capture":{"present":true}}"#
+        let json = #"{"verdict":{"prediction":"generated","p":0.7,"threshold":0.5,"band":0.04},"semantic_tiles":[[0.9,0.2],[0.8,0.7]],"capture":{"present":true}}"#
         let v = try BatteryVerdict(resultJSON: Data(json.utf8))
-        #expect(v.weighted == "generated" && v.weightedScore == 0.7 && v.semanticScore == 0.75 && v.capturePresent)
-        let none = try BatteryVerdict(resultJSON: Data(#"{"verdict":{"weighted":{"prediction":"real","score":0.2}}}"#.utf8))
+        #expect(v.prediction == "generated" && v.p == 0.7 && v.semanticScore == 0.75 && v.capturePresent)
+        let none = try BatteryVerdict(resultJSON: Data(#"{"verdict":{"prediction":"real","p":0.2}}"#.utf8))
         #expect(none.semanticScore == nil && !none.capturePresent)
+        #expect(throws: VeilGardeFailure.self) { try BatteryVerdict(resultJSON: Data(#"{"verdict":{"weighted":{"prediction":"real"}}}"#.utf8)) }
     }
 }
 
-@Suite("Battery: the base expert it gates")
-struct BatteryBaseExpertTests {
-    @Test("the runtime names the bundle's hashes, and a study's warp base, never by default")
+@Suite("Battery: the detector it gates")
+struct BatteryDetectorTests {
+    @Test("the runtime names the bundle and its hashes")
     func runtime() {
         let detector = DetectorVerdicts(bundle: .shipped)
-        #expect(detector.runtime["base_expert"] == nil && detector.runtime["bundle"] == DetectorBundle.shipped.directory.path)
-        #expect(detector.runtime["weighted_base_model_sha256"] == DetectorBundle.shipped.manifest.artifact(.warpTile)?.sha256)
-        #expect(detector.runtime["manifest_sha256"] != nil && detector.runtime["backend"] == "veilgarde-detector")
-        #expect(DetectorVerdicts(bundle: .shipped, baseExpert: .warp).runtime["base_expert"] == "warp")
+        #expect(detector.runtime["bundle"] == DetectorBundle.shipped.directory.path && detector.runtime["backend"] == "veilgarde-detector")
+        #expect(detector.runtime["fusion_head_sha256"] == DetectorBundle.shipped.manifest.artifact(.fusionHead)?.sha256)
+        #expect(detector.runtime["combiner_sha256"] == DetectorBundle.shipped.manifest.artifact(.combiner)?.sha256)
+        #expect(detector.runtime["manifest_sha256"] != nil && detector.runtime["base_expert"] == nil)
     }
 }

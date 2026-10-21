@@ -4,14 +4,13 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The router, the one entry point of the full detector. It picks the image's domain, runs
-//        that domain's base expert (camera: the warp lens and the fusion head; screenshot: the
-//        content head), then compounds the high-precision priors on it in a fixed order: capture
-//        and the pooled specialists, the frame seam, the semantic chain. The result keeps two
-//        numbers: `majority`, the camera-sensor anchor, and `weighted`, the compounded score.
-//  PIN:  Garde's router, unchanged in order and arithmetic, split one mechanism per file.
-//        Stacking, not blending: a monolithic combiner regressed real false positives 8% → 50–92%
-//        in the research's measurement, the stack holds them at 0%. Routing is never by image size. The
-//        weighted state is frozen before the semantic chain (preSemantic) for replay.
+//        that domain's base expert (camera: the fusion head; screenshot: the content head), then
+//        compounds the high-precision priors on it in a fixed order: capture and the pooled
+//        specialists, the frame seam, the semantic chain. One verdict comes out.
+//  PIN:  The reference router's order and arithmetic, split one mechanism per file. Stacking, not
+//        blending: a monolithic combiner regressed real false positives 8% → 50–92% in the
+//        research's measurement, the stack holds them at 0%. Routing is never by image size. The
+//        state is frozen before the semantic chain (preSemantic) for replay.
 //
 
 import CoreGraphics
@@ -52,19 +51,16 @@ public final class Detector: @unchecked Sendable {
         try FrameSeam.apply(&state, s, capture: cap, hint: hint, detector: self)
         let preSemanticP = state.p
         let preSemanticPrediction = state.verdict
-        let surfaced = SemanticChain.apply(&state, s, base: base, domain: domain, capture: cap)
+        let semanticTiles = SemanticChain.apply(&state, s, capture: cap)
 
         let diagnostics = RouteDiagnostics(
-            route: domain.rawValue, requestedHint: hint?.rawValue,
-            semanticProfile: config.mechanisms.semanticResponsibility.rawValue, resultSurface: config.mechanisms.resultSurface.rawValue,
-            warpP: base.weightedScore, sensorRawP: base.sensorRawProbability, sensorP: base.sensorProbability, sensorPrediction: base.sensorPrediction,
-            preSemanticP: preSemanticP, preSemanticPrediction: preSemanticPrediction, semanticMajority: state.semanticMajority,
-            semanticEvaluated: state.semanticEvaluated, semanticTriggered: state.semanticTriggered, semanticDecisive: state.semanticDecisive,
-            previewEvaluated: state.previewEvaluated, previewTriggered: state.previewTriggered, previewDecisive: state.previewDecisive)
-        let result = PublicSurface.routed(
-            base: base, weightedPrediction: state.verdict, weightedScore: state.p, capture: cap, specialists: state.stack,
-            semanticTiles: surfaced.semanticTiles, majorityPrediction: surfaced.majorityPrediction, majorityScore: surfaced.majorityScore,
-            majoritySource: surfaced.majoritySource, tileMapSource: surfaced.tileMapSource, routeDiagnostics: diagnostics)
+            route: domain.rawValue, requestedHint: hint?.rawValue, semanticProfile: config.semanticResponsibility.rawValue,
+            screenshotGate: s.gate.isScreenshot, baseP: base.p, preSemanticP: preSemanticP, preSemanticPrediction: preSemanticPrediction,
+            semanticMajority: state.semanticMajority, semanticEvaluated: state.semanticEvaluated, semanticTriggered: state.semanticTriggered,
+            semanticDecisive: state.semanticDecisive, previewEvaluated: state.previewEvaluated, previewTriggered: state.previewTriggered,
+            previewDecisive: state.previewDecisive)
+        let result = PublicSurface.routed(base: base, prediction: state.verdict, p: state.p, capture: cap, specialists: state.stack,
+                                          semanticTiles: semanticTiles, routeDiagnostics: diagnostics, bundle: config.bundle.hashes)
         return (result, domain)
     }
 }

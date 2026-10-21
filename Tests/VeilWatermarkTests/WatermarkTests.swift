@@ -105,11 +105,42 @@ struct WatermarkTests {
     }
 }
 
+@Suite("The acceptance's sample")
+struct AcceptanceSampleTests {
+    func dataset(_ csv: String) throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vg-fm-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try csv.write(to: dir.appendingPathComponent("manifest.csv"), atomically: true, encoding: .utf8)
+        return dir
+    }
+
+    @Test("final_mixed's CSV reads in file order, quotes and all")
+    func finalMixed() throws {
+        let dir = try dataset("dest_name,class,source_pool,tag,scored_verdict,src_path\r\niphone_real_00000.jpeg,real,iphone,iphone,real,\"/a,b/IMG.jpeg\"\r\nagvr_ai_00001.png,generated,agvr_gen,fill,generated,/x.png\r\n")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let items = try AcceptanceSample.dataset(dir)
+        #expect(items.map(\.url.lastPathComponent) == ["iphone_real_00000.jpeg", "agvr_ai_00001.png"])
+        #expect(items.map { $0.url.deletingLastPathComponent().lastPathComponent } == ["real", "generated"])
+        #expect(items.map(\.label) == [0, 1])
+    }
+
+    @Test("the sample is seeded, at most n of each label, in the dataset's order")
+    func sample() {
+        let items = (0..<200).map { AcceptanceSample.Item(url: URL(fileURLWithPath: "/d/\($0).jpg"), label: $0 % 3 == 0 ? 1 : 0) }
+        let a = AcceptanceSample.sample(items, perLabel: 10, seed: 0)
+        #expect(a.count == 20 && a.filter { $0.label == 1 }.count == 10)
+        #expect(a == AcceptanceSample.sample(items, perLabel: 10, seed: 0))
+        #expect(a != AcceptanceSample.sample(items, perLabel: 10, seed: 1))
+        let order = a.map { Int($0.url.deletingPathExtension().lastPathComponent)! }
+        #expect(order == order.sorted(), "kept rows stay in the dataset's order")
+    }
+}
+
 extension WatermarkMLXSuites {
     @Suite("Watermark on the GPU", .serialized)
     struct OnGPU {
         static let image = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("VeilGardeInferenceTests/Fixtures/garde/crop_ben.png")
+            .appendingPathComponent("VeilGardeInferenceTests/Fixtures/crops/crop_ben.png")
 
         @Test("signing is deterministic, an image matches itself, a tile-aligned crop matches at its offset")
         func signAndMatch() throws {

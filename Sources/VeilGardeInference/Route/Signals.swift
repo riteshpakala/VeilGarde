@@ -5,9 +5,10 @@
 //
 //  WHAT: What every part of one detection shares, computed once: the image, the config, the
 //        flat-UI screenshot gate (cheap, eager: the domain detector reads it), and, lazily, the
-//        native capture signature and the normalized DINOv2 embedding the heads read.
-//  PIN:  Garde's signals. The normalized embedding here is always the 360×640 force-resize at
-//        the config's DINOv2 variant.
+//        native capture signature and the two DINOv2 embeddings: the fusion head's plain one and
+//        the normalized one the heads read.
+//  PIN:  The reference's signals. The normalized embedding is always the 360×640 force-resize, the
+//        fusion embedding the plain 256/224 preprocessing, both at the config's DINOv2 variant.
 //
 
 import CoreGraphics
@@ -21,6 +22,7 @@ public final class DetectionSignals: @unchecked Sendable {
     public let height: Int
     private var cachedCapture: CaptureSignature?
     private var cachedDinoNorm: [Float]?
+    private var cachedDinoFusion: [Float]?
 
     public init(cgImage: CGImage, config: InferenceConfig) {
         self.cgImage = cgImage
@@ -43,6 +45,14 @@ public final class DetectionSignals: @unchecked Sendable {
         if let e = cachedDinoNorm { return e }
         let e = try SemanticLens.normalizedEmbedding(cgImage, variant: config.dinoVariant)
         cachedDinoNorm = e
+        return e
+    }
+
+    /// The plain DINOv2 embedding the fusion head reads.
+    public func dinoFusion() throws -> [Float] {
+        if let e = cachedDinoFusion { return e }
+        let e = try SemanticLens.fusionEmbedding(cgImage, variant: config.dinoVariant)
+        cachedDinoFusion = e
         return e
     }
 }

@@ -5,11 +5,11 @@
 //
 //  WHAT: Labeled images to one new shard of the features-only store: each image's bytes hashed
 //        (the row id, as the store names rows), decoded, measured by FeatureExtractor, and
-//        dropped. Nothing but the six columns and the row's metadata is written.
+//        dropped. Nothing but the three columns and the row's metadata is written.
 //  PIN:  The id is the SHA-1 of the file's bytes; an id the store already holds is skipped (the
 //        store is append-only and an image is measured once). An image that fails to decode is
-//        reported, never fatal. The shard is written once, at the end, under a new name. A row
-//        names the warp model only when its warp column was measured.
+//        reported, never fatal. The shard is written once, at the end, under a new name, with the
+//        extractor's provenance (the DINOv2 variant and its weights' hash) as its metadata.
 //
 
 import CoreGraphics
@@ -78,9 +78,7 @@ public enum ShardExtractor {
                 let cg = try ImageDecoding.cgImage(data: data, name: url.lastPathComponent)
                 let f = try extractor.extract(cg)
                 rows.append(FeatureRow(id: id, path: url.path, label: item.label, category: item.category, source: item.source,
-                                       golden: item.golden ?? false, genFamily: item.genFamily,
-                                       warpModel: extractor.columns.contains(.warp) ? extractor.warpModelTag : nil,
-                                       width: f.width, height: f.height))
+                                       golden: item.golden ?? false, genFamily: item.genFamily, width: f.width, height: f.height))
                 for column in FeatureColumn.allCases { columns[column]! += f.values(column) }
                 known.insert(id)
             } catch {
@@ -93,8 +91,7 @@ public enum ShardExtractor {
         report.rows = rows.count
         if !rows.isEmpty {
             try FileManager.default.createDirectory(at: store.directory, withIntermediateDirectories: true)
-            try FeatureShard(name: name, rows: rows, columns: columns,
-                             metadata: ["warp_model_sha256_prefix": extractor.warpModelTag, "dino_variant": extractor.variant.rawValue]).write(to: store.directory)
+            try FeatureShard(name: name, rows: rows, columns: columns, metadata: extractor.provenance).write(to: store.directory)
         }
         report.seconds = Date().timeIntervalSince(started)
         return report

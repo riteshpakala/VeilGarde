@@ -80,10 +80,10 @@ func encodePNG(_ image: CGImage) -> Data {
 
 /// Constant features: the acquirer's bookkeeping without DINOv2.
 final class StubMeasure: FeatureMeasuring {
-    let warpModelTag = "516119c92d36"
+    let provenance = ["dino_variant": "small"]
     func extract(_ cg: CGImage) throws -> ExtractedFeatures {
         ExtractedFeatures(dinoNorm: [Float](repeating: 0.1, count: 384), dinoFusion: [Float](repeating: 0.2, count: 384), cap: [Float](repeating: 0, count: 9),
-                          warp: 0.5, sharp: [1, 2, 3], noiseprint: 0.4, width: cg.width, height: cg.height)
+                          width: cg.width, height: cg.height)
     }
 }
 
@@ -219,7 +219,7 @@ struct AcquireTests {
         #expect(report.jobs[1].skipped?.contains("by hand") == true)
         let shard = try FeatureShard.read("acquire_test", in: f.area.store)
         #expect(shard.rows.allSatisfy { $0.label == 1 && $0.category == "art" && $0.path.hasPrefix("/acquired/fake/") && $0.license == "cc0" && $0.dhash?.count == 16 })
-        #expect(shard.rows.first?.warpModel == "516119c92d36" && shard.columns[.dinoNorm]?.count == 6 * 384)
+        #expect(shard.metadata["dino_variant"] == "small" && shard.metadata["acquired"] != nil && shard.columns[.dinoNorm]?.count == 6 * 384)
         // No image anywhere in the work area.
         let walker = FileManager.default.enumerator(at: f.area.root, includingPropertiesForKeys: nil)!
         let images = walker.compactMap { $0 as? URL }.filter { ["png", "jpg", "jpeg", "webp"].contains($0.pathExtension.lowercased()) }
@@ -244,9 +244,6 @@ struct AcquireTests {
                 columns[.dinoNorm]! += (0..<384).map { _ in gauss() }
                 columns[.dinoFusion]! += (0..<384).map { _ in gauss() }
                 columns[.cap]! += [10, 1, 0, 2000, 5, 0.5, 0.5, 0.5, 0]
-                columns[.warp]!.append(0.5)
-                columns[.sharp]! += [10, 10, 1]
-                columns[.noiseprint]!.append(.nan)
             }
         }
         let dir = f.root.appendingPathComponent("gapstore", isDirectory: true)

@@ -1,31 +1,30 @@
 // swift-tools-version: 6.4
 // SPDX-License-Identifier: GPL-3.0-only
-// VeilGarde — the AI-generated-image detector, as one package anyone can train and run: the
-// homography perspective-warp residual lens (the camera-sensor thesis), the models trained on it,
-// the detector that composes them, the flywheel that grows the specialist heads, and a
-// crop-robust watermark read off the same residual.
+// VeilGarde — an AI-generated-image detector and a crop-robust watermark, as one package anyone
+// can train and run: a fusion head over DINOv2 and the capture signature with a specialist stack
+// on it, the trainers and the flywheel that grow them, and a watermark read off a perspective-warp
+// residual.
 //
 // Four products: VeilGarde (everything), VeilGardeInference (the detector alone), VeilWatermark
 // (the signature alone) and the `veilgarde` executable. Eight targets, in layers:
 //   VeilGardeCore       the domain, Foundation + Crypto only, Swift 6 strict: Support/ (JSON,
 //                       hashing, failures, the work area, safetensors, seeded splits), Features/
-//                       (the 19 warp features, capture 9, sharpness 3, the fusion vector), Grid/
-//                       (tile grids, scoring geometry, the weight map, the verdict law), Boost/
-//                       (GBDTModel: the XGBoost JSON codec and evaluator), Heads/ (linear heads,
-//                       the stack combiner, the sensor calibration), Bundle/ (artifacts, the
-//                       manifest, SHA-256 binding), Result/ (InferenceResult, the schema-v2 JSON,
-//                       trust, surfaces, route batches), Store/ (the features-only store)
-//   VeilGardeLens       the extractors, in the order a pixel travels: Image/, Warp/, Features/,
-//                       Capture/, Semantic/ (DINOv2, CLIP vision), Noiseprint/, Scoring/
+//                       (capture 9, the screenshot gate, the fusion vector), Boost/ (GBDTModel:
+//                       the XGBoost JSON codec and evaluator), Heads/ (linear heads, the stack
+//                       combiner), Bundle/ (artifacts, the manifest, SHA-256 binding), Result/
+//                       (InferenceResult, the schema-v3 JSON, the verdict law, route batches),
+//                       Store/ (the features-only store)
+//   VeilGardeLens       the extractors, in the order a pixel travels: Image/, Warp/, Capture/,
+//                       Semantic/ (DINOv2, CLIP vision), Scoring/
 //                                                          (MLX through Frigate, Swift 5 mode)
-//   VeilGardeInference  the detector, in the order a verdict is built: Config/, Warp/, Fusion/,
+//   VeilGardeInference  the detector, in the order a verdict is built: Config/, Fusion/,
 //                       Specialists/, Route/ (signals, domain heads, mechanisms, the Detector),
 //                       Bundle/ (the shipped artifacts)               (Swift 5 mode, resources)
-//   VeilGardeTraining   the trainers: Data/, Extract/, Boost/ (a native GBDT), Linear/, Warp/,
-//                       Calibration/, Fusion/, Heads/, Combiner/, Noiseprint/, Backbone/
-//                       (DINOv2 and CLIP imports), Recipe/, Engine/, Artifacts/  (Swift 5 mode)
-//   VeilGardeFlywheel   the specialist-head regime: Area/, Store/, Acquire/, Ingest/,
-//                       Candidates/, Battery/, Promote/                          (Swift 5 mode)
+//   VeilGardeTraining   the trainers: Data/, Extract/, Boost/ (a native GBDT), Linear/, Fusion/,
+//                       Heads/, Combiner/, Backbone/ (DINOv2 and CLIP imports), Recipe/, Engine/,
+//                       Artifacts/                                               (Swift 5 mode)
+//   VeilGardeFlywheel   the regime that grows the fusion head and the specialist stack: Area/,
+//                       Store/, Acquire/, Ingest/, Candidates/, Battery/, Promote/ (Swift 5 mode)
 //   VeilWatermark       the crop-robust signature on the warp residual: Signature/, Sections/,
 //                       Match/, Acceptance/                                      (Swift 5 mode)
 //   VeilGarde           the umbrella, and the doctor that checks every layer     (Swift 5 mode)
@@ -61,14 +60,12 @@ let frigate: String = {
     return "../Frigate"
 }()
 
-/// Weights stay out of git but for the noiseprint's (130 KB), which ships in the Inference resources. Copied there,
-/// the DINOv2 files ship inside the bundle too, as Garde's did; otherwise WeightLocator finds them in the work area
-/// or an override folder.
+/// Weights stay out of git. Copied into the Inference resources, the DINOv2 files ship inside the bundle;
+/// otherwise WeightLocator finds them in the work area or an override folder.
 let optionalWeights: [Resource] = [
     "Resources/dinov2_small.safetensors",
     "Resources/dinov2_small_xsmall.safetensors",
     "Resources/dinov2_small_xxsmall.safetensors",
-    "Resources/noiseprint_v1.safetensors",
 ].filter {
     FileManager.default.fileExists(atPath: Context.packageDirectory + "/Sources/VeilGardeInference/" + $0)
 }.map { .copy($0) }
@@ -100,7 +97,7 @@ let package = Package(
                 .product(name: "MLXNN", package: "Frigate"),
                 .product(name: "MLXFFT", package: "Frigate"),
                 .product(name: "MLXAccelerate", package: "Frigate"),
-                // FrigateBoost's XGBoostTreeModel, the evaluator Garde scores tiles with.
+                // FrigateBoost's XGBoostTreeModel, the evaluator the fusion head is scored with.
                 .product(name: "Frigate", package: "Frigate"),
             ],
             swiftSettings: v5
@@ -108,25 +105,18 @@ let package = Package(
         .target(
             name: "VeilGardeInference",
             dependencies: ["VeilGardeLens"],
-            // The shipped bundle: the shipped artifacts, by name (the result JSON reports
-            // the warp models' hashes; the calibration is bound to the sensor model's bytes), bound
-            // by manifest.json. Weights are gitignored but for the noiseprint's, and resolved at run
-            // time (WeightLocator); copied into this folder they ship inside the bundle.
+            // The shipped bundle: the shipped artifacts, by name, bound by manifest.json. Weights are
+            // gitignored and resolved at run time (WeightLocator); copied into this folder they ship
+            // inside the bundle.
             resources: [
                 .copy("Resources/manifest.json"),
-                .copy("Resources/warp_tile32.xgb.json"),
-                .copy("Resources/warp_majority_tile32.xgb.json"),
-                .copy("Resources/warp_sensor_calibration.json"),
                 .copy("Resources/fusion_head.xgb.json"),
-                .copy("Resources/fusion_ref.xgb.json"),
-                .copy("Resources/stack_combiner_v2.json"),
-                .copy("Resources/xdomain_centroids_v0.json"),
+                .copy("Resources/stack_combiner_v3.json"),
                 .copy("Resources/screenshot_dinov2_v1.10.json"),
                 .copy("Resources/art_dinov2_v2.json"),
                 .copy("Resources/blur_dinov2_v1.json"),
                 .copy("Resources/human_dinov2_v4.json"),
                 .copy("Resources/semtile_dinov2_v1.json"),
-                .copy("Resources/cgi_dinov2_v1.json"),
                 .copy("Resources/preview_dinov2_v1.json"),
             ] + optionalWeights,
             swiftSettings: v5
@@ -137,7 +127,6 @@ let package = Package(
                 "VeilGardeLens",
                 .product(name: "MLX", package: "Frigate"),
                 .product(name: "MLXNN", package: "Frigate"),
-                .product(name: "MLXOptimizers", package: "Frigate"),
                 .product(name: "FrigateHub", package: "Frigate"),
             ],
             swiftSettings: v5
@@ -179,7 +168,7 @@ let package = Package(
         .testTarget(name: "VeilGardeInferenceTests", dependencies: ["VeilGardeInference"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeTrainingTests", dependencies: ["VeilGardeTraining"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeFlywheelTests", dependencies: ["VeilGardeFlywheel"], swiftSettings: v5),
-        .testTarget(name: "VeilWatermarkTests", dependencies: ["VeilWatermark"], swiftSettings: v5),
+        .testTarget(name: "VeilWatermarkTests", dependencies: ["VeilWatermark"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeCLITests", dependencies: ["VeilGardeCLI"], swiftSettings: v5),
     ]
 )

@@ -3,12 +3,11 @@
 //  VeilGardeInferenceTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The full detector against Garde's headless `--route-json` goldens (2026-10-19):
-//        every label, source, route and structural field equal, every number within 1e-4, but for
-//        the sensor fields the two cuts changed on purpose (ResultJSON.changedSinceGarde), whose call
-//        is still Garde's. Under Garde's own Metal library the bytes were identical (37 of 37 on
-//        2026-10-19); under Frigate's current one DINOv2's GEMM kernels move its outputs by about
-//        1e-5. Also DINOv2 against the HF reference embeddings, and the router's domain choice.
+//  WHAT: The full detector against VeilGarde's own route goldens (`veilgarde route --json` on the
+//        two parity crops with the shipped bundle of 2026-10-21): every label, route and structural
+//        field equal, every number within 1e-4 (DINOv2's matrix kernels move with Frigate's MLX
+//        revision by about 1e-5). The schema-v3 keys; the screenshot hint; the semantic chain
+//        removed; DINOv2 against the HF reference embeddings.
 //
 
 import Foundation
@@ -22,10 +21,10 @@ func leaves(_ value: Any, _ path: String = "") -> [(String, Any)] {
     return [(path, value)]
 }
 
-/// Labels exact, numbers within `tolerance`, the fields changed since Garde aside; returns the worst numeric
-/// difference and any mismatches.
+/// Labels exact, numbers within `tolerance`, times_sec aside; returns the worst numeric difference and
+/// any mismatches.
 func compare(_ a: Data, _ b: Data, tolerance: Double) throws -> (worst: Double, mismatches: [String]) {
-    let kept: ((String, Any)) -> Bool = { !$0.0.hasPrefix("times_sec") && !ResultJSON.changedSinceGarde($0.0) }
+    let kept: ((String, Any)) -> Bool = { !$0.0.hasPrefix("times_sec") }
     let x = Dictionary(uniqueKeysWithValues: leaves(try JSONSerialization.jsonObject(with: a)).filter(kept))
     let y = Dictionary(uniqueKeysWithValues: leaves(try JSONSerialization.jsonObject(with: b)).filter(kept))
     var worst = 0.0
@@ -43,36 +42,45 @@ func compare(_ a: Data, _ b: Data, tolerance: Double) throws -> (worst: Double, 
 }
 
 extension InferenceMLXSuites {
-    @Suite("Full detector goldens from Garde", .serialized, .enabled(if: Fixture.weightsPresent))
+    @Suite("Full detector goldens", .serialized, .enabled(if: Fixture.weightsPresent))
     struct RouteGoldenTests {
-        @Test("the routed result matches Garde's: labels exact, numbers within 1e-4", arguments: ["crop_ben", "crop_fox"])
+        @Test("the routed result matches the golden: labels exact, numbers within 1e-4", arguments: ["crop_ben", "crop_fox"])
         func routeJSON(name: String) throws {
-            let cg = try ImageDecoding.cgImage(contentsOf: Fixture.garde("\(name).png"))
+            let cg = try ImageDecoding.cgImage(contentsOf: Fixture.crop("\(name).png"))
             let routed = try Detector.shared.detect(cgImage: cg, config: InferenceConfig())
             #expect(routed.domain == .camera)
             let ours = try ResultJSON.encode(routed.result, times: [], device: "route", route: routed.domain.rawValue)
-            let (worst, mismatches) = try compare(ours, Data(contentsOf: Fixture.garde("\(name).route.json")), tolerance: 1e-4)
+            let (worst, mismatches) = try compare(ours, Data(contentsOf: Fixture.crop("\(name).route.json")), tolerance: 1e-4)
             #expect(mismatches.isEmpty, "\(mismatches.prefix(5))")
             #expect(worst < 1e-4, "max |Δ| \(worst)")
-            #expect(routed.result.specialists?.map(\.name) == ["fusion", "art", "blur", "human", "sensor", "capture", "semantic-tiles"])
-            // The sensor score is the tile vote itself now; its call is Garde's (compared above).
-            #expect(routed.result.sensorProbability == routed.result.sensorRawProbability && routed.result.sensorCalibration?.transform == .cuts)
+            #expect(routed.result.specialists?.map(\.name) == ["fusion", "art", "blur", "human", "capture", "semantic-tiles"])
         }
 
-        @Test("a screenshot hint routes to the content head, which has no warp grid")
+        @Test("the result JSON is schema v3")
+        func schemaV3() throws {
+            let cg = try ImageDecoding.cgImage(contentsOf: Fixture.crop("crop_fox.png"))
+            let routed = try Detector.shared.detect(cgImage: cg, config: InferenceConfig())
+            let json = try #require(JSONSerialization.jsonObject(with: ResultJSON.encode(routed.result, times: [], device: "route", route: "camera")) as? [String: Any])
+            #expect(Set(json.keys) == ["bundle", "capture", "device", "image", "route", "route_diagnostics", "schema_version", "scorer", "semantic_tiles",
+                                       "specialists", "times_sec", "verdict"])
+            #expect(json["schema_version"] as? Int == 3 && json["scorer"] as? String == "fusion")
+            #expect(routed.result.imageWidth == cg.width && routed.result.imageHeight == cg.height)
+        }
+
+        @Test("a screenshot hint routes to the content head")
         func screenshotHint() throws {
-            let cg = try ImageDecoding.cgImage(contentsOf: Fixture.garde("crop_ben.png"))
+            let cg = try ImageDecoding.cgImage(contentsOf: Fixture.crop("crop_ben.png"))
             let routed = try Detector.shared.detect(cgImage: cg, config: InferenceConfig(), hint: .screenshot)
             #expect(routed.domain == .screenshot)
-            #expect(routed.result.scorer == "screenshot" && routed.result.majoritySource == .screenshotContent && routed.result.tileMapSource == .none)
-            #expect(routed.result.routeDiagnostics?.requestedHint == "screenshot")
+            #expect(routed.result.scorer == "screenshot")
+            #expect(routed.result.routeDiagnostics?.requestedHint == "screenshot" && routed.result.routeDiagnostics?.route == "screenshot")
         }
 
         @Test("removing the semantic chain runs no semantic probe")
         func semanticRemoved() throws {
-            let cg = try ImageDecoding.cgImage(contentsOf: Fixture.garde("crop_fox.png"))
+            let cg = try ImageDecoding.cgImage(contentsOf: Fixture.crop("crop_fox.png"))
             var config = InferenceConfig()
-            config.mechanisms.semanticResponsibility = .semanticRemoved
+            config.semanticResponsibility = .semanticRemoved
             let r = try Detector.shared.detect(cgImage: cg, config: config).result
             #expect(r.semanticTiles == nil && r.routeDiagnostics?.semanticEvaluated == false)
             #expect(!(r.specialists ?? []).contains { $0.name == "semantic-tiles" })

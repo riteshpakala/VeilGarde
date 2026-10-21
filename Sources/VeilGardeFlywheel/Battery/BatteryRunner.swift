@@ -6,7 +6,7 @@
 //  WHAT: The battery: every resolved image through a verdict source, per-group accuracy, each
 //        group judged by its mode against the recorded floors, one PASS or FAIL for the whole.
 //  PIN:  The Python battery runner's run_full, verbatim in its rules. Per image: the input hashed before and
-//        after (bytes that change mid-run are an error); weighted correct when the prediction is
+//        after (bytes that change mid-run are an error); correct when the prediction is
 //        the group's want; semantic correct when (majority > 0.5) == (want is generated), counted
 //        only where tiles exist. Per group: acc = ok / max(n, 1), sem_acc = semok / semn or nil.
 //        HARD needs acc 1.0; HARD_SEM also sem_acc 1.0 (a missing one fails); RATCHET needs
@@ -63,16 +63,16 @@ public struct BatteryImageRow: Codable, Sendable, Equatable {
     public var inputSHA256: String
     public var group: String
     public var want: String
-    public var weightedPred: String
-    public var weightedP: Double
+    public var prediction: String
+    public var p: Double
     public var semScore: Double?
     public var capPresent: Bool
 
     enum CodingKeys: String, CodingKey {
         case path, group, want
         case inputSHA256 = "input_sha256"
-        case weightedPred = "weighted_pred"
-        case weightedP = "weighted_p"
+        case prediction
+        case p
         case semScore = "sem_score"
         case capPresent = "cap_present"
     }
@@ -83,8 +83,8 @@ public struct BatteryImageRow: Codable, Sendable, Equatable {
         try c.encode(inputSHA256, forKey: .inputSHA256)
         try c.encode(group, forKey: .group)
         try c.encode(want, forKey: .want)
-        try c.encode(weightedPred, forKey: .weightedPred)
-        try c.encode(weightedP, forKey: .weightedP)
+        try c.encode(prediction, forKey: .prediction)
+        try c.encode(p, forKey: .p)
         if let semScore { try c.encode(semScore, forKey: .semScore) } else { try c.encodeNil(forKey: .semScore) }
         try c.encode(capPresent, forKey: .capPresent)
     }
@@ -132,7 +132,7 @@ public struct BatteryReport: Codable, Sendable {
             let fill = String(repeating: " ", count: n - s.count)
             return right ? fill + s : s + fill
         }
-        var lines = ["\(pad("group", 24)) \(pad("mode", 10)) \(pad("n", 3, right: true)) \(pad("weighted", 9, right: true)) \(pad("floor", 7, right: true)) \(pad("semantic", 9, right: true))  status"]
+        var lines = ["\(pad("group", 24)) \(pad("mode", 10)) \(pad("n", 3, right: true)) \(pad("acc", 9, right: true)) \(pad("floor", 7, right: true)) \(pad("semantic", 9, right: true))  status"]
         for s in statuses {
             guard let r = groups[s.group] else { continue }
             let floor = s.floor.map { String(format: "%.2f", $0) } ?? ""
@@ -166,13 +166,13 @@ public enum BatteryRunner {
                     let r = try verdicts.verdict(for: url)
                     guard try ContentHash.sha256Hex(fileAt: url) == before else { throw VeilGardeFailure.data("input bytes changed while inference was running: \(path)") }
                     n += 1
-                    if r.weighted == g.want { ok += 1 }
+                    if r.prediction == g.want { ok += 1 }
                     if let sem = r.semanticScore {
                         semN += 1
                         if (sem > 0.5) == (g.want == "generated") { semOK += 1 }
                     }
-                    images.append(BatteryImageRow(path: path, inputSHA256: before, group: g.name, want: g.want, weightedPred: r.weighted,
-                                                  weightedP: r.weightedScore, semScore: r.semanticScore, capPresent: r.capturePresent))
+                    images.append(BatteryImageRow(path: path, inputSHA256: before, group: g.name, want: g.want, prediction: r.prediction,
+                                                  p: r.p, semScore: r.semanticScore, capPresent: r.capturePresent))
                 } catch {
                     note("  ! \(url.lastPathComponent): \(error)")
                     errors.append(.init(path: path, group: g.name, error: "\(error)"))

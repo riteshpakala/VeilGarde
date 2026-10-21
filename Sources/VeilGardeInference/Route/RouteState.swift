@@ -3,7 +3,7 @@
 //  VeilGardeInference
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The router's working state as the mechanisms revise it in order: the weighted P(AI) and
+//  WHAT: The router's working state as the mechanisms revise it in order: the P(AI) and
 //        its label, the specialist rows recorded so far, and the trace flags that observe (never
 //        steer) what the semantic and preview probes did.
 //
@@ -21,8 +21,8 @@ struct RouteState {
     var previewDecisive = false
 
     init(base: InferenceResult) {
-        p = base.weightedScore
-        verdict = base.weightedPrediction
-        stack = [SpecialistContribution(name: base.scorer, pAI: base.weightedScore, verdict: base.weightedPrediction, weight: 1.0)]
+        p = base.p
+        verdict = base.prediction
+        stack = [SpecialistContribution(name: base.scorer, pAI: base.p, verdict: base.prediction, weight: 1.0)]
     }
 }

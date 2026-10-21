@@ -3,9 +3,9 @@
 //  VeilGardeCore
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The domains the router knows, each with its own base expert: camera (the warp lens and
-//        the fusion head, the patent core) and screenshot (a DINOv2 content head, because the warp
-//        lens false-fires on recompressed reels).
+//  WHAT: The domains the router knows, each with its own base expert: camera (the fusion head
+//        over DINOv2 and the capture signature) and screenshot (a DINOv2 content head, because a
+//        camera-anchored base false-fires on recompressed reels).
 //  PIN:  Raw values are the result JSON's `route` and the batch manifest's `hint`.
 //
 

@@ -3,8 +3,8 @@
 //  VeilGardeInferenceTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: Paths the Inference tests read by repo path: Garde's goldens (the parity crops and the JSON
-//        Garde's headless app wrote for them on 2026-10-19), and whether the neural weights are present.
+//  WHAT: Paths the Inference tests read by repo path: the two parity crops and VeilGarde's own route
+//        goldens for them, and whether the DINOv2 weights are present.
 //
 
 import Foundation
@@ -17,7 +17,7 @@ enum Fixture {
         return url.deletingLastPathComponent()
     }()
 
-    static func garde(_ name: String) -> URL { repoRoot.appendingPathComponent("Tests/VeilGardeInferenceTests/Fixtures/garde/\(name)") }
+    static func crop(_ name: String) -> URL { repoRoot.appendingPathComponent("Tests/VeilGardeInferenceTests/Fixtures/crops/\(name)") }
 
     /// The parity fixtures too large for the repo (dino_parity.safetensors is 1.8 MB), in the work
     /// area's parity/; VEILGARDE_PARITY_DIR names another folder.
@@ -26,6 +26,6 @@ enum Fixture {
 
     static var weightsPresent: Bool {
         ShippedBundle.registerWeightFolders()
-        return WeightLocator.shared.url(.dinov2Small) != nil && WeightLocator.shared.url(.noiseprint) != nil
+        return WeightLocator.shared.url(.dinov2Small) != nil
     }
 }

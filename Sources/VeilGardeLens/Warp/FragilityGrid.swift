@@ -43,10 +43,11 @@ public struct NativePlane {
     public let height: Int
 
     public init(_ cg: CGImage) throws {
-        let p = try ImageLoading.prepare(cg, maxDim: 0, patchSize: 1)
-        array = MLXArray(p.pixels, [p.realHeight, p.realWidth, 3])
-        width = p.realWidth
-        height = p.realHeight
+        guard cg.width > 0, cg.height > 0 else { throw VeilGardeFailure.data("the image is empty") }
+        let pixels = try ImageLoading.rgbPixels(cg, width: cg.width, height: cg.height)
+        array = MLXArray(pixels, [cg.height, cg.width, 3])
+        width = cg.width
+        height = cg.height
     }
 
     /// The fragility rate of every full tile from (originX, originY).

@@ -9,16 +9,13 @@
 //  PIN:  Every write goes through `put`, which writes the file, hashes it, replaces that slot's
 //        entry in manifest.json (recording where it came from and, for a warm start, its
 //        parent's hash) and drops an inherited file nothing references any more. Weights stay
-//        outside the bundle and keep the parent's expected hashes, except one the candidate
-//        retrained (the noiseprint): `putWeight` writes it inside and re-pins that weight entry,
-//        and the detector reads it with --weights-dir <candidate>/noiseprint. A candidate is
-//        created once; a second run under the same id is refused unless asked to replace it.
+//        outside the bundle and keep the parent's expected hashes. A candidate is created once;
+//        a second run under the same id is refused unless asked to replace it.
 //
 //            candidates/<id>/
 //              manifest.json  recipe.json  runs.jsonl  *.json (inherited)
-//              warp/ calibration/ fusion/ combiner/        the model and its metrics.json
+//              fusion/ combiner/                           the model and its metrics.json
 //              heads/<kind>/{head.json, recipe.json, metrics.json}
-//              noiseprint/{noiseprint_v1.safetensors, recipe.json, metrics.json}
 //
 
 import Foundation
@@ -77,36 +74,6 @@ public struct CandidateBundle: Sendable {
         if let previous, previous.file != file, !manifest.artifacts.contains(where: { $0.file == previous.file }) {
             try? FileManager.default.removeItem(at: root.appendingPathComponent(previous.file))
         }
-        try save()
-        return artifact
-    }
-
-    /// Writes a weight the candidate retrained as `file` and makes it the expected weight for `role`.
-    @discardableResult
-    public mutating func putWeight(_ data: Data, as file: String, role: ArtifactRole) throws -> Artifact {
-        let url = root.appendingPathComponent(file)
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
-        let previous = manifest.weights.first { $0.role == role }
-        let weight = Artifact(role: role, file: file, sha256: ContentHash.sha256Hex(data), bytes: data.count, source: source, parent: previous?.sha256)
-        manifest.weights.removeAll { $0.role == role }
-        manifest.weights.append(weight)
-        manifest.weights.sort { ($0.slot, $0.file) < ($1.slot, $1.file) }
-        try save()
-        return weight
-    }
-
-    /// Writes an edited copy of an inherited artifact, a measurement variant: `put`, then the
-    /// artifact's source and its parent's hash, and the history events that say what was done.
-    @discardableResult
-    public mutating func derive(_ data: Data, as file: String, role: ArtifactRole, head: HeadKind? = nil, source: String, parentSHA256: String?,
-                                events: [BundleEvent]) throws -> Artifact {
-        var artifact = try put(data, as: file, role: role, head: head, parent: parentSHA256)
-        if let i = manifest.artifacts.firstIndex(where: { $0.role == role && $0.head == head }) {
-            manifest.artifacts[i].source = source
-            artifact = manifest.artifacts[i]
-        }
-        manifest.history += events
         try save()
         return artifact
     }

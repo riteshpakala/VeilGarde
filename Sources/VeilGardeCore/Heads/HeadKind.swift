@@ -22,8 +22,9 @@ public enum HeadKind: String, Codable, Sendable, CaseIterable {
     /// The heads the stack combiner pools, in w_gen's order.
     public static let combinerOrder: [HeadKind] = [.art, .blur, .human]
 
-    /// The heads the flywheel retrains every cycle (the weekly regime: art, blur, human, cgi).
-    public static let flywheelCategories: [HeadKind] = [.art, .blur, .human, .cgi]
+    /// The heads the flywheel retrains every cycle: the three the combiner pools. The cgi head left
+    /// the shipped bundle on 2026-10-21 with the render arbiter, its only reader.
+    public static let flywheelCategories: [HeadKind] = [.art, .blur, .human]
 
     /// The name a head row carries in `specialists[]`.
     public var specialistName: String { self == .artPair ? "art-pair" : rawValue }

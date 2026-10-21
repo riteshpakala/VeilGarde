@@ -65,9 +65,7 @@ public enum Doctor {
     static func weights() -> [DoctorCheck] {
         ShippedBundle.manifest.weights.map { expected in
             guard let url = WeightLocator.shared.url(named: expected.file) else {
-                let how = expected.file.hasPrefix("noiseprint")
-                    ? "it ships in Sources/VeilGardeInference/Resources: restore it from git, or train one (`veilgarde train noiseprint`)"
-                    : "`veilgarde weights import-dinov2` builds it from Hugging Face's checkpoint; fusion, the heads and routing need it"
+                let how = "`veilgarde weights import-dinov2` builds it from Hugging Face's checkpoint; fusion, the heads and routing need it"
                 return DoctorCheck("weights", ok: false, "\(expected.file) not found in the work area's weights/: \(how)")
             }
             guard let sha = try? ArtifactHashCache.shared.sha256(url) else { return DoctorCheck("weights", ok: false, "cannot read \(url.path)") }

@@ -78,10 +78,9 @@ public enum GapMiner {
                         var row = [Float]()
                         for column in FeatureColumn.fusion { row.append(contentsOf: s.vector(column, row: i)) }
                         let norm = Array(s.vector(.dinoNorm, row: i))
-                        let np = s.vector(.noiseprint, row: i).first ?? .nan
                         let p = fusion.predict(row)
                         b[k] = p
-                        w[k] = combiner.pool(base: p, heads: heads.map { $0.pAI(norm) }, pairAI: pair?.pAI(norm), np: np.isFinite ? np : nil)
+                        w[k] = combiner.pool(base: p, heads: heads.map { $0.pAI(norm) }, pairAI: pair?.pAI(norm))
                     }
                 }
             }

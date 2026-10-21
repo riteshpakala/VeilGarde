@@ -1,51 +1,74 @@
 {
- "user_real": {
-  "acc": 1.0,
-  "n": 9,
-  "sem_acc": 0.8888888888888888,
-  "mode": "HARD",
-  "want": "real"
- },
- "native_12yrs": {
-  "acc": 1.0,
-  "n": 1,
-  "sem_acc": 1.0,
-  "mode": "HARD",
-  "want": "real"
- },
- "flux_anchor": {
-  "acc": 1.0,
-  "n": 2,
-  "sem_acc": 1.0,
-  "mode": "HARD_SEM",
-  "want": "generated"
- },
- "user_gen": {
-  "acc": 1.0,
-  "n": 9,
-  "sem_acc": 0.5555555555555556,
-  "mode": "HARD",
-  "want": "generated"
- },
- "native_cam": {
-  "acc": 1.0,
-  "n": 24,
-  "sem_acc": 0.7916666666666666,
-  "mode": "HARD",
-  "want": "real"
- },
- "gen_semantic": {
-  "acc": 1.0,
-  "n": 24,
-  "sem_acc": 1.0,
-  "mode": "RATCHET_SEM",
-  "want": "generated"
- },
- "wildlife_real": {
-  "acc": 1.0,
-  "n": 26,
-  "sem_acc": 0.9230769230769231,
-  "mode": "RATCHET",
-  "want": "real"
- }
+  "flux_anchor" : {
+    "acc" : 0.5,
+    "expected_n" : 2,
+    "input_complete" : true,
+    "mode" : "HARD_SEM",
+    "n" : 2,
+    "sem_acc" : 1,
+    "want" : "generated"
+  },
+  "gen_semantic" : {
+    "acc" : 1,
+    "expected_n" : 24,
+    "input_complete" : true,
+    "mode" : "RATCHET_SEM",
+    "n" : 24,
+    "sem_acc" : 1,
+    "want" : "generated"
+  },
+  "lion_hard" : {
+    "acc" : 1,
+    "expected_n" : 1,
+    "input_complete" : true,
+    "mode" : "HARD",
+    "n" : 1,
+    "sem_acc" : 0,
+    "want" : "real"
+  },
+  "native_12yrs" : {
+    "acc" : 1,
+    "expected_n" : 1,
+    "input_complete" : true,
+    "mode" : "HARD",
+    "n" : 1,
+    "sem_acc" : 1,
+    "want" : "real"
+  },
+  "native_cam" : {
+    "acc" : 1,
+    "expected_n" : 24,
+    "input_complete" : true,
+    "mode" : "HARD",
+    "n" : 24,
+    "sem_acc" : 0.7916666666666666,
+    "want" : "real"
+  },
+  "user_gen" : {
+    "acc" : 0.7692307692307693,
+    "expected_n" : 13,
+    "input_complete" : true,
+    "mode" : "HARD",
+    "n" : 13,
+    "sem_acc" : 0.38461538461538464,
+    "want" : "generated"
+  },
+  "user_real" : {
+    "acc" : 1,
+    "expected_n" : 9,
+    "input_complete" : true,
+    "mode" : "HARD",
+    "n" : 9,
+    "sem_acc" : 0.8888888888888888,
+    "want" : "real"
+  },
+  "wildlife_real" : {
+    "acc" : 0.9230769230769231,
+    "expected_n" : 26,
+    "input_complete" : true,
+    "mode" : "RATCHET",
+    "n" : 26,
+    "sem_acc" : 0.9230769230769231,
+    "want" : "real"
+  }
 }

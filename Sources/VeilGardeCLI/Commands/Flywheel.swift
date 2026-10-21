@@ -3,7 +3,7 @@
 //  VeilGardeCLI
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: `veilgarde flywheel`: the specialist-head regime on the work area. `init` seeds the live
+//  WHAT: `veilgarde flywheel`: the regime that grows the fusion head and the specialist stack. `init` seeds the live
 //        bundle and the battery, `seed` copies a feature store in, `acquire` fetches images from the
 //        collectors into a features-only shard (no image is written), `gap` says where the base
 //        is weakest and which jobs would fill it, `ingest` measures labeled local images into a
@@ -104,11 +104,9 @@ struct FlywheelCommand: ParsableCommand {
                 let perJob = per ?? max(50, budget / max(1, jobs.count))
                 for j in jobs { note("  job: \(j.source) \(j.category)/\(j.label) '\(j.query.prefix(50))'" + (j.gap.map { " (gap \($0))" } ?? "")) }
                 if dryRun { print("\(jobs.count) jobs × \(perJob) images"); return }
-                let live = try area.liveBundle()
-                guard let warp = live.url(.warpTile) else { throw VeilGardeFailure.missing("the live bundle has no warp tile model") }
                 let router: CategoryRouter? = noRoute ? nil : try CategoryRouter()
                 if router != nil { _ = try CLIPLens.shared.tower() }
-                let report = try Acquirer(area: area, note: note).run(jobs, perJob: perJob, extractor: try FeatureExtractor(warpModelURL: warp), router: router, shard: shard)
+                let report = try Acquirer(area: area, note: note).run(jobs, perJob: perJob, extractor: FeatureExtractor(), router: router, shard: shard)
                 for j in report.jobs {
                     print("\(j.job.source) \(j.job.category)/\(j.job.label): " + (j.skipped.map { "skipped, \($0)" } ?? "\(j.accepted) kept of \(j.fetched) fetched, rejected \(j.rejected)"))
                 }
@@ -141,7 +139,7 @@ struct FlywheelCommand: ParsableCommand {
     }
 
     struct IngestImages: ParsableCommand {
-        static let configuration = CommandConfiguration(commandName: "ingest", abstract: "Measure labeled images into a new store shard under the live warp model; the images are read and dropped.")
+        static let configuration = CommandConfiguration(commandName: "ingest", abstract: "Measure labeled images into a new store shard (DINOv2's two views and the capture values); the images are read and dropped.")
         @Argument(help: "A .jsonl of {path, label, category, source?, golden?, gen_family?}.") var items: String
         @Option(help: "The new shard's name.") var shard: String
         @OptionGroup var workArea: WorkAreaOptions
@@ -160,7 +158,6 @@ struct FlywheelCommand: ParsableCommand {
     struct Candidates: ParsableCommand {
         static let configuration = CommandConfiguration(commandName: "candidates", abstract: "Train the weekly candidates (a warm-started base and the atlas heads) on top of live, measure them, write REVIEW.md.")
         @Option(help: "The candidate's id (default: weekly-<date>).") var id: String?
-        @Flag(name: .customLong("allow-mixed-warp"), help: "Let the base train on rows whose warp column came from different warp models.") var allowMixedWarp = false
         @Flag(help: "Replace a candidate with the same id.") var replace = false
         @Flag(help: "Print the plan and stop.") var plan = false
         @OptionGroup var workArea: WorkAreaOptions
@@ -171,7 +168,7 @@ struct FlywheelCommand: ParsableCommand {
                 let f = DateFormatter()
                 f.locale = Locale(identifier: "en_US_POSIX")
                 f.dateFormat = "yyyyMMdd"
-                let recipe = WeeklyCandidates.recipe(id: id ?? "weekly-\(f.string(from: Date()))", allowMixedWarp: allowMixedWarp)
+                let recipe = WeeklyCandidates.recipe(id: id ?? "weekly-\(f.string(from: Date()))")
                 if plan {
                     let p = try TrainingEngine(area: area.area, parent: area.live, store: area.store).plan(recipe)
                     print(p.summary)
@@ -214,21 +211,18 @@ struct FlywheelCommand: ParsableCommand {
         @Option(help: "Write the report JSON here (`-` for stdout).") var json: String?
         @Flag(help: "Re-record the ratchet floors from this run (full gate only, with --yes-i-reviewed).") var rebaseline = false
         @Flag(name: .customLong("yes-i-reviewed"), help: "Confirms a rebaseline was reviewed.") var reviewed = false
-        @OptionGroup var expert: BaseExpertOptions
         @OptionGroup var workArea: WorkAreaOptions
 
         func run() throws {
             guarded {
                 guard let g = BatterySpec.Gate(rawValue: gate) else { throw VeilGardeFailure.usage("--gate is promote or full") }
                 if rebaseline && !(g == .full && reviewed) { throw VeilGardeFailure.usage("--rebaseline needs --gate full and --yes-i-reviewed") }
-                let base = try expert.resolve()
-                if rebaseline && base != .fusion { throw VeilGardeFailure.usage("--rebaseline records the detector's floors; it cannot run with --base \(base.rawValue)") }
                 let area = try FlywheelCommand.area(workArea)
                 ShippedBundle.registerWeightFolders(workArea: area.area)
                 let root = bundle.map(datasetURL) ?? area.live
                 let spec = try BatterySpec.load(area.batterySpec)
                 let report = try BatteryRunner.run(spec: spec, specURL: area.batterySpec, gate: g, baselineURL: area.batteryBaseline,
-                                                   verdicts: DetectorVerdicts(bundle: try DetectorBundle.load(root), baseExpert: base),
+                                                   verdicts: DetectorVerdicts(bundle: try DetectorBundle.load(root)),
                                                    vars: spec.resolvedVars(images: area.batteryImages), rebaseline: rebaseline, note: note)
                 let saved = area.batteryRuns.appendingPathComponent("\(FlywheelArea.stamp())-\(g.rawValue).json")
                 try JSONCoding.write(report, to: saved)
@@ -242,7 +236,7 @@ struct FlywheelCommand: ParsableCommand {
 
     struct Promote: ParsableCommand {
         static let configuration = CommandConfiguration(commandName: "promote", abstract: "Promote one slot from a candidate into live, behind its battery; a failure restores live.")
-        @Argument(help: "base, combiner, calibration, or a head (art, blur, human, cgi, preview, art-pair, screenshot, semtile).") var slot: String
+        @Argument(help: "base, combiner, or a head (art, blur, human, cgi, preview, art-pair, screenshot, semtile).") var slot: String
         @Option(help: "The candidate bundle.") var from: String
         @Flag(name: .customLong("dry-run"), help: "Run every check and print what would change; write nothing, run no battery.") var dryRun = false
         @OptionGroup var workArea: WorkAreaOptions

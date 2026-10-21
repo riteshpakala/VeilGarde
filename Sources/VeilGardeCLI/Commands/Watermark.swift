@@ -87,19 +87,19 @@ struct WatermarkCommand: ParsableCommand {
 
         func run() throws {
             guarded {
-                let engine = TrainingEngine(area: try workArea.resolve(), parent: ShippedBundle.directory)
+                _ = try workArea.resolve()
                 guard let dataset = dataset.map(datasetURL) ?? WorkArea.datasets().map({ $0.appendingPathComponent("final_mixed") }) else {
                     throw VeilGardeFailure.usage("no dataset: pass --dataset or set VEILGARDE_DATASETS")
                 }
-                let manifest = try engine.manifest(for: dataset, samplePerLabel: max(1, n / 2), seed: seed)
+                let sample = AcceptanceSample.sample(try AcceptanceSample.dataset(dataset), perLabel: max(1, n / 2), seed: seed)
                 var settings = AcceptanceSettings()
                 settings.seed = seed
                 settings.phases = phases.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
-                note("accept: \(manifest.count) images from \(dataset.path)")
+                note("accept: \(sample.count) images from \(dataset.path)")
                 // Each image's row as it is measured, so a long run that stops keeps what it measured.
                 let rowsURL = out.map { datasetURL($0).deletingPathExtension().appendingPathExtension("rows.jsonl") }
                 let rows = try rowsURL.map { try JSONLWriter(url: $0, truncate: true) }
-                let report = try WatermarkAcceptance.run(manifest.records.map { (manifest.url($0), $0.label) }, settings: settings, note: note,
+                let report = try WatermarkAcceptance.run(sample.map { ($0.url, $0.label) }, settings: settings, note: note,
                                                          measured: { try? rows?.append($0) })
                 let s = report.summary
                 print(String(format: "images %d; self-match %.1f%%; crop matched with its offset %.1f%%; JPEG q75 median score %.3f", s.images, s.selfMatchRate * 100,

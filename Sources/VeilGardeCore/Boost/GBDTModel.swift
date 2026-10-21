@@ -4,8 +4,8 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: A gradient-boosted tree ensemble (binary logistic) as a value: decoded from and encoded to
-//        the XGBoost ≥ 2.0 JSON every VeilGarde booster ships as (the warp tile model, the fusion head,
-//        its frozen reference), and evaluated on feature rows. It is what the trainer writes and
+//        the XGBoost ≥ 2.0 JSON every VeilGarde booster ships as (the fusion head), and evaluated
+//        on feature rows. It is what the trainer writes and
 //        what a warm start continues.
 //  PIN:  Byte-identical round trip: encoding a decoded model writes the file's exact bytes,
 //        because every inherited tree keeps its JSON text (`raw`) and the rest follows XGBoost
@@ -18,7 +18,7 @@
 
 import Foundation
 
-public struct GBDTModel: TileScorer, Sendable, Equatable {
+public struct GBDTModel: Sendable, Equatable {
     /// One tree, as XGBoost stores it: parallel arrays indexed by node, −1 children for a leaf.
     public struct Tree: Sendable, Equatable {
         public var id: Int

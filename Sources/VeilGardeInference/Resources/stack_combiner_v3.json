@@ -1,0 +1,26 @@
+{
+  "cap_base" : 4,
+  "cap_head" : 2,
+  "formula" : "asymmetric",
+  "gate_ceiling" : 0.75,
+  "inputs" : [
+    "base",
+    "art_gen",
+    "blur_gen",
+    "human_gen",
+    "rescue"
+  ],
+  "model" : "stack_combiner",
+  "note" : "VeilGarde v3 asymmetric evidence pooling (capture-absent branch only), fitted on the features-only store: non-negative weights, reals ×3.0, the rescue weight chosen against the protect-real probes.",
+  "pair_adjudicates" : false,
+  "threshold" : 0.5,
+  "version" : 3,
+  "w0" : -1.0216338510927914,
+  "w_base" : 1.664112977699542,
+  "w_gen" : [
+    0.15331665321009014,
+    0.2197897549987958,
+    0.2999066044320255
+  ],
+  "w_rescue" : 1
+}

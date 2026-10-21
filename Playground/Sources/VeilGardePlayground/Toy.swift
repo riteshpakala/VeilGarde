@@ -3,10 +3,9 @@
 //  VeilGardePlayground
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The training regime in miniature, on real code paths: a dataset of the final_mixed
-//        sample (its tiles cut by the warp lens into Playground/.work), and a small store, a
-//        seeded sample of the work area's feature store when this Mac has it. Without the T9 or
-//        that store, seeded synthetic tiles and rows take their place, and the output says so.
+//  WHAT: The training regime in miniature, on real code paths: a small store, a seeded sample of the
+//        work area's feature store when this Mac has it. Without that store, seeded synthetic rows
+//        take its place, and the output says so.
 //  PIN:  Writes only Playground/.work; reads final_mixed and the work area's store, never writes them.
 //
 
@@ -14,49 +13,10 @@ import Foundation
 import VeilGarde
 
 enum Toy {
-    static let dataset = Scratch.work.appendingPathComponent("toy/dataset.jsonl")
     static let store = Scratch.work.appendingPathComponent("store/shards", isDirectory: true)
     /// The work area's feature store (VEILGARDE_SEED_STORE names another), read, never written.
     static let seedStore = URL(fileURLWithPath: ProcessInfo.processInfo.environment["VEILGARDE_SEED_STORE"]
         ?? WorkArea.resolve()?.shards.path ?? "store/shards", isDirectory: true)
-
-    /// The toy dataset: the labeled sample, two of each class held out for validation. Returns
-    /// what it is made of.
-    static func writeDataset(_ sample: [PlaygroundImage]) throws -> String {
-        try? FileManager.default.removeItem(at: dataset.deletingLastPathComponent())
-        let labeled = sample.filter { $0.label != nil }
-        if labeled.count >= 8 {
-            var records: [ImageRecord] = []
-            for label in [0, 1] {
-                for (k, image) in labeled.filter({ $0.label == label }).enumerated() {
-                    records.append(ImageRecord(path: image.url.path, label: label, stem: (image.name as NSString).deletingPathExtension,
-                                               split: k < 2 ? .val : .train))
-                }
-            }
-            try ImageManifest(records: records, root: dataset.deletingLastPathComponent()).write(to: dataset)
-            return "\(records.count) final_mixed images (\(records.filter { $0.split == .train }.count) train, \(records.filter { $0.split == .val }.count) validation)"
-        }
-        // No T9: 120 synthetic images whose tiles are written straight into the cache.
-        var rng = SplitMix64(seed: 5)
-        let records = (0..<120).map { ImageRecord(path: "synthetic/\($0).png", label: $0 % 2, stem: String(format: "synthetic_%03d", $0), split: $0 % 5 == 0 ? .val : .train) }
-        let manifest = ImageManifest(records: records, root: dataset.deletingLastPathComponent())
-        try manifest.write(to: dataset)
-        var images: [TileImage] = [], features: [Float] = [], texture: [Float] = []
-        for r in records {
-            images.append(TileImage(stem: r.stem, path: r.path, label: r.label, split: r.split!, pool: nil, tag: nil, rows: 4, cols: 4, start: texture.count, width: 128, height: 128))
-            for _ in 0..<16 {
-                var row = (0..<WarpFeatures.count).map { _ in Float(rng.unit()) }
-                row[0] = Float(rng.unit()) * 0.6 + (r.label == 1 ? 0.3 : 0)
-                features += row
-                texture.append(Float(0.2 + rng.unit()))
-            }
-        }
-        let cache = Scratch.work.appendingPathComponent("store/tiles/dataset", isDirectory: true)
-        try? FileManager.default.removeItem(at: cache)
-        try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
-        try TileShard(name: "tiles_0000", images: images, features: features, texture: texture).write(to: cache)
-        return "120 synthetic images (the T9 is not mounted; their tiles are seeded, not measured)"
-    }
 
     /// The toy store: per (category, label) group a seeded handful of the store's rows, or synthetic rows.
     static func writeStore() throws -> String {
@@ -93,9 +53,6 @@ enum Toy {
                 columns[.dinoNorm]! += norm
                 columns[.dinoFusion]! += (0..<384).map { j in gauss() + (label == 1 && j < 8 ? 1 : 0) }
                 columns[.cap]! += [Float(rng.unit() * 40), 1, 0, 2000, 5, 0.5, 0.5, 0.5, 0]
-                columns[.warp]!.append(Float(0.4 + (label == 1 ? 0.2 : 0) + 0.1 * Double(gauss())))
-                columns[.sharp]! += [10, 10, 1]
-                columns[.noiseprint]!.append(Float(label == 0 ? 0.6 : 0.3))
             }
         }
         try FeatureShard(name: "synthetic", rows: rows, columns: columns).write(to: store)

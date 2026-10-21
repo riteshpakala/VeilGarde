@@ -4,8 +4,8 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: Frigate's XGBoostTreeModel (what the detector scores with) and Core's GBDTModel (what the
-//        trainer writes and evaluates) agree bit for bit on the shipped boosters; the decoder
-//        applies EXIF orientation exactly as Garde's NSImage path did.
+//        trainer writes and evaluates) agree bit for bit on the shipped fusion head, missing values
+//        included; the decoder applies EXIF orientation as NSImage does.
 //
 
 import CoreGraphics
@@ -17,14 +17,16 @@ import UniformTypeIdentifiers
 
 @Suite("Scorers and decoding")
 struct ScorerTests {
-    @Test("Frigate's evaluator and GBDTModel agree bit for bit", arguments: [("warp", "warp_tile32.xgb.json"), ("fusion", "fusion_head.xgb.json")])
-    func evaluatorsAgree(key: String, file: String) throws {
-        let reference = try JSONSerialization.jsonObject(with: Data(contentsOf: Fixture.core("boost_reference.json"))) as! [String: Any]
-        let rows = ((reference[key] as! [String: Any])["rows"] as! [[NSNumber]]).map { $0.map(\.floatValue) }
-        let frigate = try TreeModelCache.shared.scorer(Fixture.resource(file))
-        let core = try GBDTModel.load(Fixture.resource(file))
-        #expect(frigate.featureCount == core.featureCount)
-        #expect(frigate.scoreBatch(rows) == core.scoreBatch(rows))
+    @Test("Frigate's evaluator and GBDTModel agree bit for bit on the shipped fusion head")
+    func evaluatorsAgree() throws {
+        let url = Fixture.resource("fusion_head.xgb.json")
+        let frigate = try TreeModelCache.shared.model(url)
+        let core = try GBDTModel.load(url)
+        #expect(frigate.numFeatures == core.featureCount)
+        var rng = SplitMix64(seed: 7)
+        var rows = (0..<32).map { _ in (0..<core.featureCount).map { _ in Float(rng.unit() * 4 - 2) } }
+        for i in stride(from: 0, to: rows.count, by: 4) { rows[i][384] = .nan; rows[i][0] = .nan }   // missing values go their default way
+        #expect(frigate.predictBatch(rows) == core.scoreBatch(rows))
     }
 
     /// A 3×2 image whose pixels are all distinct, written with an EXIF orientation tag.

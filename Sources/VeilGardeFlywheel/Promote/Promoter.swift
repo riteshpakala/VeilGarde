@@ -155,14 +155,13 @@ public final class Promoter {
                   zip(previous.trees, next.trees).allSatisfy({ $0.raw != nil && $0.raw == $1.raw }) else {
                 throw VeilGardeFailure.usage("the base moves only by a warm start of the live head: the candidate does not keep the live head's \(previous.trees.count) trees byte for byte")
             }
-        case .calibration:
-            guard let sensor = live.manifest.artifact(.warpMajoritySensor) else { throw VeilGardeFailure.missing("the live bundle has no sensor model") }
-            let variant = try SensorCalibrationContract.variant(featureCount: try GBDTModel.load(live.root.appendingPathComponent(sensor.file)).featureCount)
-            _ = try SensorCalibrationContract.decode(data, expectedModelSHA256: sensor.sha256, expectedSensorVariant: variant)
         case .combiner:
             let c = try JSONDecoder().decode(StackCombiner.self, from: data)
-            guard c.wBase >= 0, c.wRescue >= 0, c.wGen.allSatisfy({ $0 >= 0 }), (c.wNp ?? 0) >= 0 else {
+            guard c.wBase >= 0, c.wRescue >= 0, c.wGen.allSatisfy({ $0 >= 0 }) else {
                 throw VeilGardeFailure.usage("a combiner's evidence weights must all be ≥ 0")
+            }
+            if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], object["w_np"] != nil {
+                throw VeilGardeFailure.usage("the combiner carries a noiseprint term (w_np), which the detector no longer reads")
             }
         case .head(let kind):
             let head = try LinearHead(data: data)
@@ -179,8 +178,8 @@ public final class Promoter {
 
     func targetFile(_ slot: FlywheelSlot, current: Artifact?, candidateID: String) -> String {
         switch slot {
-        case .base, .combiner, .calibration:
-            return current?.file ?? (slot == .base ? "fusion_head.xgb.json" : slot == .combiner ? "stack_combiner_v2.json" : "warp_sensor_calibration.json")
+        case .base, .combiner:
+            return current?.file ?? (slot == .base ? "fusion_head.xgb.json" : "stack_combiner_v3.json")
         case .head(let kind):
             let tag = candidateID.replacingOccurrences(of: "/", with: "-")
             return HeadTrainer.fileName(kind, version: tag)

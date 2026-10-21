@@ -3,42 +3,35 @@
 //  VeilGardeCore
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: One file a detector bundle holds, named by its role (the warp tile model, the sensor
-//        calibration, the fusion head, a specialist head, …) and bound by its SHA-256, size,
-//        provenance and, for a warm-started model, its parent's hash.
-//  PIN:  `frozen` marks what the flywheel may never move: the warp tile model and its sensor
-//        copy, the fusion reference, noiseprint and the backbones (Flywheel/Promote's policy reads
-//        it). A file's name is free; what binds it is its hash: the result JSON reports the warp
-//        models' hashes and the calibration is bound to the sensor model's bytes.
+//  WHAT: One file a detector bundle holds, named by its role (the fusion head, the combiner, a
+//        specialist head, a weight) and bound by its SHA-256, size, provenance and, for a
+//        warm-started model, its parent's hash.
+//  PIN:  `frozen` marks what the flywheel may never move: the weights, the embeddings every model
+//        was trained on (Flywheel/Promote's policy reads it). A file's name is free; what binds it
+//        is its hash.
 //
 
 public enum ArtifactRole: String, Codable, Sendable, CaseIterable {
-    case warpTile = "warp-tile"
-    case warpMajoritySensor = "warp-majority-sensor"
-    case sensorCalibration = "sensor-calibration"
     case fusionHead = "fusion-head"
-    case fusionReference = "fusion-reference"
     case combiner
-    case xDomainCentroids = "xdomain-centroids"
     case head
     case dinov2Small = "dinov2-small"
     case dinov2XSmall = "dinov2-xsmall"
     case dinov2XXSmall = "dinov2-xxsmall"
-    case noiseprint
     case clipVision = "clip-vision"
 
-    /// Roles the flywheel may never promote over.
+    /// Roles the flywheel may never promote over: the weights.
     public var isFrozen: Bool {
         switch self {
-        case .warpTile, .warpMajoritySensor, .fusionReference, .noiseprint, .dinov2Small, .dinov2XSmall, .dinov2XXSmall, .clipVision: return true
-        case .sensorCalibration, .fusionHead, .combiner, .xDomainCentroids, .head: return false
+        case .dinov2Small, .dinov2XSmall, .dinov2XXSmall, .clipVision: return true
+        case .fusionHead, .combiner, .head: return false
         }
     }
 
     /// Weights live outside the bundle (gitignored, resolved by the Lens's WeightLocator).
     public var isWeights: Bool {
         switch self {
-        case .dinov2Small, .dinov2XSmall, .dinov2XXSmall, .noiseprint, .clipVision: return true
+        case .dinov2Small, .dinov2XSmall, .dinov2XXSmall, .clipVision: return true
         default: return false
         }
     }
@@ -50,7 +43,7 @@ public struct Artifact: Codable, Sendable, Equatable {
     public var file: String
     public var sha256: String
     public var bytes: Int
-    /// Where the bytes came from: "garde@dbc6277", "candidates/<recipe>", "garde WeightOverride".
+    /// Where the bytes came from: "candidates/<recipe>", an import, the research's heads.
     public var source: String?
     /// The hash of the artifact this one continues (a warm-started fusion head's parent).
     public var parent: String?

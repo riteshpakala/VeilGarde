@@ -3,9 +3,10 @@
 //  VeilGardeTrainingTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The combiner's columns equal atlas_combiner.features, its bounded fit reaches scipy's
-//        optimum, and the rescue sweep picks what the reference's picks: the fallback on the synthetic fit,
-//        and the shipped 0.5 on the shipped weights.
+//  WHAT: The combiner's five columns equal the reference's first five (atlas_combiner.features;
+//        the sixth, the noiseprint's, left on 2026-10-21), the bounded solver reaches scipy's
+//        optimum on the reference fit, the rescue sweep follows its rule, and the shipped combiner's
+//        rescue weight is what the sweep picks on its own weights.
 //
 
 import Foundation
@@ -19,15 +20,16 @@ struct CombinerTests {
 
     static func optional(_ any: Any?) -> Double? { (any as? NSNumber)?.doubleValue }
 
-    @Test("the feature columns equal the reference's")
+    @Test("the five feature columns equal the reference's first five")
     func features() throws {
         let f = try Self.fixture()
         let base = doubles(f["base"]), heads = (f["heads"] as! [[NSNumber]]).map { $0.map(\.doubleValue) }
-        let pair = (f["pair"] as! [Any]).map(Self.optional), np = (f["np"] as! [Any]).map(Self.optional)
+        let pair = (f["pair"] as! [Any]).map(Self.optional)
         let expected = (f["features"] as! [[NSNumber]]).map { $0.map(\.doubleValue) }
         for i in base.indices {
-            let row = CombinerFeatures.row(base: base[i], heads: heads[i], pair: pair[i], noiseprint: np[i])
-            #expect(maxAbs(row, expected[i]) < 1e-12, "row \(i)")
+            let row = CombinerFeatures.row(base: base[i], heads: heads[i], pair: pair[i])
+            #expect(row.count == CombinerFeatures.count && CombinerFeatures.count == 5)
+            #expect(maxAbs(row, Array(expected[i].prefix(5))) < 1e-12, "row \(i)")
         }
     }
 
@@ -35,62 +37,66 @@ struct CombinerTests {
     func adjudication() throws {
         let f = try Self.fixture()
         let base = doubles(f["base"]), heads = (f["heads"] as! [[NSNumber]]).map { $0.map(\.doubleValue) }, y = ints(f["y"])
-        let pair = (f["pair"] as! [Any]).map(Self.optional), np = (f["np"] as! [Any]).map(Self.optional)
+        let pair = (f["pair"] as! [Any]).map(Self.optional)
         func samples(_ withPair: Bool) -> [CombinerSample] {
-            base.indices.map { CombinerSample(id: "row\($0)", label: y[$0], base: base[$0], heads: heads[$0], pair: withPair ? pair[$0] : nil, noiseprint: np[$0]) }
+            base.indices.map { CombinerSample(id: "row\($0)", label: y[$0], base: base[$0], heads: heads[$0], pair: withPair ? pair[$0] : nil) }
         }
-        let (alone, _) = try CombinerTrainer.train(samples(false))
+        let (alone, report) = try CombinerTrainer.train(samples(false))
         #expect(alone.pairAdjudicates == false && !alone.note.contains("art-pair"))
         #expect(try alone.combiner().pairAdjudicates == false)
+        #expect(alone.inputs == ["base", "art_gen", "blur_gen", "human_gen", "rescue"])
+        #expect(report.fitted.count == 1 + CombinerFeatures.count)
         let (beside, _) = try CombinerTrainer.train(samples(true))
         #expect(beside.pairAdjudicates == true && beside.note.contains("art-pair"))
     }
 
-    @Test("the bounded fit reaches scipy's optimum")
+    @Test("the bounded solver reaches scipy's optimum on the reference's six-column fit")
     func fit() throws {
         let f = try Self.fixture()
         let features = (f["features"] as! [[NSNumber]]).map { $0.map(\.doubleValue) }
         let y = ints(f["y"]), n = f["train"] as! Int
-        let (w0, w) = CombinerTrainer.fitWeights(features: Array(features.prefix(n)), labels: Array(y.prefix(n)), realsWeight: 3)
+        var flat = [Double]()
+        for row in features.prefix(n) { var r = row; r[4] = 0; flat += r }
+        let theta = BoundedLogistic.fit(f: flat, y: y.prefix(n).map(Double.init), m: 6, sampleWeight: y.prefix(n).map { $0 == 0 ? 3 : 1 })
         let tight = f["tight"] as! [String: Any]
         let tw = doubles(tight["w"])
-        #expect(abs(w0 - double(tight["w0"])) < 1e-4)
-        for j in [0, 1, 2, 3, 5] { #expect(abs(w[j] - tw[j]) < 1e-4, "w[\(j)] \(w[j]) vs \(tw[j])") }
-        #expect(w[4] == 0)
-        #expect(w.allSatisfy { $0 >= 0 })
+        #expect(abs(theta[0] - double(tight["w0"])) < 1e-4)
+        for j in [0, 1, 2, 3, 5] { #expect(abs(theta[1 + j] - tw[j]) < 1e-4, "w[\(j)] \(theta[1 + j]) vs \(tw[j])") }
+        #expect(theta.dropFirst().allSatisfy { $0 >= 0 })
     }
 
-    @Test("the rescue sweep falls back to 1.0 when no weight keeps every probe real")
-    func sweepFallback() throws {
+    /// The sweep's rule, restated: the first nonzero candidate under which every probe reads at or
+    /// under 0.5 and none above 0.42, else the fallback.
+    func expectedRescue(w0: Double, w: [Double], settings: CombinerSettings) -> Double {
+        for candidate in settings.rescueSweep where candidate != 0 {
+            var ww = w
+            ww[4] = candidate
+            let scores = CombinerTrainer.probeScores(w0, ww, settings.probes)
+            if scores.values.allSatisfy({ $0 <= 0.5 }) && (scores.values.max() ?? 0) <= settings.maxProbe { return candidate }
+        }
+        return settings.rescueFallback
+    }
+
+    @Test("the rescue sweep follows its rule on the reference fit and on the research's weights")
+    func sweep() throws {
         let f = try Self.fixture()
         let final = f["final"] as! [String: Any]
-        var w = doubles(final["w"])
-        w[4] = 0
-        let (rescue, rows) = CombinerTrainer.chooseRescue(w0: double(final["w0"]), w: w, settings: CombinerSettings())
-        #expect(rescue == 1.0)
-        let expected = f["sweep"] as! [[String: Any]]
-        for (row, e) in zip(rows, expected) {
-            #expect(row.rescue == double(e["w_rescue"]))
-            #expect(row.probesReal == e["user_reals_real"] as! Int)
-            #expect(abs(row.maxProbe - double(e["max_p"])) < 1e-12)
-        }
+        var fitted = Array(doubles(final["w"]).prefix(5))
+        fitted[4] = 0
+        let settings = CombinerSettings()
+        #expect(CombinerTrainer.chooseRescue(w0: double(final["w0"]), w: fitted, settings: settings).rescue
+                == expectedRescue(w0: double(final["w0"]), w: fitted, settings: settings))
+        // The research's v1.9.7 weights without the noiseprint: probe 3 reads 0.409 at rescue 0.5, under the 0.42 bar.
+        let research = [3.8205217946638634, 0.0, 0.0, 0.1966929563436263, 0.0]
+        let (rescue, rows) = CombinerTrainer.chooseRescue(w0: -0.6754975033517225, w: research, settings: settings)
+        #expect(rescue == 0.5 && rows.count == settings.rescueSweep.count)
     }
 
-    @Test("on the shipped weights the sweep picks the shipped 0.5")
+    @Test("the shipped combiner's rescue weight is what the sweep picks on its own weights")
     func sweepShipped() throws {
-        let f = try Self.fixture()
-        let w = [3.8205217946638634, 0.0, 0.0, 0.1966929563436263, 0.0, 0.8]
-        let (rescue, rows) = CombinerTrainer.chooseRescue(w0: -0.6754975033517225, w: w, settings: CombinerSettings())
-        #expect(rescue == double(f["deployed_chosen"]))
-        #expect(rescue == 0.5)
-        let expected = f["deployed_sweep"] as! [[String: Any]]
-        for (row, e) in zip(rows, expected) {
-            var ww = w
-            ww[4] = row.rescue
-            let mine = CombinerTrainer.probeScores(-0.6754975033517225, ww, CombinerProbe.userReals)
-            for (name, p) in e["p"] as! [String: NSNumber] { #expect(abs(mine[name]! - p.doubleValue) < 1e-12, "probe \(name)") }
-        }
-        let shipped = try CombinerFile(w0: -0.6754975033517225, wBase: w[0], wGen: Array(w[1...3]), wRescue: rescue, wNp: w[5], note: "").combiner()
-        #expect(shipped.wRescue == 0.5)
+        let c = try StackCombiner.load(Fixture.resource("stack_combiner_v3.json"))
+        let w = [Double(c.wBase)] + c.wGen.map(Double.init) + [0]
+        let (rescue, _) = CombinerTrainer.chooseRescue(w0: Double(c.w0), w: w, settings: CombinerSettings())
+        #expect(rescue == Double(c.wRescue))
     }
 }

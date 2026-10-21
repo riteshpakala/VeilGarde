@@ -8,9 +8,6 @@
 //  PIN:  XGBoost defaults: η 0.3, depth 6, λ 1, γ 0, min_child_weight 1, subsample and
 //        colsample_bytree 1, scale_pos_weight 1, 256 bins (`hist`). base_score defaults to the
 //        weighted label mean (XGBoost 2.x estimates its intercept; the trees absorb the difference).
-//        `allowedColumns` is a column mask: trees split only on those columns and the model keeps
-//        the data's width, so a masked model deploys wherever the unmasked one does (XGBoost's
-//        nearest equivalent is feature_weights of 0 and 1). Absent, every column is allowed.
 //
 
 public struct BoostParams: Codable, Sendable, Equatable {
@@ -28,12 +25,10 @@ public struct BoostParams: Codable, Sendable, Equatable {
     public var earlyStoppingRounds: Int? = nil
     public var metric: BoostMetric = .auc
     public var seed: UInt64 = 0
-    /// The columns a tree may split on, ascending and distinct (nil: every column).
-    public var allowedColumns: [Int]? = nil
 
     public init(trees: Int = 200, maxDepth: Int = 6, eta: Double = 0.3, lambda: Double = 1, gamma: Double = 0, minChildWeight: Double = 1,
                 subsample: Double = 1, colsampleByTree: Double = 1, scalePosWeight: Double = 1, baseScore: Double? = nil, maxBin: Int = 256,
-                earlyStoppingRounds: Int? = nil, metric: BoostMetric = .auc, seed: UInt64 = 0, allowedColumns: [Int]? = nil) {
+                earlyStoppingRounds: Int? = nil, metric: BoostMetric = .auc, seed: UInt64 = 0) {
         self.trees = trees
         self.maxDepth = maxDepth
         self.eta = eta
@@ -48,7 +43,6 @@ public struct BoostParams: Codable, Sendable, Equatable {
         self.earlyStoppingRounds = earlyStoppingRounds
         self.metric = metric
         self.seed = seed
-        self.allowedColumns = allowedColumns
     }
 }
 

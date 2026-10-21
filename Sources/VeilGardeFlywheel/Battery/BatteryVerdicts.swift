@@ -3,15 +3,12 @@
 //  VeilGardeFlywheel
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: What the battery reads off one image: the weighted verdict and score, the semantic
-//        tile majority, and whether a capture signature is present. The production source runs
-//        the full detector on a bundle in process; tests hand the runner canned verdicts.
-//  PIN:  The values are read from the result JSON the detector writes (schema v2, Garde's bytes),
-//        exactly as the Python runner's route backend reads Garde's --route-json:
-//        verdict.weighted.prediction and .score, the share of semantic_tiles cells above 0.5
-//        (nil without tiles), capture.present. A study may run the battery with the warp lens as
-//        the camera base (`flywheel battery --base warp`); the runtime says which base ran, and
-//        promote and rollback always gate the detector as it ships.
+//  WHAT: What the battery reads off one image: the verdict and its P(AI), the semantic tile
+//        majority, and whether a capture signature is present. The production source runs the full
+//        detector on a bundle in process; tests hand the runner canned verdicts.
+//  PIN:  The values are read from the result JSON the detector writes (schema v3):
+//        verdict.prediction and .p, the share of semantic_tiles cells above 0.5 (nil without
+//        tiles), capture.present.
 //
 
 import CoreGraphics
@@ -20,27 +17,26 @@ import VeilGardeCore
 import VeilGardeInference
 
 public struct BatteryVerdict: Codable, Sendable, Equatable {
-    public var weighted: String
-    public var weightedScore: Double
+    public var prediction: String
+    public var p: Double
     public var semanticScore: Double?
     public var capturePresent: Bool
 
-    public init(weighted: String, weightedScore: Double, semanticScore: Double?, capturePresent: Bool) {
-        self.weighted = weighted
-        self.weightedScore = weightedScore
+    public init(prediction: String, p: Double, semanticScore: Double?, capturePresent: Bool) {
+        self.prediction = prediction
+        self.p = p
         self.semanticScore = semanticScore
         self.capturePresent = capturePresent
     }
 
-    /// Reads a result JSON (the detector's or Garde's --route-json).
+    /// Reads a schema-v3 result JSON.
     public init(resultJSON data: Data) throws {
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let verdict = object["verdict"] as? [String: Any], let weighted = verdict["weighted"] as? [String: Any],
-              let prediction = weighted["prediction"] as? String else {
-            throw VeilGardeFailure.data("a result JSON without verdict.weighted.prediction")
+              let verdict = object["verdict"] as? [String: Any], let prediction = verdict["prediction"] as? String else {
+            throw VeilGardeFailure.data("a result JSON without verdict.prediction")
         }
-        self.weighted = prediction
-        self.weightedScore = (weighted["score"] as? NSNumber)?.doubleValue ?? .nan
+        self.prediction = prediction
+        self.p = (verdict["p"] as? NSNumber)?.doubleValue ?? .nan
         let cells = ((object["semantic_tiles"] as? [[NSNumber]]) ?? []).flatMap { $0 }.map(\.doubleValue)
         self.semanticScore = cells.isEmpty ? nil : Double(cells.filter { $0 > 0.5 }.count) / Double(cells.count)
         self.capturePresent = ((object["capture"] as? [String: Any])?["present"] as? Bool) ?? false
@@ -59,15 +55,11 @@ public final class DetectorVerdicts: BatteryVerdictSource {
     private let config: InferenceConfig
     public private(set) var runtime: [String: String]
 
-    public init(bundle: DetectorBundle, baseExpert: BaseExpert = .fusion) {
+    public init(bundle: DetectorBundle) {
         self.bundle = bundle
-        var config = InferenceConfig(bundle: bundle)
-        config.timing = false
-        config.baseExpert = baseExpert
-        self.config = config
+        self.config = InferenceConfig(bundle: bundle)
         var runtime = ["backend": "veilgarde-detector", "core_version": VeilGardeVersion.string]
         runtime.merge(bundle.provenance) { _, new in new }
-        if baseExpert != .fusion { runtime["base_expert"] = baseExpert.rawValue }
         self.runtime = runtime
     }
 

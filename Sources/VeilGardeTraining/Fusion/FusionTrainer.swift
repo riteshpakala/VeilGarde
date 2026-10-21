@@ -4,19 +4,22 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The fusion head, the base verdict for every image without a capture signature: a
-//        boosted classifier over the 397-value row [warp | dino_fusion(384) | cap(9) | sharp(3)].
-//        Trained from scratch, or (the flywheel's only base-moving step) continued from the live
-//        head by appending trees so the parent's trees stay byte for byte.
-//  PIN:  v199_warmstart.py's corpus and weights: every store row that is not golden, not NSFW and
-//        carries dino_fusion, ordered by id; weight w_new_gen on generated rows from new-generator
-//        shards (scrape_*), 0.7 on gen_family flux2-klein-4b, ×w_preview on preview_aug,
-//        ×3 on emphasized ids. Warm start: +80 trees, depth 5, η 0.03, subsample 0.8,
-//        colsample_bytree 0.8 (the weekly script). Scratch: 500 trees, depth 5, η 0.04, subsample 0.8,
-//        colsample_bytree 0.8. One change from the Python trainer, on purpose: the new-generator rows it reported
-//        recall on were also trained on; here 30% of them (StableSplit "fusion-held:v1" on the id)
-//        are held out of training, so the recall is honest. Missing values stay NaN and go right,
-//        as at inference. Rows whose warp column came from different warp models are refused
-//        unless allowed: the fusion head would learn two scales as one.
+//        boosted classifier over the 393-value row [dino_fusion(384) | cap(9)]. Trained from
+//        scratch, or (the flywheel's only base-moving step) continued from the live head by
+//        appending trees so the parent's trees stay byte for byte.
+//  PIN:  The reference's warm-start corpus and weights: every store row that is not golden, not
+//        NSFW and carries dino_fusion, ordered by id; weight w_new_gen on generated rows from
+//        new-generator shards (scrape_*, acquire_*), 0.7 on gen_family flux2-klein-4b, ×w_preview on
+//        preview_aug, ×3 on emphasized ids. Warm start: +80 trees, depth 5, η 0.03, subsample 0.8,
+//        colsample_bytree 0.8 (the weekly script). Scratch: 500 trees, depth 5, η 0.04, subsample
+//        0.8, colsample_bytree 0.8. Two changes from the Python trainer, on purpose: 30% of the
+//        new-generator rows (StableSplit "fusion-held:v1" on the id) are held out of training so
+//        their recall is honest; and an evaluation twin, fitted the same way on the training rows
+//        outside a 10% hash holdout (StableSplit "fusion-eval:v1"), is scored on that holdout so a
+//        scratch fit reports a held-out AUC. The written head trains on every training row; the
+//        twin is measurement only. A warm start needs a parent of the same width; recall and
+//        agreement against a parent are measured only when it reads the same columns. Missing
+//        values stay NaN and go right, as at inference.
 //
 
 import Foundation
@@ -44,7 +47,8 @@ public struct FusionSettings: Codable, Sendable, Equatable {
     /// Shard-name prefixes whose generated rows are new-generator rows.
     public var newGeneratorShards = ["scrape_", "acquire_"]
     public var holdoutFraction = 0.3
-    public var allowMixedWarp = false
+    /// The share of rows the evaluation twin holds out (0 skips the twin).
+    public var evaluationFraction = 0.1
 
     public init() {}
 }
@@ -54,21 +58,15 @@ public struct FusionDataset: Sendable {
     public var data: BoostDataset
     public var isNewGenerator: [Bool]
     public var isHeldOut: [Bool]
-    /// warp_model tag → rows ("unknown" for rows that do not say, as the seed store's do not).
-    public var warpModels: [String: Int]
+    /// Rows the evaluation twin holds out (StableSplit "fusion-eval:v1").
+    public var isEvaluation: [Bool]
 
     public static func assemble(_ store: FeatureStore, settings: FusionSettings) throws -> FusionDataset {
         let selection = try store.select(columns: Set(FeatureColumn.fusion)) { !$0.golden && !$0.nsfw }
         var order = (0..<selection.count).filter { selection.vector(.dinoFusion, row: $0).first?.isFinite ?? false }
         order.sort { selection.rows[$0].id < selection.rows[$1].id }
-        var histogram: [String: Int] = [:]
-        for i in order { histogram[selection.rows[i].warpModel ?? "unknown", default: 0] += 1 }
-        if histogram.count > 1 && !settings.allowMixedWarp {
-            throw VeilGardeFailure.data("the store's warp column comes from \(histogram.count) warp models \(histogram); allow mixed warp rows to train anyway",
-                                        hint: "rows without warp_model were scored by an older warp model (optimal_6); re-extract them or pass --allow-mixed-warp")
-        }
         let emphasized = Set(settings.emphasize)
-        var x: [Float] = [], y: [Float] = [], w: [Float] = [], ids: [String] = [], newGen: [Bool] = [], held: [Bool] = []
+        var x: [Float] = [], y: [Float] = [], w: [Float] = [], ids: [String] = [], newGen: [Bool] = [], held: [Bool] = [], eval: [Bool] = []
         x.reserveCapacity(order.count * FusionVector.count)
         for i in order {
             let row = selection.rows[i]
@@ -82,9 +80,10 @@ public struct FusionDataset: Sendable {
             ids.append(row.id)
             newGen.append(isNew)
             held.append(isNew && StableSplit.isHoldout(row.id, salt: "fusion-held:v1", fraction: settings.holdoutFraction))
+            eval.append(settings.evaluationFraction > 0 && StableSplit.isHoldout(row.id, salt: "fusion-eval:v1", fraction: settings.evaluationFraction))
         }
         return FusionDataset(ids: ids, data: BoostDataset(x: x, y: y, weight: w, features: FusionVector.count),
-                             isNewGenerator: newGen, isHeldOut: held, warpModels: histogram)
+                             isNewGenerator: newGen, isHeldOut: held, isEvaluation: eval)
     }
 
     public func subset(_ keep: (Int) -> Bool) -> BoostDataset {
@@ -110,7 +109,15 @@ public struct FusionReport: Codable, Sendable, Equatable {
     public var agreementWithParent: Double?
     public var trees: Int
     public var inheritedTrees: Int
-    public var warpModels: [String: Int]
+    /// The parent reads the same columns, so its recall and the agreement were measured.
+    public var parentComparable: Bool
+    /// The evaluation twin: rows it held out, and on them its AUC, its real false-positive rate and
+    /// its generated recall at 0.5.
+    public var evaluationRows: Int
+    public var evaluationAUC: Double?
+    public var evaluationRealFPR: Double?
+    public var evaluationGeneratedRecall: Double?
+    public var evaluationNote: String
     public var seconds: Double
 }
 
@@ -127,10 +134,31 @@ public enum FusionTrainer {
             params.eta = eta
         case .warmStart(let add, let eta):
             guard let parent else { throw VeilGardeFailure.missing("a warm start needs the parent fusion head") }
+            guard parent.featureCount == dataset.data.features else {
+                throw VeilGardeFailure.data("the parent fusion head reads \(parent.featureCount) features; the store's fusion rows have \(dataset.data.features)",
+                                            hint: "train the fusion head from scratch")
+            }
             params.trees = add
             params.eta = eta
             warm = parent
         }
+        let comparable = parent.map { $0.featureCount == dataset.data.features } ?? false
+
+        // The evaluation twin: the same fit without the evaluation rows, scored on them.
+        let evalRows = (0..<dataset.data.count).filter { dataset.isEvaluation[$0] && !dataset.isHeldOut[$0] }
+        var evalAUC: Double? = nil, evalFPR: Double? = nil, evalRecall: Double? = nil
+        if !evalRows.isEmpty {
+            let twinTraining = dataset.subset { !dataset.isHeldOut[$0] && !dataset.isEvaluation[$0] }
+            note("fusion: evaluation twin on \(twinTraining.count) rows, \(evalRows.count) held out")
+            let twin = BoostTrainer.train(twinTraining, params: params, warmStart: warm, featureNames: []).model
+            let p = evalRows.map { twin.predict(dataset.data.row($0)) }
+            let y = evalRows.map { dataset.data.y[$0] }
+            let reals = zip(p, y).filter { $0.1 == 0 }, gens = zip(p, y).filter { $0.1 == 1 }
+            if !reals.isEmpty && !gens.isEmpty { evalAUC = Metrics.auc(p, y) }
+            if !reals.isEmpty { evalFPR = Double(reals.filter { $0.0 > 0.5 }.count) / Double(reals.count) }
+            if !gens.isEmpty { evalRecall = Double(gens.filter { $0.0 >= 0.5 }.count) / Double(gens.count) }
+        }
+
         note("fusion: \(training.count) rows to train on (\(dataset.isHeldOut.filter { $0 }.count) new-generator rows held out), \(params.trees) trees")
         let boost = BoostTrainer.train(training, params: params, warmStart: warm, featureNames: [], progress: { round in
             if (round.tree + 1 - (warm?.trees.count ?? 0)) % 20 == 0 { note("fusion: tree \(round.tree + 1)") }
@@ -142,7 +170,7 @@ public enum FusionTrainer {
             return Double(held.filter { m.predict(dataset.data.row($0)) >= 0.5 }.count) / Double(held.count)
         }
         var agreement: Double? = nil
-        if let parent {
+        if let parent, comparable {
             var same = 0
             for i in 0..<dataset.data.count {
                 let row = dataset.data.row(i)
@@ -151,9 +179,13 @@ public enum FusionTrainer {
             agreement = Double(same) / Double(max(1, dataset.data.count))
         }
         let report = FusionReport(rows: dataset.data.count, trainedOn: training.count, newGeneratorRows: dataset.isNewGenerator.filter { $0 }.count,
-                                  heldOutRows: dataset.isHeldOut.filter { $0 }.count, heldOutRecallParent: parent.flatMap(recall),
+                                  heldOutRows: dataset.isHeldOut.filter { $0 }.count,
+                                  heldOutRecallParent: comparable ? parent.flatMap(recall) : nil,
                                   heldOutRecallCandidate: recall(model), agreementWithParent: agreement, trees: model.trees.count,
-                                  inheritedTrees: boost.inheritedTrees, warpModels: dataset.warpModels, seconds: Date().timeIntervalSince(started))
+                                  inheritedTrees: boost.inheritedTrees, parentComparable: comparable, evaluationRows: evalRows.count,
+                                  evaluationAUC: evalAUC, evaluationRealFPR: evalFPR, evaluationGeneratedRecall: evalRecall,
+                                  evaluationNote: "measured on a twin fitted without these rows (StableSplit fusion-eval:v1); the written head trained on them",
+                                  seconds: Date().timeIntervalSince(started))
         return (model, report)
     }
 }

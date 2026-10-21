@@ -9,8 +9,8 @@
 //        more images, so the agreement should climb and the AUC gap close.
 //  PIN:  flywheel_agreement.py's formula on the store instead of the v197 fusion cache: every row that
 //        is not golden or NSFW and carries both embeddings; pooled = StackCombiner.pool (the
-//        detector's arithmetic) on the bundle's art, blur and human heads, the art-pair head and
-//        the stored noiseprint, for every row, capture-present ones included, as the Python formula computes it;
+//        detector's arithmetic) on the bundle's art, blur and human heads and the art-pair head,
+//        for every row, capture-present ones included, as the Python formula computes it;
 //        agreement = mean((base > 0.5) == (pooled > 0.5)); domains by v198_probe.domain_of's path
 //        rule; accuracy on a fixed 20% (StableSplit "agreement:v1" on the id). A row of the
 //        report appends to flywheel_metrics.csv with the Python report's columns.
@@ -70,9 +70,8 @@ public enum Agreement {
                         for column in FeatureColumn.fusion { row.append(contentsOf: s.vector(column, row: i)) }
                         let norm = Array(s.vector(.dinoNorm, row: i))
                         let p = fusion.predict(row)
-                        let np = s.vector(.noiseprint, row: i).first ?? .nan
                         b[k] = p
-                        w[k] = combiner.pool(base: p, heads: heads.map { $0.pAI(norm) }, pairAI: pair?.pAI(norm), np: np.isFinite ? np : nil)
+                        w[k] = combiner.pool(base: p, heads: heads.map { $0.pAI(norm) }, pairAI: pair?.pAI(norm))
                     }
                 }
             }

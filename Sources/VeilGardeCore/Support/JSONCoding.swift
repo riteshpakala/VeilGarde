@@ -7,8 +7,8 @@
 //        and staged reviews with.
 //  PIN:  Sorted keys and ISO-8601 dates, so the same value always encodes to the same bytes and
 //        a manifest's hash means something. Non-finite floats encode as strings so a log line
-//        never fails to write. The detector's result JSON (schema v2) is NOT written here: it
-//        keeps Garde's JSONSerialization bytes (Result/ResultJSON.swift). Ported from Braid.
+//        never fails to write. The detector's result JSON (schema v3) is NOT written here: it
+//        keeps JSONSerialization's sorted bytes (Result/ResultJSON.swift). Ported from Braid.
 //
 
 import Foundation

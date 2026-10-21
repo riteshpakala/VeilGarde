@@ -5,9 +5,9 @@
 //
 //  WHAT: The flywheel's laws on a fixture work area: init seeds live once; a promote moves exactly
 //        its slot behind the battery and logs it; a failed battery restores live byte for byte; a
-//        rollback returns live to the snapshot byte for byte; the frozen artifacts never move; the
-//        base moves only by a warm start of the live head; a calibration must be bound to the live
-//        sensor; an atlas head must pass admission; training and measuring never write live/.
+//        rollback returns live to the snapshot byte for byte; the frozen weights never move; the
+//        base moves only by a warm start of the live head; an atlas head must pass admission;
+//        training and measuring never write live/.
 //
 
 import Foundation
@@ -23,7 +23,7 @@ struct FlywheelInvariantsTests {
     }
 
     static func frozen(_ live: ModelBundle) -> [String: String] {
-        Dictionary(uniqueKeysWithValues: live.manifest.artifacts.filter(\.frozen).map { ($0.slot, $0.sha256) })
+        Dictionary(uniqueKeysWithValues: live.manifest.weights.map { ($0.slot, $0.sha256) })
     }
 
     @Test("init seeds live from the shipped bundle once")
@@ -35,7 +35,7 @@ struct FlywheelInvariantsTests {
         #expect(throws: VeilGardeFailure.self) { try f.area.initialize(from: try ModelBundle.load(Fixture.resources), spec: Data(), baseline: Data()) }
     }
 
-    @Test("a promote moves its slot behind the battery; frozen artifacts never move; rollback restores live byte for byte")
+    @Test("a promote moves its slot behind the battery; the frozen weights never move; rollback restores live byte for byte")
     func promoteAndRollback() throws {
         let f = try FlywheelFixture()
         let before = try f.area.liveHashes()
@@ -84,10 +84,10 @@ struct FlywheelInvariantsTests {
         #expect(last.contains("\"kind\":\"failed\""))
     }
 
-    @Test("frozen slots, a cold base, an unbound calibration and a blocking head are refused before live moves")
+    @Test("frozen and retired slots, a cold base and a blocking head are refused before live moves")
     func refusals() throws {
         let f = try FlywheelFixture()
-        for name in ["warp-tile", "fusion-reference", "noiseprint", "dinov2-small"] {
+        for name in ["dinov2-small", "clip-vision", "warp-tile", "calibration", "fusion-reference", "noiseprint"] {
             #expect(throws: VeilGardeFailure.self) { try FlywheelSlot(parsing: name) }
         }
         let before = try f.area.liveHashes()
@@ -95,12 +95,8 @@ struct FlywheelInvariantsTests {
         let cold = try Self.candidate(f, id: "cold") { FusionHead().scratch(trees: 3, eta: 0.1) }
         #expect(throws: VeilGardeFailure.self) { try promoter.promote(.base, from: cold) }
 
-        // A calibration bound to another sensor model, and a head that fires on every calm real.
+        // A head that fires on every calm real.
         var c = try CandidateBundle.open(cold)
-        let unbound = SensorCalibrationFile(sensorVariant: "warp19", sensorModelSHA256: String(repeating: "cd", count: 32), calibration: .identity,
-                                            plattPayload: nil, decisionThreshold: 0.5, uncertainBand: 0.04)
-        try c.put(try JSONCoding.prettyEncoder().encode(unbound), as: "calibration/warp_sensor_calibration.json", role: .sensorCalibration)
-        #expect(throws: (any Error).self) { try promoter.promote(.calibration, from: cold) }
         let shipped = try LinearHead.load(Fixture.resources.appendingPathComponent("human_dinov2_v4.json"))
         let blocking = HeadFile(model: "human_dinov2", scalerMean: shipped.mean.map(Double.init), scalerScale: shipped.scale.map(Double.init),
                                 coef: [Double](repeating: 0, count: 384), intercept: 9)
@@ -109,7 +105,7 @@ struct FlywheelInvariantsTests {
         #expect(throws: VeilGardeFailure.self) { try promoter.promote(.head(.human), from: cold, store: nil) }
         #expect(try f.area.liveHashes() == before)
         let refused = try String(contentsOf: f.area.promoteLog, encoding: .utf8).split(separator: "\n").filter { $0.contains("\"kind\":\"refused\"") }
-        #expect(refused.count == 4)
+        #expect(refused.count == 3)
     }
 
     @Test("the weekly candidates and the agreement read live and never write it")

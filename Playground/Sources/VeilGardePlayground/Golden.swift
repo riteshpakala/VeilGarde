@@ -3,8 +3,8 @@
 //  VeilGardePlayground
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: Comparing a result JSON with Garde's: every label exact and every number within a tolerance,
-//        times_sec and the sensor fields the two cuts changed on purpose (ResultJSON.changedSinceGarde) aside.
+//  WHAT: Comparing a result JSON with VeilGarde's own golden: every label exact and every number
+//        within a tolerance, times_sec aside.
 //
 
 import Foundation
@@ -18,7 +18,7 @@ enum Golden {
     }
 
     static func compare(_ a: Data, _ b: Data, tolerance: Double) throws -> (worst: Double, mismatches: [String]) {
-        let kept: ((String, Any)) -> Bool = { !$0.0.hasPrefix("times_sec") && !ResultJSON.changedSinceGarde($0.0) }
+        let kept: ((String, Any)) -> Bool = { !$0.0.hasPrefix("times_sec") }
         let x = Dictionary(uniqueKeysWithValues: leaves(try JSONSerialization.jsonObject(with: a)).filter(kept))
         let y = Dictionary(uniqueKeysWithValues: leaves(try JSONSerialization.jsonObject(with: b)).filter(kept))
         var worst = 0.0

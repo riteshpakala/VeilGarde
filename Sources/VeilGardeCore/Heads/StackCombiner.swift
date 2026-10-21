@@ -4,20 +4,21 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The stack combiner (v3 asymmetric evidence pooling): on a capture-absent image it pools
-//        the fusion base with the art, blur and human heads and noiseprint into one P(AI), and, when a
-//        combiner file asks for it, an art-pair head adjudicating the art head (the shipped one does not). Heads add bounded GEN evidence only (a head saying "real" adds
-//        nothing), all heads agreeing "real" can mount a consensus rescue when the base is
-//        uncertain, and noiseprint's camera evidence pulls toward real under the same gate. A
-//        saturated head can never overturn a confident base.
-//  PIN:  Garde's StackCombiner.pool and contribution, unchanged:
+//        the fusion base with the art, blur and human heads into one P(AI), and, when a combiner
+//        file asks for it, an art-pair head adjudicating the art head (the shipped one does not).
+//        Heads add bounded GEN evidence only (a head saying "real" adds nothing), and all heads
+//        agreeing "real" can mount a consensus rescue when the base is uncertain. A saturated head
+//        can never overturn a confident base.
+//  PIN:  The reference's pool and contribution, without the noiseprint term it carried until
+//        2026-10-21:
 //          lg(q, c) = clip(logit(clip(q, 1e-4, 1 − 1e-4)), ±c)
 //          z = w0 + w_base·lg(base, cap_base) + Σ w_gen[k]·max(0, l_k),  l = lg(head_k, cap_head)
 //          l_art = min(l_art, lg(pair, cap_head))                        when pair_adjudicates
-//          if base < gate_ceiling: z −= w_rescue·max(0, −max l);  z −= w_np·max(0, lg(np, cap_head))
+//          if base < gate_ceiling: z −= w_rescue·max(0, −max l)
 //          p = σ(z), generated iff p > 0.5
-//        Shipped: stack_combiner_v2.json, Garde's weights (w0 −0.6755, w_base 3.8205, w_gen [0, 0,
-//        0.1967], w_rescue 0.5, w_np 0.8, caps 4/2, gate 0.75) with pair_adjudicates false: the pruning
-//        study found the art-pair broke 19 store calls to fix 10. Arithmetic in Float, as Garde's.
+//        Shipped: stack_combiner_v3.json, refit on the store on 2026-10-21 over the fusion head that
+//        reads DINOv2 and capture (caps 4/2, gate 0.75, no art-pair adjudication). A file that still
+//        carries a noiseprint weight (w_np) is refused. Arithmetic in Float.
 //
 
 import Foundation
@@ -31,13 +32,11 @@ public struct StackCombiner: Codable, Sendable, Equatable {
     public var capBase: Float
     public var capHead: Float
     public var gateCeiling: Float
-    /// Noiseprint's camera-evidence weight (protect-real, ≥ 0). Absent in a v2 file.
-    public var wNp: Float?
     /// When true, the art logit is min(l_art, l_pair).
     public var pairAdjudicates: Bool?
 
     public init(w0: Float, wBase: Float, wGen: [Float], wRescue: Float, capBase: Float = 4, capHead: Float = 2,
-                gateCeiling: Float = 0.75, wNp: Float? = nil, pairAdjudicates: Bool? = true) {
+                gateCeiling: Float = 0.75, pairAdjudicates: Bool? = true) {
         self.w0 = w0
         self.wBase = wBase
         self.wGen = wGen
@@ -45,7 +44,6 @@ public struct StackCombiner: Codable, Sendable, Equatable {
         self.capBase = capBase
         self.capHead = capHead
         self.gateCeiling = gateCeiling
-        self.wNp = wNp
         self.pairAdjudicates = pairAdjudicates
     }
 
@@ -57,14 +55,23 @@ public struct StackCombiner: Codable, Sendable, Equatable {
         case capBase = "cap_base"
         case capHead = "cap_head"
         case gateCeiling = "gate_ceiling"
-        case wNp = "w_np"
         case pairAdjudicates = "pair_adjudicates"
     }
 
     public static func load(_ url: URL) throws -> StackCombiner {
-        do { return try JSONDecoder().decode(StackCombiner.self, from: Data(contentsOf: url)) } catch {
+        let data: Data
+        let combiner: StackCombiner
+        do {
+            data = try Data(contentsOf: url)
+            combiner = try JSONDecoder().decode(StackCombiner.self, from: data)
+        } catch {
             throw VeilGardeFailure.data("not a stack combiner: \(url.lastPathComponent): \(error)")
         }
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], object["w_np"] != nil {
+            throw VeilGardeFailure.data("the combiner \(url.lastPathComponent) carries a noiseprint term (w_np); the noiseprint left the detector on 2026-10-21",
+                                        hint: "refit the combiner with `veilgarde train combine`")
+        }
+        return combiner
     }
 
     /// The bounded logit.
@@ -84,7 +91,7 @@ public struct StackCombiner: Codable, Sendable, Equatable {
     }
 
     /// The pooled P(AI).
-    public func pool(base: Float, heads: [Float], pairAI: Float? = nil, np: Float? = nil) -> Float {
+    public func pool(base: Float, heads: [Float], pairAI: Float? = nil) -> Float {
         var z = w0 + wBase * lg(base, capBase)
         let ls = headLogits(heads, pairAI: pairAI)
         var maxHeadLogit = -capHead
@@ -92,10 +99,7 @@ public struct StackCombiner: Codable, Sendable, Equatable {
             maxHeadLogit = max(maxHeadLogit, l)
             if k < wGen.count { z += wGen[k] * max(0, l) }
         }
-        if base < gateCeiling {
-            z -= wRescue * max(0, -maxHeadLogit)
-            if let wn = wNp, let pn = np { z -= wn * max(0, lg(pn, capHead)) }
-        }
+        if base < gateCeiling { z -= wRescue * max(0, -maxHeadLogit) }
         return 1 / (1 + exp(-z))
     }
 
@@ -116,12 +120,11 @@ public struct CombinerFile: Codable, Sendable, Equatable {
     public var model = "stack_combiner"
     public var version = 3
     public var formula = "asymmetric"
-    public var inputs = ["base", "art_gen", "blur_gen", "human_gen", "rescue", "noiseprint"]
+    public var inputs = ["base", "art_gen", "blur_gen", "human_gen", "rescue"]
     public var w0: Double
     public var wBase: Double
     public var wGen: [Double]
     public var wRescue: Double
-    public var wNp: Double
     public var pairAdjudicates = true
     public var capBase: Double = 4
     public var capHead: Double = 2
@@ -129,12 +132,11 @@ public struct CombinerFile: Codable, Sendable, Equatable {
     public var threshold: Double = 0.5
     public var note: String
 
-    public init(w0: Double, wBase: Double, wGen: [Double], wRescue: Double, wNp: Double, note: String) {
+    public init(w0: Double, wBase: Double, wGen: [Double], wRescue: Double, note: String) {
         self.w0 = w0
         self.wBase = wBase
         self.wGen = wGen
         self.wRescue = wRescue
-        self.wNp = wNp
         self.note = note
     }
 
@@ -143,7 +145,6 @@ public struct CombinerFile: Codable, Sendable, Equatable {
         case wBase = "w_base"
         case wGen = "w_gen"
         case wRescue = "w_rescue"
-        case wNp = "w_np"
         case pairAdjudicates = "pair_adjudicates"
         case capBase = "cap_base"
         case capHead = "cap_head"

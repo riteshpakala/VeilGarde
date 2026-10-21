@@ -16,7 +16,7 @@ import Foundation
 import VeilGarde
 
 struct WeightsCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "weights", abstract: "List and verify the DINOv2, noiseprint and CLIP weights.",
+    static let configuration = CommandConfiguration(commandName: "weights", abstract: "List and verify the DINOv2 and CLIP weights.",
                                                     subcommands: [List.self, Verify.self, ImportDINOv2.self, ExportXXSmall.self, ImportCLIP.self])
 
     struct List: ParsableCommand {

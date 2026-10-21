@@ -3,16 +3,11 @@
 //  VeilGardeCLI
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: `veilgarde parity`: the checks against the Python references. `warp` compares one tile's
-//        residual maps with a cv2 fixture (dump_reference.py); `dirsig` compares the directional
-//        signature with a v4_a1_tilesig fixture. Each prints a JSON report of max |Δ| for the
-//        quantized and the exact-coordinate paths and exits 3 when the quantized path misses.
-//        `dino` compares DINOv2 embeddings of HF-preprocessed pixels with the dino_parity_dump.py
-//        references, isolating the ViT; with --images it runs the full Swift preprocessing on the
-//        raw images too (the end-to-end check).
-//  PIN:  Garde's --verify-warp, --verify-dirsig, --verify-dino and --verify-dino-e2e, with their
-//        thresholds: warp < 1e-3; signature < 1e-3 on the 16 raw energies and < 5e-3 on the 5
-//        log-ratios (log amplifies near-zero energies); ViT cosine ≥ 0.999; end to end ≥ 0.99.
+//  WHAT: `veilgarde parity`: the checks against the Python references. `dino` compares DINOv2
+//        embeddings of HF-preprocessed pixels with the dino_parity_dump.py references, isolating the
+//        ViT; with --images it runs the full Swift preprocessing on the raw images too (the end-to-end
+//        check). `clip` does the same for CLIP's vision tower.
+//  PIN:  The thresholds: ViT cosine ≥ 0.999; end to end ≥ 0.99.
 //
 
 import ArgumentParser
@@ -21,70 +16,14 @@ import VeilGarde
 
 struct ParityCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "parity", abstract: "Check the lens against the Python fixtures and against Garde.",
-        subcommands: [Warp.self, Dirsig.self, Dino.self, Clip.self])
+        commandName: "parity", abstract: "Check the DINOv2 and CLIP towers against the Python fixtures.",
+        subcommands: [Dino.self, Clip.self])
 
     static func floats(_ any: Any?) -> [Float]? { (any as? [Any])?.map { Float(($0 as? NSNumber)?.doubleValue ?? 0) } }
 
     static func report(_ values: [String: Double], pass: Bool) throws {
         try emitJSON(try JSONSerialization.data(withJSONObject: values, options: [.sortedKeys]), to: "-")
         if !pass { throw ArgumentParser.ExitCode(FailureCode.parityMismatch.rawValue) }
-    }
-
-    struct Warp: ParsableCommand {
-        static let configuration = CommandConfiguration(commandName: "warp", abstract: "Compare one tile's warp residual maps with a cv2 fixture ({tile, R_low, R_high}).")
-
-        @Argument(help: "The fixture JSON.") var fixture: String
-
-        func run() throws {
-            guarded {
-                let object = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: fixture))) as? [String: Any]
-                guard let tile = ParityCommand.floats(object?["tile"]), let low = ParityCommand.floats(object?["R_low"]), let high = ParityCommand.floats(object?["R_high"]) else {
-                    throw VeilGardeFailure.data("\(fixture) is not a warp fixture ({tile, R_low, R_high})")
-                }
-                func maxDiff(_ a: [Float], _ b: [Float]) -> Double { Double(zip(a, b).map { abs($0 - $1) }.max() ?? .infinity) }
-                var report = [String: Double]()
-                for quantize in [true, false] {
-                    let maps = WarpDebug.residualMaps(tileRGB: tile, quantizeLikeCV2: quantize)
-                    let key = quantize ? "cv2_quantized" : "exact_double"
-                    report["\(key)_low_maxdiff"] = maxDiff(maps.low, low)
-                    report["\(key)_high_maxdiff"] = maxDiff(maps.high, high)
-                }
-                try ParityCommand.report(report, pass: (report["cv2_quantized_low_maxdiff"] ?? 1) < 1e-3 && (report["cv2_quantized_high_maxdiff"] ?? 1) < 1e-3)
-            }
-        }
-    }
-
-    struct Dirsig: ParsableCommand {
-        static let configuration = CommandConfiguration(commandName: "dirsig", abstract: "Compare the directional signature with a v4_a1_tilesig fixture ({height, width, image, sig}).")
-
-        @Argument(help: "The fixture JSON.") var fixture: String
-
-        func run() throws {
-            guarded {
-                let object = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: fixture))) as? [String: Any]
-                guard let h = (object?["height"] as? NSNumber)?.intValue, let w = (object?["width"] as? NSNumber)?.intValue,
-                      let img = ParityCommand.floats(object?["image"]), let sig = ParityCommand.floats(object?["sig"]) else {
-                    throw VeilGardeFailure.data("\(fixture) is not a signature fixture ({height, width, image, sig})")
-                }
-                let tiles = (h / 32) * (w / 32)
-                var report = [String: Double]()
-                for quantize in [true, false] {
-                    let got = WarpDebug.directionalSignature(imageRGB: img, height: h, width: w, quantizeLikeCV2: quantize)
-                    var raw: Float = 0, derived: Float = 0
-                    for t in 0..<tiles {
-                        for f in 0..<DirectionalSignature.count {
-                            let d = abs(got[t * 21 + f] - sig[t * 21 + f])
-                            if f < 16 { raw = max(raw, d) } else { derived = max(derived, d) }
-                        }
-                    }
-                    let key = quantize ? "cv2_quantized" : "exact_double"
-                    report["\(key)_raw_maxdiff"] = Double(raw)
-                    report["\(key)_derived_maxdiff"] = Double(derived)
-                }
-                try ParityCommand.report(report, pass: (report["cv2_quantized_raw_maxdiff"] ?? 1) < 1e-3 && (report["cv2_quantized_derived_maxdiff"] ?? 1) < 5e-3)
-            }
-        }
     }
 
     struct Dino: ParsableCommand {

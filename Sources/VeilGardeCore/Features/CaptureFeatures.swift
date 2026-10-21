@@ -11,7 +11,7 @@
 //        destroys it, so `valid` requires a native short side of 512. `present` needs peak ≥ 30,
 //        Swift's threshold since 2026-07-11 (the Python reference used 20; the [20, 30) band held only
 //        AI-video re-encodes). The order of the nine is capture_signature.py's
-//        CAPTURE_FEATURE_NAMES and the fusion head's columns 386–394.
+//        CAPTURE_FEATURE_NAMES and the fusion head's columns 384–392.
 //
 
 /// What the verdict and the trust law read from the capture signature.

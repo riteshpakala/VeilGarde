@@ -37,7 +37,7 @@ final class FlywheelFixture {
         // The battery: one HARD group of one image that must read real.
         probe = root.appendingPathComponent("probe.jpg")
         try Data("probe".utf8).write(to: probe)
-        verdicts = CannedVerdicts([probe.path: BatteryVerdict(weighted: "real", weightedScore: 0.2, semanticScore: 0.1, capturePresent: false)])
+        verdicts = CannedVerdicts([probe.path: BatteryVerdict(prediction: "real", p: 0.2, semanticScore: 0.1, capturePresent: false)])
         let spec = BatterySpec(groups: [BatterySpec.Group(name: "protect_real", mode: .hard, want: "real", paths: [probe.path])])
         let baseline = ["protect_real": BatteryGroupResult(acc: 1, n: 1, mode: .hard, want: "real")]
         let shipped = try ModelBundle.load(Fixture.resources)
@@ -55,7 +55,7 @@ final class FlywheelFixture {
         }
     }
 
-    func fail() { verdicts.verdicts[probe.path] = BatteryVerdict(weighted: "generated", weightedScore: 0.9, semanticScore: 0.9, capturePresent: false) }
+    func fail() { verdicts.verdicts[probe.path] = BatteryVerdict(prediction: "generated", p: 0.9, semanticScore: 0.9, capturePresent: false) }
 
     static func writeStore(_ directory: URL) throws {
         var rng = SplitMix64(seed: 3)
@@ -78,9 +78,6 @@ final class FlywheelFixture {
                 columns[.dinoNorm]! += norm
                 columns[.dinoFusion]! += (0..<384).map { j in gauss() + (label == 1 && j < 10 ? 1 : 0) }
                 columns[.cap]! += [Float(rng.unit() * 40), 1, 0, 2000, 5, 0.5, 0.5, 0.5, 0]
-                columns[.warp]!.append(Float(0.45 + (label == 1 ? 0.15 : 0)))
-                columns[.sharp]! += [10, 10, 1]
-                columns[.noiseprint]!.append(label == 0 ? 0.6 : 0.3)
             }
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
