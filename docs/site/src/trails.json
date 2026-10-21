@@ -452,7 +452,7 @@
    "kind": "inference",
    "title": "Shared Signals",
    "subtitle": "everything later stages read, computed once",
-   "say": "The second stage: one object holds what every later stage reads, each computed once on first use: the screenshot gate, the capture signature, the two DINOv2 readings, and the warp residual's statistics, measured by the watermark's code. The Domain stage reads the gate first.",
+   "say": "The second stage: one object holds what every later stage reads, each computed once on first use: the screenshot gate, the capture signature and the two DINOv2 readings. The Domain stage reads the gate first.",
    "steps": [
     {
      "n": 1,
@@ -536,44 +536,6 @@
        "scope": "SemanticLens.normalizedEmbedding(_:variant:normW:normH:)",
        "anchor": "Dinov2Preprocess.inputNormalized(cg, normW: normW, normH: normH)",
        "note": "The same backbone after a forced resize, so a phone screenshot's size cannot leak into the heads' embedding."
-      }
-     ]
-    },
-    {
-     "n": 5,
-     "title": "The warp base, from VeilWatermark",
-     "chapters": [
-      "07-residual.html"
-     ],
-     "entries": [
-      {
-       "scope": "DetectionSignals.residual()",
-       "anchor": "let r = try ResidualStatistics.measure(cgImage)",
-       "note": "The warp residual's 38 statistics, measured only when the fusion head's layout reads them; the shipped head does not.",
-       "link": "none"
-      },
-      {
-       "scope": "ResidualStatistics.measure(_:)",
-       "anchor": "summarize(TileFeatures.measure(try TilePlane(cg)))",
-       "note": "The watermark's code measures; detection reads only these numbers.",
-       "cite": "WHAT"
-      },
-      {
-       "scope": "TilePlane.init(_:maxDim:)",
-       "anchor": "let real = try ImageLoading.rgbPixels(cg, width: w, height: h)",
-       "note": "The image capped at 512 on its longest edge and padded to whole 32-pixel tiles, as the research's tiles were cut.",
-       "cite": "PIN:Sources/VeilWatermark/Residual/TileFeatures.swift"
-      },
-      {
-       "scope": "TileFeatures.measure(_:quantizeLikeCV2:)",
-       "anchor": "let FR = WarpResidual.fragility(low: Rl, high: Rh)",
-       "note": "warp19: each tile's fragility, variances, mirror correlation, seams and demosaic columns, through the same residual the signature reads."
-      },
-      {
-       "scope": "ResidualStatistics.summarize(_:)",
-       "anchor": "let spread = (0..<f).map { max(0, squares[$0] / N - mean[$0] * mean[$0]).squareRoot() }",
-       "note": "Each feature's mean, then its spread, over the tiles: the store's residual column.",
-       "cite": "PIN"
       }
      ]
     }
@@ -687,13 +649,13 @@
       {
        "scope": "FusionLayout.of(width:)",
        "anchor": "guard let layout = FusionLayout(width: width) else {",
-       "note": "393 columns read DINOv2 and capture, 777 add the second reading, 815 add the residual statistics; any other width is refused.",
+       "note": "A head's width names its row; v1's head is 393 columns wide. Wider rows exist in the code for candidates and are not shipped.",
        "cite": "WHAT:Sources/VeilGardeCore/Features/FusionVector.swift"
       },
       {
        "scope": "Fusion.vector(_:layout:capture:)",
-       "anchor": "case .bothReadingsResidual: return try s.dinoFusion() + s.dinoNorm() + cap + s.residual()",
-       "note": "Concatenates the shared signals in the layout's order, nothing measured twice."
+       "anchor": "case .dinoCapture: return try s.dinoFusion() + cap",
+       "note": "v1's head reads the plain DINOv2 reading and the nine capture values, 393 columns, in the order the store keeps them."
       }
      ]
     },

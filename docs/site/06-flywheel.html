@@ -45,7 +45,7 @@
 
 <h2 id="battery">The battery</h2>
 <p>The battery is a set of images grouped by what the detector must do with them. Six groups are hard: every image in them must get the call its group wants. Two more are ratchets that must not fall below their recorded floors.</p>
-<p>The owner named the shipped two-lane detector v1 on 2026-10-21 and made its battery the baseline for testing. Battery spec v3 sets aside the four generated images v1 reads as real. They sit in the spec's staged list for research, measured and not gated. On the 96 images left, v1 passes every group, and the ratchets' floors were recorded from that run.</p>
+<p>The owner named the shipped two-lane detector v1 on 2026-10-21 and made its battery the baseline for testing. Battery spec v3 sets aside the four generated images v1 reads as real, in the spec's staged list for research. On every image left, v1 passes every group, and the ratchets' floors were recorded from that run.</p>
 <div class="scroll">
 <table class="data">
 <thead><tr><th>Group</th><th>Mode</th><th class="n">Images, v3</th><th class="n">Right, warp era</th><th class="n">Right, v1</th><th>Status, v1</th></tr></thead>
@@ -61,7 +61,7 @@
 </tbody>
 </table>
 </div>
-<p>The four set aside are generated images the head without the warp reads as real; in the warp era every one was called generated, and HNUFoy2bcAA0vDW defeated every wider head of the 2026-10-21 studies too. Promote runs the full battery after every write, so a candidate must hold every v1 floor.</p>
+<p>In the warp era all four were called generated. HNUFoy2bcAA0vDW also defeated every wider head the 2026-10-21 studies trained. Promote runs the full battery after every write, so a candidate must hold every v1 floor.</p>
 <div class="code" data-excerpt="Sources/VeilGardeFlywheel/Battery/BatteryRunner.swift:BatteryRunner.run(spec:specURL:gate:baselineURL:verdicts:vars:rebaseline:note:)"></div>
 
 <h2 id="promote">Promote is the only writer of live</h2>

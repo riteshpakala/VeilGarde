@@ -34,7 +34,7 @@
 <thead><tr><th class="n">#</th><th>Stage</th><th>What it does</th><th>Trail</th></tr></thead>
 <tbody>
 <tr><td class="n">1</td><td>Decode</td><td>The file to the pixels every model saw: NSImage first, then ImageIO.</td><td><a href="code.html#trail-decode-1">DE</a></td></tr>
-<tr><td class="n">2</td><td>Shared Signals</td><td>Computed once: the screenshot gate, the capture signature, both DINOv2 readings, and the warp residual's statistics measured by the watermark's code.</td><td><a href="code.html#trail-shared-signals-1">SG</a></td></tr>
+<tr><td class="n">2</td><td>Shared Signals</td><td>Computed once: the screenshot gate, the capture signature and both DINOv2 readings.</td><td><a href="code.html#trail-shared-signals-1">SG</a></td></tr>
 <tr><td class="n">3</td><td>Domain</td><td>A hint, else the gate: camera or screenshot, never by size.</td><td><a href="code.html#trail-domain-1">DO</a></td></tr>
 <tr><td class="n">4</td><td>Base</td><td>The fusion head's P(AI), its row in the layout its width names.</td><td><a href="code.html#trail-base-1">BA</a></td></tr>
 <tr><td class="n">5</td><td>Stack</td><td>Capture first, then the specialist heads pooled onto the base.</td><td><a href="code.html#trail-stack-1">SK</a></td></tr>
@@ -43,7 +43,7 @@
 </tbody>
 </table>
 </div>
-<p>The warp residual crosses into detection only as numbers. Its code lives in the watermark, and the shipped fusion head does not read it.</p>
+<p>v1 does not read the warp residual. A candidate head could take its statistics as numbers from the watermark's code; none ships.</p>
 
 <h2 id="order">The order of the steps</h2>
 <div class="code" data-excerpt="Sources/VeilGardeInference/Route/Detector.swift:Detector.detect(cgImage:config:hint:)"></div>
