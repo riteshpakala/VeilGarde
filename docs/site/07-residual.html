@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What does the warp residual measure? · VeilGarde</title>
+<meta name="description" content="The warp residual: every 32-pixel tile at native size warped through 16 fixed homographies and back at two strengths, the high frequencies of what the round trip loses, and the fragility rate the watermark reads.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-groups="Sources-VeilWatermark">
+<a class="skip" href="#main">Skip to the chapter</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 7 of 10</span><a href="code.html#trail-watermark-signing-2">Walk the residual in the explorer</a></header>
+
+<h1 id="ch-residual">What does the warp residual measure?</h1>
+<p class="lede"><em>On the one physical measurement VeilGarde keeps: what a tile loses when it is warped a hair out of place and back.</em></p>
+
+<p>A camera leaves a trace in its pixels that a generator does not. The sensor sees the scene through a mosaic of red, green and blue filters, and every pixel carries a little noise of its own. Warp a patch of those pixels a hair out of place and back, and the mosaic and the noise do not come back as they were.</p>
+<p>A generator's output is smoother, and it survives the round trip differently. What the round trip loses is the warp residual. VeilGarde reads one number from it for every tile, the fragility rate, and since 2026-10-21 only the watermark reads it.</p>
+
+<h2 id="tiles">Thirty-two pixels at native size</h2>
+<p>The residual is read tile by tile, each tile a square of 32 by 32 pixels. The image is decoded once at its own size, with no cap and no padding, and only full tiles count.</p>
+<p>Native size is the point. A crop must land on the same pixels in the same tiles as its source, so the matcher can find it. A resize would move every pixel to a new tile, and the pattern with it.</p>
+<div class="code" data-excerpt="Sources/VeilWatermark/Residual/FragilityGrid.swift:NativePlane.init(_:)"></div>
+
+<h2 id="warps">Sixteen warps, two strengths</h2>
+<p>Each tile is warped through 16 fixed homographies. Here a homography moves the tile's four corners and drags every pixel with them. The 16 corner moves were drawn once from a seeded generator and are kept as a literal table: every signature ever written was read through these warps and no others.</p>
+<div class="code" data-excerpt="Sources/VeilWatermark/Residual/WarpTables.swift:WarpTables.build(scale:quantizeLikeCV2:)"></div>
+<p>Each warp runs at two strengths, 0.025 and 0.05. At the stronger one a corner moves up to 1.6 pixels along each axis.</p>
+<p>The tile goes forward and comes back through cv2's bicubic kernel and its 1/32-pixel coordinates. The way back keeps the reference's inverse of the inverse in float64 rather than the original matrix, because the two round differently and the signatures were read the first way.</p>
+<p>The residual is the difference between each pixel and its value after the round trip, averaged over the 16 warps and the three colour channels. Only its high frequencies are kept: a 9×9 Gaussian blur at σ 1.5 is subtracted, the one parameter that won the research's v29 ablation.</p>
+<div class="code" data-excerpt="Sources/VeilWatermark/Residual/WarpResidual.swift:WarpResidual.batch(_:forward:back:)"></div>
+
+<h2 id="fragility">One number a tile</h2>
+<p>The fragility rate compares the two strengths. It is the mean residual at 0.05, less the mean at 0.025, per unit of strength. A tile whose texture breaks up faster under the stronger warp has the higher rate.</p>
+<div class="code" data-excerpt="Sources/VeilWatermark/Residual/WarpResidual.swift:WarpResidual.fragility(low:high:)"></div>
+<p>The plane is cut into tiles from a chosen origin, so the same image can be read on a grid shifted by any number of pixels. Signing reads it from the top-left corner. Matching reads a crop from 16 origins, every 8 pixels in each direction, as chapter 8 tells.</p>
+<p>The tiles go to the GPU in batches of 256, both strengths for each batch, and the rates come back in row-major order.</p>
+<div class="code" data-excerpt="Sources/VeilWatermark/Residual/FragilityGrid.swift:NativePlane.fragility(originX:originY:quantizeLikeCV2:)"></div>
+<p>The rates are pinned. For the two parity crops, the tests hold every tile's rate and the signature's id exactly. A separate gate signs the battery's 105 images again and compares each signature with the recorded one.</p>
+
+<h2 id="history">Where the residual came from</h2>
+<p>Until 2026-10-21 the same residual fed the detector, and the branch 2026-rnd keeps that code.</p>
+<p>Each tile became a row of 19 features. A tree model scored each tile, and the tiles gave a weighted verdict and a camera-sensor call. The record chapter keeps that model's numbers.</p>
+<p>The research measured that the detector no longer needed it. Refit without the warp score, the fusion head lost 0.0012 AUC on held-out store rows, at the noise floor of a re-seed. The owner then gave the warp to the watermark alone.</p>
+<p>The move changed no operation and no order. The residual's five files moved from the lens into the watermark. The tests held the pinned rates and ids bit for bit before the change, after detection lost the warp, and after the move.</p>
+
+<h2 id="sources">Where the numbers come from</h2>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>32-pixel tiles, 16 homographies, strengths 0.025 and 0.05, a 9×9 high-pass at σ 1.5, 256 tiles a batch</td><td class="mono"><a href="code.html#Sources/VeilWatermark/Residual/WarpConstants.swift">WarpConstants.swift</a>; test “tiles of 32 px, 16 trials, a 9×9 high-pass at σ 1.5, strengths 0.025 and 0.05, 256 tiles an eval”</td><td>Ported 2026-10-19; pinned by a test on 2026-10-21, <a href="index.html#command-88">ledger command-88</a></td></tr>
+<tr><td>The 16 corner moves</td><td class="mono"><a href="code.html#Sources/VeilWatermark/Residual/WarpDisplacements.swift">WarpDisplacements.swift</a> PIN, numpy's default_rng(42); test “the sixteen corner moves are the literal table, every value”</td><td>2026-10-21</td></tr>
+<tr><td>The high-pass won the v29 ablation</td><td class="mono"><a href="code.html#Sources/VeilWatermark/Residual/WarpConstants.swift">WarpConstants.swift</a> PIN, quoted from the research</td><td>Not recorded</td></tr>
+<tr><td>The inverse of the inverse, cv2's bicubic, 1/32-pixel coordinates</td><td class="mono"><a href="code.html#Sources/VeilWatermark/Residual/WarpTables.swift">WarpTables.swift</a> PIN</td><td>Ported 2026-10-19</td></tr>
+<tr><td>Both crops' rates and signature ids, bit for bit, before the change, after it and after the move</td><td>Test “each parity crop's fragility rate and signature are the pinned ones”; <a href="index.html#command-88">ledger command-88</a></td><td>2026-10-21</td></tr>
+<tr><td>105 of 105 signatures equal after each change</td><td><a href="index.html#command-99">Ledger command-99</a> and <a href="index.html#command-100">command-100</a></td><td>2026-10-21</td></tr>
+<tr><td>−0.0012 AUC without the warp score</td><td><a href="index.html#command-56">Ledger command-56</a>, 22,703 held-out store rows</td><td>2026-10-19</td></tr>
+<tr><td>The warp leaves detection; the residual moves into the watermark</td><td><a href="index.html#decision-104">Ledger decision-104</a> and <a href="index.html#decision-108">decision-108</a>, after the owner's request</td><td>2026-10-21</td></tr>
+</tbody>
+</table>
+</div>
+
+<details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
+<ul class="plain">
+<li>The residual lives in <code>Sources/VeilWatermark/Residual/</code>: WarpConstants, WarpDisplacements, WarpTables, WarpResidual and FragilityGrid. The warp taps, the Gaussian blur and the perspective transforms are Frigate's MLXAccelerate.</li>
+<li><a href="code.html#trail-watermark-signing-2">Watermark signing, step 2,</a> walks it from NativePlane.fragility through the tables to the rate.</li>
+<li>ResidualTests in the watermark's tests pin the table, the constants, both crops' rates and their ids; run them after any change under Residual.</li>
+<li><code>veilgarde watermark invariance --images &lt;dir&gt; --baseline &lt;json&gt;</code> signs a folder again and fails on any signature that moved.</li>
+</ul>
+</div></details>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/index.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount();</script>
+</body>
+</html>

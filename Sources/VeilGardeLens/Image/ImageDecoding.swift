@@ -7,12 +7,12 @@
 //        applies the EXIF orientation (an iPhone photo stored sideways is analysed upright) and,
 //        for some sources, re-renders the rotated image in its own colour space.
 //  PIN:  Garde loaded every image as NSImage(contentsOf:).cgImage(forProposedRect: nil, …), and
-//        the heads, the fusion corpus and the calibration were all computed from Swift features
-//        decoded that way. Measured 2026-10-19 against Garde's own runs:
+//        the heads and the fusion corpus were computed from Swift features decoded that way.
+//        Measured 2026-10-19 against Garde's own runs:
 //        on unrotated images NSImage and ImageIO agree byte for byte, but on rotated iPhone JPEGs
 //        NSImage renders Display P3 into Generic RGB (bitmap info 8194) and a pixel-exact ImageIO
 //        rotation differs by up to 58 levels, moving the capture peak by up to 50 and flipping a
-//        weighted verdict. So decoding stays NSImage's, the only AppKit use in Sources
+//        verdict. So decoding stays NSImage's, the only AppKit use in Sources
 //        (PackageLayeringTests). ImageIO is the fallback only for bytes NSImage cannot read.
 //
 

@@ -96,6 +96,17 @@
       "id": "amendment-19",
       "date": "2026-10-20",
       "text": "Make this an unsupervised run, I will be AFK."
+    },
+    {
+      "id": "amendment-20",
+      "date": "2026-10-21",
+      "edited": true,
+      "text": "The fusion head truly just requires DINOv2 and the capture signature; otherwise the watermark is warp dependent pretty much. So I think a cleaner stack is this: fusion head → specialist heads for deepfake detection; warp → purely for watermark. Simple and highly effective."
+    },
+    {
+      "id": "amendment-21",
+      "date": "2026-10-21",
+      "text": "Time to make this even simpler.\nPhase 1) Make a new branch to backup the current repo into a branch named 2026-rnd\nPhase 2) Full simplification into 2 parallel lanes. Deepfake detection is only the fusion head and the specialist stack. And the flywheel is only meant to train and improve the fusion head and specialist stack\nPhase 3) Bring the warp model back to just FR JUST FOR THE WATERMARK only the watermark uses warp so keep it in there instead. and make sure the watermark/signature remains consistent passing all kill criteria\nPhase 4) Clean up all dead code afterwards update the site/docs and then update the trails in the code explorer. I expect the trails and guides to be easier to follow now after this session as well.\nIn regards to deepfake detection AUC changes after this, even if it drops, but the margin is negligible it should be fine, we will just begin the flywheel training soon to bring it back up."
     }
   ],
   "answers": [
@@ -202,6 +213,58 @@
       "question_id": "question-12",
       "question": "The redundancy verdicts' bars: redundant at a gain of at most 0.005 AUC, complementary when the gain's interval excludes zero and exceeds 0.005, reconstructed at a held-out AUC of at least 0.90; or tighter, or looser?",
       "answer": "The owner answered with amendment-18, the condensed model, and named no bar; the proposed 0.005 and 0.90 were fixed when the plan was approved."
+    },
+    {
+      "id": "answer-17",
+      "date": "2026-10-21",
+      "question": "The result JSON once the warp leaves detection: keep schema v2 with its warp, majority and sensor fields emptied, or a clean break to a schema v3 of VeilGarde's own?",
+      "answer": "Schema v3, a clean break (Recommended)"
+    },
+    {
+      "id": "answer-18",
+      "date": "2026-10-21",
+      "question": "The noiseprint: keep it as the combiner's camera evidence, or drop it from the detector, the bundle, the store's columns and the trainers?",
+      "answer": "Drop it entirely (Recommended)"
+    },
+    {
+      "id": "answer-19",
+      "date": "2026-10-21",
+      "question": "Zoom escalation, the render taxonomy and the x-domain gate, none of which runs by default: keep them behind their switches, or remove all three?",
+      "answer": "Remove all three (Recommended)"
+    },
+    {
+      "id": "answer-20",
+      "date": "2026-10-21",
+      "question": "The bar the retrained fusion head and combiner must clear before they ship: the battery's floors, a census bar, or none?",
+      "answer": "No bar"
+    },
+    {
+      "id": "answer-21",
+      "date": "2026-10-21",
+      "question_id": "question-13",
+      "question": "The golden combination of warp features, or the shipped warp model?",
+      "answer": "Closed by amendment-21: the warp left detection on 2026-10-21, so no warp model ships and none is chosen; the golden candidate stays in the work area and its code on the 2026-rnd branch."
+    },
+    {
+      "id": "answer-22",
+      "date": "2026-10-21",
+      "question_id": "question-14",
+      "question": "The noiseprint term: keep it, take it out, or decide it with the warp model?",
+      "answer": "Taken out with everything else of the noiseprint (answer-18)."
+    },
+    {
+      "id": "answer-23",
+      "date": "2026-10-21",
+      "question_id": "question-15",
+      "question": "The condensed model: pursue it, or close it?",
+      "answer": "Closed by amendment-21: detection is the fusion head and the specialist stack; the condensed model's code is on the 2026-rnd branch."
+    },
+    {
+      "id": "answer-24",
+      "date": "2026-10-21",
+      "question_id": "question-16",
+      "question": "The site's data cap: keep 3.5 MB, or restore 3 MB?",
+      "answer": "Restored to 3 MB: with the warp's, the noiseprint's and the studies' sources gone the data measured 2.28 MB on 2026-10-21, under the old cap (decision-117)."
     }
   ],
   "base": {
@@ -321,7 +384,8 @@
       "chose": "Inference holds no MLX: the sensor lane's second pass lives in the Lens (WarpLens.sensorLane)",
       "rejected": "listing MLX in VeilGardeInference",
       "reason": "the detector composes; the Lens computes; PackageLayeringTests keeps each Frigate import in a target that lists it",
-      "file": "Sources/VeilGardeLens/Warp/WarpLens.swift"
+      "file": "Sources/VeilGardeLens/Warp/WarpLens.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-17",
@@ -335,7 +399,8 @@
       "chose": "Drop Garde's legacy per-patch scorer (scoreGroup, fullGridFeatures=false)",
       "rejected": "porting it behind a flag",
       "reason": "no deployment or battery path ran it; Garde's own comment says do not deploy it with optimal_8",
-      "file": "Sources/VeilGardeLens/Features/FullGridExtractor.swift"
+      "file": "Sources/VeilGardeLens/Features/FullGridExtractor.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-19",
@@ -384,7 +449,8 @@
       "chose": "The deployed warp shape is optimal_8's recorded settings: 200 trees, depth 8, eta 0.1, subsample 0.8, colsample_bytree 0.8, seed 0",
       "rejected": "sweeping eta over 0.03, 0.05 and 0.1 as the plan proposed",
       "reason": "the research's xgboost_tile32_v2.5_optimal_8.pkl records them in get_params(), so nothing needs to be guessed",
-      "file": "Sources/VeilGardeTraining/Warp/WarpTrainer.swift"
+      "file": "Sources/VeilGardeTraining/Warp/WarpTrainer.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-26",
@@ -461,7 +527,8 @@
       "chose": "The tile cut bounds MLX's buffer cache, releases it after every image, and decodes up to six images ahead on CPU threads through the loader's own CPU half",
       "rejected": "the plain one-image-at-a-time loop",
       "reason": "the first cut reached 38 GB resident after about 400 iPhone photos and stalled at 0.9 images/s; ImageLoading.prepare is load's CPU half, so the warp JSON stays byte-identical to Garde's (WarpGoldenTests)",
-      "file": "Sources/VeilGardeTraining/Extract/TileExtractor.swift"
+      "file": "Sources/VeilGardeTraining/Extract/TileExtractor.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-37",
@@ -482,7 +549,8 @@
       "chose": "The model, head and combiner caches key on the file's path, modification date and size",
       "rejected": "the path alone",
       "reason": "a promote rewrites fusion_head.xgb.json in place and its battery runs in the same process; keyed by path, the battery would score the old bytes",
-      "file": "Sources/VeilGardeLens/Scoring/XGBoostScorer.swift"
+      "file": "Sources/VeilGardeLens/Scoring/XGBoostScorer.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-40",
@@ -622,28 +690,32 @@
       "chose": "The noiseprint trains with Adam with bias correction",
       "rejected": "mlx-swift's Adam default (no bias correction)",
       "reason": "The v202 reference trained with PyTorch's Adam, which always corrects the moments' bias",
-      "file": "Sources/VeilGardeTraining/Noiseprint/NoiseprintTrainer.swift"
+      "file": "Sources/VeilGardeTraining/Noiseprint/NoiseprintTrainer.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-60",
       "chose": "Each image draws its patches from its own CPython Random stream, seeded by the patch seed and its index",
       "rejected": "one stream over all images in order, as the reference drew them",
       "reason": "images can then be cut six at a time and in any order with the same patches; the reference's single stream made each image's draws depend on every earlier decode",
-      "file": "Sources/VeilGardeTraining/Noiseprint/PatchSampler.swift"
+      "file": "Sources/VeilGardeTraining/Noiseprint/PatchSampler.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-61",
       "chose": "The noiseprint's negatives are ai_photo, ai_art (Midjourney v6 from mj_pool), web_real, screenshot and ai_video (Sora and Hailuo frames)",
       "rejected": "the reference's six families",
       "reason": "the atlas pools behind ai_art, shot_render and cgi were deleted from the T9 in the features-only cleanup (measured 2026-10-19: <datasets>/atlas does not exist); shot renders and CGI have no surviving images",
-      "file": "Sources/VeilGardeTraining/Noiseprint/NoiseprintData.swift"
+      "file": "Sources/VeilGardeTraining/Noiseprint/NoiseprintData.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-62",
       "chose": "HEIC at 0.75 stands in for the reference's WebP 75 recompression level",
       "rejected": "dropping the level",
       "reason": "macOS ImageIO has no WebP encoder; the five-level design (both classes recompressed alike) is what keeps compression from becoming the label",
-      "file": "Sources/VeilGardeTraining/Noiseprint/PatchSampler.swift"
+      "file": "Sources/VeilGardeTraining/Noiseprint/PatchSampler.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-63",
@@ -671,21 +743,24 @@
       "chose": "The noiseprint's photoreal family reads ig_fullres/generated alone (116 full-resolution photoreal AI images from Instagram), placed last so the other families keep their splits; the adversarial anchor is excluded from every family by path and by content",
       "rejected": "adding photoreal_faces/gen",
       "reason": "photoreal_faces/gen holds 224-pixel face crops of 86 of the same ig_fullres images (same names, checked 2026-10-19): the same source image would sit on both sides of the split, and 224 pixels is under the 4×4 grid of 128-pixel patches the net scores",
-      "file": "Sources/VeilGardeTraining/Noiseprint/NoiseprintData.swift"
+      "file": "Sources/VeilGardeTraining/Noiseprint/NoiseprintData.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-67",
       "chose": "Adoption rules for the photoreal retrain, fixed before it runs: (1) the anchor reads P(camera) < 0.5, native; (2) the pooled held-out AUC (camera against every family, native) is at least the shipped net's on the same images minus 0.005; (3) the photoreal family's native AUC is at least the shipped net's. Passing all three stages the net as a candidate; the shipped default changes only on the owner's word",
       "rejected": "adopting on AUC alone, as the 2026-10-19 run would have",
       "reason": "the first retrain beat the shipped net's AUC and still read the anchor as a camera (question-2); rules first, numbers second",
-      "file": "Sources/VeilGardeTraining/Noiseprint/NoiseprintTrainer.swift"
+      "file": "Sources/VeilGardeTraining/Noiseprint/NoiseprintTrainer.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-68",
       "chose": "The pruning study's rules, fixed before it runs: (1) every number is held out. The warp studies score final_mixed's test partition (1,738 images, StableSplit by stem; no model the study fits trains on it). The fusion studies fit on 80% of the store's rows and score the other 20% (StableSplit prune:v1 on the row id). The stack studies run on the store's capture-absent rows, which the shipped heads and combiner may have seen, so they report how often a term changes the call, not a generalization AUC. (2) A part is a pruning candidate when taking it out costs at most 0.005 held-out AUC and changes at most 0.5% of held-out calls; it is over-provisioned when half its trees, or a shallower depth, comes within 0.005 of its full AUC. (3) Every difference carries a bootstrap 95% interval (1,000 resamples of images or rows, seed 0); an interval that spans zero is reported as no measurable difference. (4) Nothing shipped changes in this run: findings become recommendations and questions for the owner",
       "rejected": "judging each part after seeing its numbers",
       "reason": "amendment-4 asks what can be pruned and what is over-optimized; the bar and the data are named before any number exists, so a finding cannot pick its own threshold",
-      "file": "Sources/VeilGardeTraining/Research/PruningStudy.swift"
+      "file": "Sources/VeilGardeTraining/Research/PruningStudy.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-69",
@@ -699,7 +774,8 @@
       "chose": "Two controls added after the first run, under unchanged rules: refits that change only the seed (1 and 2), giving the call movement a refit makes on its own; and combined drops of the parts whose single drop was within the AUC tolerance (the warp's mirror, seam and CFA groups together; fusion without sharpness and warp together)",
       "rejected": "judging a single drop's moved calls with no noise floor; dropping parts one at a time only",
       "reason": "every warp refit moved 60–200 calls, including features that carry no measurable AUC, so the 0.5% call bar cannot tell a part's effect from a refit's own noise; the controls are labelled post hoc in the report and the chapter, and the rules of decision-68 are not changed",
-      "file": "Sources/VeilGardeTraining/Research/PruningStudy.swift"
+      "file": "Sources/VeilGardeTraining/Research/PruningStudy.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-71",
@@ -720,14 +796,16 @@
       "chose": "The art-pair adjudicator leaves the shipped system: the shipped combiner, stack_combiner_v2.json, is Garde's weights with pair_adjudicates false; the art-pair head leaves the bundle and the shipped recipe; and the trainer writes a combiner that adjudicates only when it was fitted beside an art-pair head",
       "rejected": "deleting the art-pair from the code, or refitting the combiner without it",
       "reason": "the owner's answer to question-4. What ships is the variant the study measured (command-54, command-56): Garde's weights and no adjudication. The formula keeps the option, so Garde's combiner and the Python reference arithmetic stay testable",
-      "file": "Sources/VeilGardeInference/Resources/stack_combiner_v2.json"
+      "file": "Sources/VeilGardeInference/Resources/stack_combiner_v2.json",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-74",
       "chose": "The camera-sensor call is two cuts on the tile vote (contract schema 2): real at or under 0.71687186, generated at or over 0.83653802, and the score the vote itself. The cuts are where Garde's Platt contract changes its call, found by bisection over every float32 vote; the trainer still fits Platt by the same rule and writes its contract as the cuts",
       "rejected": "the rounded cuts the study quoted, 0.717 and 0.837, which call a vote between the rounded and the exact cut differently from Platt",
       "reason": "the owner's answer to question-4. Exact cuts keep every call Garde's: the test checks every vote k/n up to 1,024 tiles and either side of each cut",
-      "file": "Sources/VeilGardeCore/Heads/SensorCalibration.swift"
+      "file": "Sources/VeilGardeCore/Heads/SensorCalibration.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-75",
@@ -761,7 +839,8 @@
       "chose": "The noiseprint's weights ship in the package, Sources/VeilGardeInference/Resources/noiseprint_v1.safetensors (133,580 bytes, the manifest's SHA-256 a891b9ae), where the weight locator finds them after the work area's weights/",
       "rejected": "a release asset; leaving them out",
       "reason": "the owner's answer to the weights (amendment-7). A release asset needs a push and a download step; the file is small and already bound by the manifest's hash, and without it anyone else's detector runs without its camera evidence",
-      "file": "Sources/VeilGardeInference/Resources/noiseprint_v1.safetensors"
+      "file": "Sources/VeilGardeInference/Resources/noiseprint_v1.safetensors",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-80",
@@ -864,28 +943,32 @@
       "chose": "The core study's rules, fixed before it runs. R0: every arm is the deployed shape refit on final_mixed's train partition under a column mask, colsample taken over the mask, every model 19 wide, its sensor cuts refit on the validation partition by the engine's rule, every number held out. The seed floor is the largest vote-AUC move of the full model refit with seed 1 or 2. R1: a feature moves the needle when the vote AUC it adds to the trio FR, LV, CV has a 95% interval excluding zero and a gain above the seed floor. Forward selection adds the best vote gain until that gain's interval holds zero or does not pass the seed floor. R2: the golden combination is the smallest arm whose vote AUC is within 0.005 of the full model's, whose iPhone real-call share is no more than 2 points under the full model's and whose share of generated images called real is no more than 2 points over it, in both the stem-split run and the run that leaves the iPhone pool out; if none qualifies, the full model",
       "rejected": "judging on the weighted lane; a single run with the iPhone pool partly in training",
       "reason": "the majority route is the tile vote and its two cuts. The owner chose the pool, both designs and the bars (answer-10, answer-11, answer-12). Stated before the run: one seed floor serves every arm, nothing adjusts for the number of arms, and the test partition holds 74 iPhone images",
-      "file": "Sources/VeilGardeTraining/Research/CoreStudy.swift"
+      "file": "Sources/VeilGardeTraining/Research/CoreStudy.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-95",
       "chose": "The pruning study and the paired comparison keep their bytes: the core study calls PruningStudy.padded, and a new overload of PairedComparison.measure, which calls each side with its own cuts, wraps the existing one",
       "rejected": "moving timed and padded into a shared file; folding the two-call form into measure",
       "reason": "both declarations carry trail anchors, and a moved line fails the site's build; the published pruning report's call counts stay as they were",
-      "file": "Sources/VeilGardeTraining/Research/PairedComparison.swift"
+      "file": "Sources/VeilGardeTraining/Research/PairedComparison.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-96",
       "chose": "The redundancy check's rules, fixed before it runs. On the 8,760 final_mixed images the store holds, joined by id to their DINOv2 and capture rows and a freshly measured noiseprint, and by stem to their cached tiles, each arm's residual view, its weighted score, vote, sharpness and the mean and spread of each allowed column, is asked to reconstruct the noiseprint's call and the fusion head's call, and each signal's gain on top of the view is measured on held-out images. Every second-stage model is the scratch fusion shape, cross-fitted on the held-out partitions, fit on validation and scored on test and the other way round, so no stacked model sees a residual score from an image the warp model trained on. The combiner replayed with and without the noiseprint is descriptive. RR1: a signal is redundant with the residual under an arm when its AUC gain on top of the view is at most 0.005, complementary when the gain's 95% interval excludes zero and exceeds 0.005, else undetermined. RR2: the residual reconstructs a signal when it predicts that signal's call with held-out AUC of at least 0.90",
       "rejected": "a store-wide check, whose warp column an older model wrote and whose noiseprint is missing on four rows in five",
       "reason": "amendment-17 asks whether the noiseprint's and the fusion head's signals are recoverable from the trio expanded. Only final_mixed's images have cached tiles; the store holds 8,760 of them with DINOv2 and capture and none with a noiseprint, so it is measured once into a scratch store (answer-14)",
-      "file": "Sources/VeilGardeTraining/Research/RedundancyStudy.swift"
+      "file": "Sources/VeilGardeTraining/Research/RedundancyStudy.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-97",
       "chose": "A condensed model as a second route, trained in Swift on MLX through Frigate: the core's tiles through one shared per-tile network, pooled by means and a soft vote and never by softmax attention, beside the nine capture values and the noiseprint's P(camera), and DINOv2's embedding. Its arms: full, no-semantic, no-provenance, residual-only, semantic and provenance alone, and per-column aggregates, on the trio, the golden set and all 19. It is admissible only when C1 its held-out AUC is at least the gradient-boosted model's on the same inputs minus 0.005, C2 its real false-positive rate at that model's recall is at most 0.01 above it, C3 it calls every HARD battery image right, offline, and C4 its iPhone real share is at least the trio warp model's. Measured offline; nothing is wired into the detector in this run",
       "rejected": "a co-registered head pooled by softmax attention; a blended meta-combiner",
       "reason": "amendment-18. The research found a learned meta-combiner raised real false positives from 8% to 50 to 92% on screenshots (2026-06-29, quoted), and an attention-pooled co-registered head closed at parity with the flat fusion, its pooling firing on single regions (2026-07-20, quoted). C2 and the pooling are those lessons written as rules",
-      "file": "Sources/VeilGardeTraining/Condensed/CondensedTrainer.swift"
+      "file": "Sources/VeilGardeTraining/Condensed/CondensedTrainer.swift",
+      "retired": "2026-10-21"
     },
     {
       "id": "decision-98",
@@ -921,6 +1004,118 @@
       "rejected": "leaving the site unbuilt and its check failing; cutting the study's sources or tests to fit",
       "reason": "the study adds about 223 KB of source, and with git's empty tree as the base there is no old text to drop, so the data stood at 3.07 MB with nothing else changed. The 3 MB figure was the explorer runbook's default, \"unless the prompt says otherwise\"; this run took the decision unsupervised, and reverting the two constants and this entry restores it",
       "file": "docs/site/src/build.py"
+    },
+    {
+      "id": "decision-103",
+      "chose": "The result JSON is schema v3, VeilGarde's own: schema_version, route, scorer, device, image, verdict {prediction, p, threshold, band}, times_sec, and when present bundle, route_diagnostics, semantic_tiles, capture and specialists. The goldens are VeilGarde's own route on the two parity crops, numbers within 1e-4",
+      "rejected": "schema v2 with its warp, majority, sensor and patch fields emptied or zeroed",
+      "reason": "with the warp gone every v2 field but a few would be a constant, and a reader trusting them would read a detector that no longer exists; the owner chose the clean break (answer-17)",
+      "file": "Sources/VeilGardeCore/Result/ResultJSON.swift"
+    },
+    {
+      "id": "decision-104",
+      "chose": "The warp leaves detection: the camera base is the fusion head over 393 values, DINOv2-small's CLS embedding and the nine capture values; the warp lens, its tile model, the sensor model, its two cuts, the majority surface and sharpness go",
+      "rejected": "keeping the warp score as one of the head's inputs; keeping the warp lens as a second base",
+      "reason": "the reduction study measured the fusion head without the warp score at -0.0012 AUC on 22,703 held-out store rows (command-53, 2026-10-19), and the owner's two lanes put the warp in the watermark only (amendment-20, amendment-21)",
+      "file": "Sources/VeilGardeCore/Features/FusionVector.swift"
+    },
+    {
+      "id": "decision-105",
+      "chose": "The noiseprint is dropped end to end: no lens, no weight in the bundle, no store column, no trainer, no w_np in the combiner; StackCombiner.load and the promote check refuse a combiner that carries w_np",
+      "rejected": "keeping the term at its 2026-10-19 weight; keeping the store column for a later study",
+      "reason": "with the shipped warp model the battery and 738 census and iPhone images kept every call without it (command-84), it adds nothing once DINOv2 and capture are present (command-79), and the owner chose to drop it (answer-18)",
+      "file": "Sources/VeilGardeCore/Heads/StackCombiner.swift"
+    },
+    {
+      "id": "decision-106",
+      "chose": "Zoom escalation, the render taxonomy with its arbiter, the x-domain gate and its centroids are removed; the semantic chain keeps the token map, its majority, the preview tail and the projection",
+      "rejected": "keeping the three behind switches that are off",
+      "reason": "none of them ran by default, the census never saw them decide, and the owner chose to remove them (answer-19)",
+      "file": "Sources/VeilGardeInference/Route/Mechanisms/SemanticChain.swift"
+    },
+    {
+      "id": "decision-107",
+      "chose": "The preview tail asks the live fusion head with the capture flags neutralized, cap[1] set to 1 and cap[3] to at least 576, instead of the frozen fusion reference, which leaves the bundle; its cuts stay 0.45 and 0.30",
+      "rejected": "keeping the frozen 397-column reference beside a 393-column head",
+      "reason": "the reference read the warp score, which no longer exists at inference; the cuts were set against the old head and are inherited as they were, reported through route_diagnostics.preview_*",
+      "file": "Sources/VeilGardeInference/Route/Mechanisms/PreviewTail.swift"
+    },
+    {
+      "id": "decision-108",
+      "chose": "The warp residual moves into VeilWatermark/Residual: the constants, the displacement table, the tap tables, the residual and the fragility grid, their MLX operations and their order untouched; the watermark depends on MLX and MLXAccelerate through Frigate",
+      "rejected": "leaving the residual in the Lens beside nothing that reads it",
+      "reason": "the watermark is the residual's only reader once detection is two lanes; ResidualTests pinned the two crops' FR vectors and cids before any change and passed after each phase, and the invariance run kept all 105 signatures",
+      "file": "Sources/VeilWatermark/Residual/WarpResidual.swift"
+    },
+    {
+      "id": "decision-109",
+      "chose": "The research module, the condensed model and their commands are retired to the 2026-rnd branch, cut from 6ed634d before any change; research census and research compare stay, the compare's rules reduced to the battery, the labelled census and reporting every comparison",
+      "rejected": "keeping the studies' code on main with nothing left to study",
+      "reason": "every study measured the warp, the noiseprint or the majority route, none of which is on main; the branch keeps them runnable at the commit their numbers came from",
+      "file": "Sources/VeilGardeCLI/Commands/ResearchCompare.swift"
+    },
+    {
+      "id": "decision-110",
+      "chose": "The fusion head and the combiner shipped on 2026-10-21 are trained here: the head from scratch, 500 trees at eta 0.04, depth 5, on the store's 393-column rows, with an evaluation twin fitted without a 10% hash holdout, salt fusion-eval:v1, to report a held-out AUC; the combiner refit on five inputs. A warm start onto a parent of another width is refused",
+      "rejected": "warm-starting the 397-column head; shipping the head with no held-out number",
+      "reason": "the warp-era head read 397 columns and cannot be continued on 393; the twin is the only held-out measure of a head trained on every row, and the written head still trains on all of them",
+      "file": "Sources/VeilGardeTraining/Fusion/FusionTrainer.swift"
+    },
+    {
+      "id": "decision-111",
+      "chose": "The battery is rebaselined on the new bundle with no bar: the ratchet floors are re-recorded as measured, the HARD groups keep their anchors, and their failures are reported image by image",
+      "rejected": "holding the warp-era floors; editing the spec to drop the failing anchors",
+      "reason": "the owner set no bar (answer-20), and HARD groups have no floor to rebaseline, so flux_anchor and user_gen fail as measured and keep promote shut until a candidate calls them right",
+      "file": "Sources/VeilGardeFlywheel/FlywheelResources.swift"
+    },
+    {
+      "id": "decision-112",
+      "chose": "The store's columns are three, dino_norm, dino_fusion and cap; older shards read as they are, their extra tensors and warp_model ignored",
+      "rejected": "rewriting the 59 seed shards",
+      "reason": "the fusion head reads dino_fusion and cap and the heads read dino_norm, nothing else; reading past the old columns keeps the seed store's 138,247 rows without touching them",
+      "file": "Sources/VeilGardeCore/Store/FeatureRow.swift"
+    },
+    {
+      "id": "decision-113",
+      "chose": "The cgi head leaves the shipped bundle and the shipped recipe with the render arbiter, its only reader; the flywheel trains art, blur and human, and HeadKind.cgi stays a store category a recipe can still train",
+      "rejected": "shipping a head nothing reads",
+      "reason": "six heads ship: screenshot, art, blur, human, semtile and preview",
+      "file": "Sources/VeilGardeTraining/Recipe/TrainingRecipe.swift"
+    },
+    {
+      "id": "decision-114",
+      "chose": "The acceptance's seeded sample moves into the watermark, AcceptanceSample, with the same arithmetic as the training manifest it replaced",
+      "rejected": "keeping a training dependency in the watermark",
+      "reason": "the training manifest left with the warp trainer; the sample must draw the same 200 images from the same seed or the acceptance would not repeat its 2026-10-19 run",
+      "file": "Sources/VeilWatermark/Acceptance/AcceptanceSample.swift"
+    },
+    {
+      "id": "decision-115",
+      "chose": "The site is two lanes and then the machinery: ten chapters, the fusion head, the specialists, the router, the bundle, training, the flywheel, the residual, the watermark, the playground and the record; six code trails, FT FI ST SI WS WM; four ML trails, MF MS MV MK; the record chapter holds the research",
+      "rejected": "keeping the warp chapter and its trails as history",
+      "reason": "a trail must follow code on main, and the owner asked for trails and guides that are easier to follow (amendment-21); the record chapter and the 2026-rnd branch keep the history",
+      "file": "docs/site/js/veilgarde.js"
+    },
+    {
+      "id": "decision-116",
+      "chose": "A ledger decision whose file left main carries retired with its date, and the overview shows it as kept on the 2026-rnd branch",
+      "rejected": "deleting those decisions; pointing them at files that no longer hold them",
+      "reason": "every decision stays in the record with the file it shaped; the self-check then asks a file only of the decisions still in force",
+      "file": "docs/site/js/overview.js"
+    },
+    {
+      "id": "decision-117",
+      "chose": "The site's data cap returns to 3.0 MB, in the build and in the check",
+      "rejected": "keeping the 3.5 MB of decision-102",
+      "reason": "the two lanes left the data at 2.28 MB on 2026-10-21, so the raise decision-102 made for the reduction study's sources is no longer needed; the plan the owner approved restores it when the data fits",
+      "file": "docs/site/src/build.py"
+    },
+    {
+      "id": "decision-118",
+      "chose": "The README's hero is redrawn for the two lanes from VeilGarde's own goldens and a committed signature of the same crop",
+      "rejected": "keeping the old hero",
+      "reason": "its generator read schema v2's majority and sensor keys, which no longer exist",
+      "file": "README_Assets/src/build.py"
     }
   ],
   "commands": [
@@ -1933,6 +2128,211 @@
         "all 105 signatures equal the baseline",
         "20 of 20 routed results equal Garde's outside the two-cut calibration and the art-pair row, which Garde shows on 4 of them; the largest difference 1.04e-5, Frigate's Metal kernels against Garde's as on 2026-10-19"
       ]
+    },
+    {
+      "id": "command-87",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "git branch 2026-rnd",
+      "exit": 0,
+      "lines": [
+        "the branch at 6ed634d, the reduction study's commit, before any change; nothing pushed"
+      ]
+    },
+    {
+      "id": "command-88",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "scripts/test.sh --filter ResidualTests, the GPU suites on, on the untouched tree",
+      "exit": 0,
+      "lines": [
+        "the two crops' FR vectors at phase 0, 0 written from the 19-column dump's FR column, 16 by 16 tiles each, and their cids from watermark sign",
+        "crop_ben 2ec88d6b…, crop_fox 43f0c78f…; NativePlane's FR equal exactly and both cids equal; the displacement table and the constants pinned"
+      ]
+    },
+    {
+      "id": "command-89",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "train run <work area>/recipes/fusion-20261021.toml, release",
+      "exit": 0,
+      "lines": [
+        "the fusion head from scratch on 113,195 store rows that are not golden or NSFW, 5,263 of them new-generator; 111,626 trained on, 1,569 new-generator rows held out; 500 trees, eta 0.04, depth 5, 393 columns",
+        "held-out new-generator recall 0.978; the evaluation twin on 100,414 rows, 11,212 held out: AUC 0.9817, real FPR 0.052, generated recall 0.918; no parent recall, the parent read 397 columns",
+        "the combiner on 77,879 train and 19,302 test rows: w0 -1.022, w_base 1.664, w_gen 0.153, 0.220, 0.300; every rescue candidate kept the 7 probes real but the top one at 0.4645, over 0.42, so the fallback 1.0",
+        "test AUC base 0.9908, combined 0.9883; real FPR 0.034 to 0.015, the base in-sample for the head; candidate verified, 8 artifacts, 35.0 s"
+      ]
+    },
+    {
+      "id": "command-90",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "bundle verify, after the head and the combiner were copied into Resources",
+      "exit": 0,
+      "lines": [
+        "8 artifacts and 3 weights: the fusion head, stack_combiner_v3.json and six heads; the warp tile model, the sensor model and its calibration, the fusion reference, the x-domain centroids, the cgi head and the noiseprint out"
+      ]
+    },
+    {
+      "id": "command-91",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "mv <work area>/live <work area>/live-warp-20261021; flywheel init",
+      "exit": 0,
+      "lines": [
+        "the warp era's live bundle, its history and its promote log moved aside, not deleted; live seeded from the new shipped bundle"
+      ]
+    },
+    {
+      "id": "command-92",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "flywheel battery --gate full, against the warp era's floors",
+      "exit": 1,
+      "lines": [
+        "FAIL: flux_anchor 0.50, IMG_0291 called real; user_gen 0.77, IMG_0345, IMG_0354 and HNUFoy2bcAA0vDW called real; wildlife_real 0.92 under its floor 1.00",
+        "user_real, native_12yrs, native_cam and lion_hard 1.00; gen_semantic 1.00"
+      ]
+    },
+    {
+      "id": "command-93",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "flywheel battery --gate full --rebaseline --yes-i-reviewed",
+      "exit": 1,
+      "lines": [
+        "the ratchets re-recorded, wildlife_real at 0.92 and gen_semantic at 1.00; the HARD groups have no floor, so FAIL on flux_anchor and user_gen as before",
+        "the baseline copied into the flywheel's resources and its hash pinned"
+      ]
+    },
+    {
+      "id": "command-94",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "route --json on the two parity crops, release",
+      "exit": 0,
+      "lines": [
+        "the schema-v3 goldens, crop_ben.route.json and crop_fox.route.json; both camera, both stacks fusion, art, blur, human, capture, semantic-tiles"
+      ]
+    },
+    {
+      "id": "command-95",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "research census on the 300 default images, then on the 438 iPhone originals",
+      "exit": 0,
+      "lines": [
+        "300 images: final_mixed routed correct 136 of 200, generated 41, real 95; the fusion base alone 137, generated 54, real 83; all labelled 230 of 300",
+        "the 438 iPhone originals: 435 routed real; capture present on 425"
+      ]
+    },
+    {
+      "id": "command-96",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "research compare --judge none, the reduction study's V0 as the reference",
+      "exit": 0,
+      "lines": [
+        "V0, the shipped warp-era detector of 2026-10-20: final_mixed 161 of 200, generated 70, real 91; its base alone 163; the iPhone originals 437 of 438",
+        "53 of 300 calls moved, 11 to the right label and 42 to the wrong one; the battery FAIL"
+      ]
+    },
+    {
+      "id": "command-97",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "flywheel agreement on live",
+      "exit": 0,
+      "lines": [
+        "109,837 rows, the head in-sample on them: agreement 0.9702 all, 0.8863 camera, 0.9587 processed",
+        "21,967 test rows: base AUC 0.9915, real FPR 0.030; pooled AUC 0.9895, real FPR 0.013"
+      ]
+    },
+    {
+      "id": "command-98",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "research census --bundle <work area>/candidates/diag-research-combiner-20261021, the new head under the warp era's combiner weights",
+      "exit": 0,
+      "lines": [
+        "final_mixed routed correct 140 of 200, generated 48, real 92: the refit combiner accounts for about 4 of the 25 calls lost, the head for the rest"
+      ]
+    },
+    {
+      "id": "command-99",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "watermark invariance --baseline <work area>/watermark/invariance-baseline-20261020.json, after the detection change",
+      "exit": 0,
+      "lines": [
+        "105 of 105 signatures equal: cid, compact bytes, grid and measured bits"
+      ]
+    },
+    {
+      "id": "command-100",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "watermark invariance, the same baseline, after the residual moved into the watermark",
+      "exit": 0,
+      "lines": [
+        "105 of 105 signatures equal"
+      ]
+    },
+    {
+      "id": "command-101",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "watermark accept --n 200 --seed 0, after the residual moved",
+      "exit": 0,
+      "lines": [
+        "about 53 minutes, 05:19Z to 06:12Z; report watermark/accept_v1_n200-after-B-20261021.json",
+        "198 images; self-match 100%; crop matched with its offset 73.2%; JPEG q75 median 0.958; cross false matches 0%, median cross score 0.570",
+        "operating point: threshold 0.73, crop recall 81.3%, false matches 0%; bit balance 0.496, 0.497, 0.498, 0.496; resized 0.90 and 0.75: matched 0%",
+        "v1 passes its acceptance; every field of every image's row equals the 2026-10-19 run's"
+      ]
+    },
+    {
+      "id": "command-102",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "Playground/run.sh, after the detection change",
+      "exit": 0,
+      "lines": [
+        "12 of 12 checkpoints: the hand-built 393 row equals the base, the hand pool equals the pre-semantic p, the routed result equals the goldens, the warm start keeps the parent's 500 trees, promote and rollback leave live byte for byte"
+      ]
+    },
+    {
+      "id": "command-103",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "README_Assets/src/build.sh, the hero redrawn for two lanes",
+      "exit": 0,
+      "lines": [
+        "hero.png 2400×1260 from the crop_ben golden, its semantic-tile map lighting each tile by its fragility rank, and its FR fixture's signature id",
+        "the verdict lane reads base 0.63, stack 0.1059, real; the signature lane fr 256 tiles, 4 bits a tile, vw1 2ec88d6b"
+      ]
+    },
+    {
+      "id": "command-104",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "docs/site/src/build.sh, after the trails, the chapters and the ledger were rewritten",
+      "exit": 0,
+      "lines": [
+        "the build: 6 trails, 101 entries over 30 steps, every anchor found; 4 ML trails, 57 entries over 25 steps, every fact, twin and cite found; no gap between entries",
+        "the data 2.30 MB of the 3 MB cap restored by decision-117",
+        "the check: 14 pages in light, dark, 390 px both ways and with storage blocked; every self-check passed; no network request attempted; the key in no tracked file"
+      ]
+    },
+    {
+      "id": "command-105",
+      "phase": 15,
+      "date": "2026-10-21",
+      "cmd": "python3 -I docs/site/src/check.py --prose",
+      "exit": 0,
+      "lines": [
+        "0 problems, 0 warnings, after two long sentences on 08-watermark.html and ml.html were shortened"
+      ]
     }
   ],
   "assumptions": [
@@ -2033,6 +2433,22 @@
     {
       "id": "question-16",
       "text": "The site's data cap was raised from 3.0 to 3.5 MB during this unsupervised run (decision-102), because the study's sources took the data to 3.07 MB with no old text to drop. Keep 3.5 MB, or restore 3 MB and decide what the site leaves out?"
+    },
+    {
+      "id": "question-17",
+      "text": "The work area keeps the warp era's data: live-warp-20261021, the warp-era candidates, store/tiles with 2,511,615 tiles, store/aux, noiseprint/ and research/. The new binary cannot read their manifests. Delete them later, or keep them as the 2026-rnd branch's record?"
+    },
+    {
+      "id": "question-18",
+      "text": "Push 2026-rnd beside main when main is published, or keep it on this Mac?"
+    },
+    {
+      "id": "question-19",
+      "text": "The battery fails two HARD groups, flux_anchor with IMG_0291 and user_gen with IMG_0345, IMG_0354 and HNUFoy2bcAA0vDW, and promote gates on every group, so no candidate moves live until one calls those four right. Train the weekly candidates as warm starts of the new head, the only base promote accepts, and wait for one that passes; or change the gate for this transition?"
+    },
+    {
+      "id": "question-20",
+      "text": "Detection lost 25 of 200 final_mixed calls against the warp era, 161 to 136, almost all of them generated photoreal images the warp score caught, so the drop is not negligible as amendment-21 asked. Keep the two lanes and recover through the flywheel, or restore a warp signal to detection?"
     }
   ],
   "tests": [
@@ -2275,6 +2691,26 @@
       "failed": 0,
       "skipped": 0,
       "note": "after the compare's last fix: every suite as in test-23"
+    },
+    {
+      "id": "test-25",
+      "phase": 15,
+      "date": "2026-10-21",
+      "suite": "all targets (scripts/test.sh, the GPU suites included), after the detection change",
+      "passed": 130,
+      "failed": 0,
+      "skipped": 0,
+      "note": "13, 31, 4, 8, 23, 46 and 5 tests by target; the goldens are VeilGarde's own"
+    },
+    {
+      "id": "test-26",
+      "phase": 15,
+      "date": "2026-10-21",
+      "suite": "all targets (scripts/test.sh, the GPU suites included), the final tree after the residual moved and the comments were rewritten",
+      "passed": 130,
+      "failed": 0,
+      "skipped": 0,
+      "note": "13, 31, 4, 8, 23, 46 and 5 tests by target; ResidualTests, RouteGoldenTests and the combiner's sweep test, renamed to say the shipped rescue is the fallback, among them"
     }
   ],
   "request_note": "Verbatim but for the research projects' names and the paths on the owner's Mac, which the owner asked to leave out of the project (amendment-4, item 1, and amendment-6); each bracket stands for a name or a path."

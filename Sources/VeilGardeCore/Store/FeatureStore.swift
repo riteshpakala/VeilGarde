@@ -37,7 +37,7 @@ public struct StoreSelection: Sendable {
         return out
     }
 
-    /// Rows whose every requested column is finite (the reference trainers drop NaN dino or warp rows the same way).
+    /// Rows whose every requested column is finite (the reference trainers drop NaN dino rows the same way).
     public func complete(_ required: [FeatureColumn]) -> StoreSelection {
         let keep = (0..<count).filter { i in required.allSatisfy { column in vector(column, row: i).allSatisfy(\.isFinite) } }
         return subset(keep)

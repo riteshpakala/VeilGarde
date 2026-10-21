@@ -3,13 +3,13 @@
 //  VeilGardeFlywheel
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The weekly step: candidate heads (art, blur, human, cgi) and a warm-started base from
+//  WHAT: The weekly step: candidate heads (art, blur, human) and a warm-started base from
 //        the whole store, trained on top of the live bundle into candidates/<id>/, measured
 //        against live by the north-star agreement, and written up in REVIEW.md with the rule
 //        for what to promote. Nothing here writes live/.
-//  PIN:  The weekly script's recipe (the fusion warm start +80 trees at η 0.03, w_gen 1.0; the four
-//        atlas heads from the store) and its review note's decision rule, with VeilGarde's
-//        commands in place of the shell scripts.
+//  PIN:  The weekly script's recipe (the fusion warm start +80 trees at η 0.03, w_gen 1.0; the
+//        atlas heads from the store, cgi no longer among them since 2026-10-21) and its review
+//        note's decision rule, with VeilGarde's commands in place of the shell scripts.
 //
 
 import Foundation
@@ -77,8 +77,8 @@ public enum WeeklyCandidates {
                   "| pooled AUC | \(f(live.weightedAUC)) | \(f(candidate.weightedAUC)) |",
                   "| AUC gap | \(f(live.aucGap)) | \(f(candidate.aucGap)) |", "",
                   "## The decision rule (heads-only flywheel)", "",
-                  "- **Head only**: the gap is in a class where the head already has authority (human through w_gen; cgi and preview through their arbiters), and its admission line above is PASS. Ship it: `veilgarde flywheel promote <kind> --from \(root)`.",
-                  "- **Head and base**: the gap needs the weighted verdict to move through a zero-weight head (art, blur), or the store gained 500 or more new dino_fusion rows in the gap's category (the base-dilution law). Ship the base first, then the head: `veilgarde flywheel promote base --from \(root)`.",
+                  "- **Head only**: the gap is in a class where the head already has authority (art, blur and human through w_gen; preview through its tail), and its admission line above is PASS. Ship it: `veilgarde flywheel promote <kind> --from \(root)`.",
+                  "- **Head and base**: the gap needs the pooled verdict to move further than a head's capped weight can carry it, or the store gained 500 or more new dino_fusion rows in the gap's category (the base-dilution law). Ship the base first, then the head: `veilgarde flywheel promote base --from \(root)`.",
                   "", "Both run the battery: the base on its HARD groups, a head on all of them, ratchet and semantic floors included, because heads reach every arbiter. A failing battery restores the live bundle.", ""]
         return lines.joined(separator: "\n")
     }

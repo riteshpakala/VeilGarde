@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How does the flywheel grow the detector? · VeilGarde</title>
+<meta name="description" content="On the regime that grows the fusion head and the specialist stack: a store of three feature columns with no images, acquisition aimed at the base's blind spots, weekly candidates, the battery, and promote as the only writer of live.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-groups="Sources-VeilGardeCore,Sources-VeilGardeFlywheel">
+<a class="skip" href="#main">Skip to the chapter</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 6 of 10</span><a href="code.html#trail-specialist-training-5">Walk promote in the explorer</a></header>
+
+<h1 id="ch-flywheel">How does the flywheel grow the detector?</h1>
+<p class="lede"><em>On the regime that keeps the fusion head and the specialist stack current as generators change, without ever keeping an image.</em></p>
+
+<p>Generators change every month, and a detector trained once falls behind. The answer is a flywheel. Find where the base is wrong, fetch images of that kind, and train candidates on them. Promote only what passes a battery of images the detector must never get wrong.</p>
+<p>The flywheel moves the fusion head, the combiner and the specialist heads, and nothing else. It stores the features those models read, never the images they came from.</p>
+
+<h2 id="store">A store of features</h2>
+<p>Every image becomes one row of three columns: DINOv2's embedding after the heads' forced resize, DINOv2's embedding of the plain crop the fusion head reads, and the nine capture values. That is everything a head, the fusion head or the combiner trains on. The image is read, measured in memory and dropped.</p>
+<div class="code" data-excerpt="Sources/VeilGardeCore/Store/FeatureRow.swift:FeatureColumn"></div>
+<p>The format is the research store's, so its 138,247 seed rows in 59 shards read as they are. Those shards also hold columns the detector no longer reads, the warp score, sharpness and the noiseprint among them, and the reader passes over them without rewriting a shard.</p>
+<p>VeilGarde's own rows add provenance: the source and its URL, the licence, the native size, a difference hash and the CLIP router's scores.</p>
+
+<h2 id="gap">Aiming at the blind spots</h2>
+<p>The gap miner reads the store and scores the live models on it, bucket by bucket: by domain, camera or processed, by category and by label. A bucket's gap is how often the base is wrong plus how often it disagrees with the pooled verdict.</p>
+<div class="code" data-excerpt="Sources/VeilGardeFlywheel/Acquire/GapMiner.swift:GapMiner.mine(_:store:shards:targets:)"></div>
+<p>On the July cache, under the warp-era head, it found the research's two worst buckets in the research's order: processed generated photographs, then camera-domain ones. Generated photographs were the blind spot then. On 2026-10-21 the census found the head without the warp misses more of them.</p>
+
+<h2 id="acquire">Fetching without keeping</h2>
+<p>Sixteen sources answer the miner's jobs, from Wikimedia and the Met to Civitai and Bluesky's firehose, each with the Python collectors' retry rules and a cursor that resumes. Every fetched image passes a gate before it is measured. It must decode, measure at least 512 pixels on its short side and weigh at least 20 KB. It must also be new: not the same bytes as a stored row, and not a near copy by its difference hash.</p>
+<p>Generated images are then routed by CLIP, the argmax of their embedding against a fixed matrix of category prompts. A row lands in the shard, and the bytes are gone.</p>
+<div class="code" data-excerpt="Sources/VeilGardeFlywheel/Acquire/Acquirer.swift:Acquirer.run(_:perJob:extractor:router:shard:)"></div>
+<p>On its first run it kept 20 of 29 fetched images as rows, refused the rest as already stored, and wrote no image.</p>
+
+<h2 id="candidates">Weekly candidates</h2>
+<p>Once a week the flywheel trains on top of live. The base is warm-started with 80 trees at a learning rate of 0.03, and the art, blur and human heads are trained from the whole store. Each candidate is a complete bundle, measured beside live, with a review file that says which slots to promote and why.</p>
+<div class="code" data-excerpt="Sources/VeilGardeFlywheel/Candidates/WeeklyCandidates.swift:WeeklyCandidates.recipe(id:)"></div>
+<p>The measure is agreement: how often the base and the pooled verdict agree on the store's rows. On the live bundle seeded when the warp left, it reads 0.9702, with the head scored on rows it was trained on.</p>
+
+<h2 id="battery">The battery</h2>
+<p>The battery is a set of images grouped by what the detector must do with them. Six groups are hard: every image in them must get the call its group wants. Two more are ratchets that must not fall below their recorded floors.</p>
+<p>When the warp left detection on 2026-10-21, the battery was rebaselined on the new bundle with no bar, as the owner chose. The ratchets' floors were re-recorded as measured. A hard group has no floor to lower, so its misses stand as failures.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Group</th><th>Mode</th><th class="n">Images</th><th class="n">Right, warp era</th><th class="n">Right, 2026-10-21</th><th>Status since the rebaseline</th></tr></thead>
+<tbody>
+<tr><td class="mono">user_real</td><td>HARD</td><td class="n">9</td><td class="n">1.00</td><td class="n">1.00</td><td>PASS</td></tr>
+<tr><td class="mono">native_12yrs</td><td>HARD</td><td class="n">1</td><td class="n">1.00</td><td class="n">1.00</td><td>PASS</td></tr>
+<tr><td class="mono">flux_anchor</td><td>HARD_SEM</td><td class="n">2</td><td class="n">1.00</td><td class="n">0.50</td><td>FAIL: IMG_0291 called real</td></tr>
+<tr><td class="mono">user_gen</td><td>HARD</td><td class="n">13</td><td class="n">1.00</td><td class="n">0.77</td><td>FAIL: IMG_0345, IMG_0354 and HNUFoy2bcAA0vDW called real</td></tr>
+<tr><td class="mono">native_cam</td><td>HARD</td><td class="n">24</td><td class="n">1.00</td><td class="n">1.00</td><td>PASS</td></tr>
+<tr><td class="mono">gen_semantic</td><td>RATCHET_SEM</td><td class="n">24</td><td class="n">1.00</td><td class="n">1.00</td><td>floor recorded at 1.00</td></tr>
+<tr><td class="mono">wildlife_real</td><td>RATCHET</td><td class="n">26</td><td class="n">1.00</td><td class="n">0.92</td><td>floor recorded at 0.92</td></tr>
+<tr><td class="mono">lion_hard</td><td>HARD</td><td class="n">1</td><td class="n">1.00</td><td class="n">1.00</td><td>PASS</td></tr>
+</tbody>
+</table>
+</div>
+<p>All four are generated images the head without the warp reads as real; in the warp era every one was called generated. Promote runs the battery after every write, so no slot reaches live until a candidate calls those four right.</p>
+<div class="code" data-excerpt="Sources/VeilGardeFlywheel/Battery/BatteryRunner.swift:BatteryRunner.run(spec:specURL:gate:baselineURL:verdicts:vars:rebaseline:note:)"></div>
+
+<h2 id="promote">Promote is the only writer of live</h2>
+<p>Promote takes one slot from a candidate into live: the base, the combiner or a head. It refuses a frozen slot outright, and since 2026-10-21 the frozen slots are the weights alone. It refuses a base that does not keep live's trees byte for byte, a combiner with a negative weight or a noiseprint term, and an atlas head that fails admission.</p>
+<p>Then it snapshots live, writes the slot, re-pins the manifest and runs the battery: the hard groups for a base, every group for anything else. On a failure it restores the snapshot.</p>
+<div class="code" data-excerpt="Sources/VeilGardeFlywheel/Promote/Promoter.swift:Promoter.promote(_:from:store:)"></div>
+<p>It earned its place on its first day, under the warp-era head. That week's warm start flipped IMG_0291, a knife-edge image the battery holds, from generated to real, and promote refused it and restored live. A smaller warm start kept the image generated and promoted.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>IMG_0291 on 2026-10-19</th><th class="n">P(AI)</th><th>Promote</th></tr></thead>
+<tbody>
+<tr><td>live, the parent</td><td class="n">0.757</td><td></td></tr>
+<tr><td>80 trees added</td><td class="n">0.184</td><td>refused, live restored</td></tr>
+<tr><td>20 trees added</td><td class="n">0.613</td><td>promoted</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="open">What is still open</h2>
+<p>The hard groups fail, and the flywheel recovers only through a candidate that passes them. Whether the weekly candidates stay warm starts of the new head and wait for one that does, or the gate changes for this transition, is the owner's question.</p>
+<p>The atlas groups are retired, not replaced. Until a new atlas is built, the art, blur and human heads are gated by the eight groups that remain and by admission.</p>
+<p>The warp era's live bundle, its candidates and its tile cache stay in the work area, moved aside and not deleted. Whether to keep them is also the owner's question.</p>
+
+<h2 id="sources">Where the numbers come from</h2>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>Three columns; older shards read as they are</td><td><a href="index.html#decision-112">Ledger decision-112</a>; <a href="code.html#Sources/VeilGardeCore/Store/FeatureRow.swift">FeatureRow.swift</a> PIN</td><td>2026-10-21</td></tr>
+<tr><td>138,247 rows in 59 shards</td><td><a href="index.html#command-25">Ledger command-25</a>, <code>flywheel seed</code> from the research's feature store</td><td>2026-10-19</td></tr>
+<tr><td>The two worst buckets in the research's order</td><td><a href="index.html#command-36">Ledger command-36</a>; the research's gap_report.txt, quoted</td><td>The research's of 2026-07-07; VeilGarde's 2026-10-19</td></tr>
+<tr><td>Sixteen sources; the gate's 512 pixels and 20 KB</td><td class="mono"><a href="code.html#Sources/VeilGardeFlywheel/Acquire/Sources.swift">Sources.swift</a>, <a href="code.html#Sources/VeilGardeFlywheel/Acquire/Gate.swift">Gate.swift</a> PIN</td><td>Ported in phase 7, 2026-10-19</td></tr>
+<tr><td>29 fetched, 9 refused as already stored, 20 kept</td><td><a href="index.html#command-38">Ledger command-38</a></td><td>2026-10-19</td></tr>
+<tr><td>The head without the warp misses more generated photographs</td><td><a href="index.html#command-95">Ledger command-95</a> and <a href="index.html#command-96">command-96</a></td><td>2026-10-21</td></tr>
+<tr><td>Agreement 0.9702 on live, in-sample for the head</td><td><a href="index.html#command-97">Ledger command-97</a></td><td>2026-10-21</td></tr>
+<tr><td>The battery's groups, the warp era's calls and today's; the four missed images</td><td><a href="index.html#command-92">Ledger command-92</a> and <a href="index.html#command-93">command-93</a>; <a href="index.html#decision-111">decision-111</a>; research/transition-20261021 in the work area</td><td>2026-10-21</td></tr>
+<tr><td>No bar on the new bundle</td><td><a href="index.html#answer-20">Ledger answer-20</a></td><td>2026-10-21</td></tr>
+<tr><td>IMG_0291 from 0.757 to 0.184; 0.613 under 20 trees</td><td><a href="index.html#command-29">Ledger command-29</a> and <a href="index.html#command-30">command-30</a>, under the warp-era head</td><td>2026-10-19</td></tr>
+<tr><td>The atlas anchors missing; the groups retired</td><td><a href="index.html#answer-5">Ledger answer-5</a> and <a href="index.html#decision-65">decision-65</a></td><td>2026-10-19</td></tr>
+<tr><td>The open questions</td><td><a href="index.html#question-17">Ledger question-17</a> and <a href="index.html#question-19">question-19</a></td><td>2026-10-21</td></tr>
+</tbody>
+</table>
+</div>
+
+<details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
+<ul class="plain">
+<li>The work area's layout is in FlywheelArea; every stage but promote and rollback opens live read-only, and a test checks it.</li>
+<li><code>veilgarde flywheel gap</code>, <code>acquire</code>, <code>ingest</code>, <code>candidates</code>, <code>agreement</code>, <code>battery</code>, <code>promote</code>, <code>rollback</code> and <code>status</code> are the loop, one command each.</li>
+<li><code>flywheel battery --gate full --rebaseline --yes-i-reviewed</code> re-records the ratchets' floors; nothing else writes them.</li>
+<li>Playground step 7 runs the loop in miniature: a live bundle, a small battery, a promote and a rollback back to the shipped bytes.</li>
+</ul>
+</div></details>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/index.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount();</script>
+</body>
+</html>

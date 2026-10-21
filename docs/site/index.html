@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The change at a glance · VeilGarde</title>
-<meta name="description" content="What this run built: VeilGarde, a detector for AI-generated images in one Swift and MLX package, told in the order the code runs, with what was checked and why each piece is the way it is.">
+<meta name="description" content="What this run built: VeilGarde, a detector for AI-generated images and a crop-robust watermark in one Swift and MLX package, in two lanes, told in the order the code runs, with what was checked and why each piece is the way it is.">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/site.css">
 </head>
@@ -17,9 +17,9 @@
 
 <h1 id="ch-overview">VeilGarde: an AI-image detector as one Swift package</h1>
 <p class="lede"><em>On what this run built, in the order the code runs, and what was checked.</em></p>
-<p>VeilGarde is a detector for AI-generated images, in one Swift and MLX package. It reads an image, measures every tile with the warp lens, pools the fusion base and the specialist heads into one verdict, and writes it as Garde's own JSON. It trains every model it ships, grows the specialist heads without storing an image, and signs an image with a watermark read off the same residual.</p>
-<p>Eleven trails walk the code in the order it runs. Four follow how each part of the verdict is trained: the warp model, the fusion head, the specialist heads and the noiseprint. Four follow the same parts at inference, from an image to the final verdict. Two follow the watermark, signing an image and matching a crop of it, and one follows the pruning study, which measures what the system could do without.</p>
-<p><a href="ml.html">The ML explorer</a> tells the same flows as machine learning: what each model learns from, why its algorithm was chosen, how it is calibrated, and how the models together reach the majority and the weighted verdicts. Its steps link back to these trails.</p>
+<p>VeilGarde is a detector for AI-generated images and a crop-robust watermark, in one Swift and MLX package, in two lanes. The detector is a fusion head over what an image depicts and how it was captured, then a stack of specialist heads, and one verdict comes out. The watermark reads the warp residual off an image's own pixels and matches a crop or a re-encode against it.</p>
+<p>Six trails walk the code in the order it runs. Two follow the fusion head, trained and run; two follow the specialist stack, trained and run, to the final verdict. Two follow the watermark, signing an image and matching a crop of it. The flywheel trains and improves the two detection lanes and nothing else.</p>
+<p><a href="ml.html">The ML explorer</a> tells the same flows as machine learning: what each model learns from and why its algorithm was chosen. It also follows how the base, the stack and two revisions reach one verdict. Its steps link back to these trails. The research that led here, the warp model, the noiseprint and the studies, is in <a href="10-record.html">the record</a> and on the 2026-rnd branch.</p>
 
 <div id="request"></div>
 
@@ -40,11 +40,11 @@
 <path class="edge" d="M290,234 V344"/>
 <path class="edge" d="M180,316 V344"/>
 <path class="edge" d="M180,398 V426"/>
-<g class="layer" data-layer="VeilGardeCore"><a href="code.html"><title>VeilGardeCore</title><rect x="20" y="10" width="320" height="52" rx="8"/><text class="name" x="34" y="30">VeilGardeCore</text><text class="count" x="326" y="30" text-anchor="end"></text><text class="what" x="34" y="48">the domain: features, grids, boosters, heads, results</text></a></g>
-<g class="layer" data-layer="VeilGardeLens"><a href="code.html"><title>VeilGardeLens</title><rect x="20" y="92" width="320" height="52" rx="8"/><text class="name" x="34" y="112">VeilGardeLens</text><text class="count" x="326" y="112" text-anchor="end"></text><text class="what" x="34" y="130">the extractors: warp, capture, DINOv2, noiseprint</text></a></g>
+<g class="layer" data-layer="VeilGardeCore"><a href="code.html"><title>VeilGardeCore</title><rect x="20" y="10" width="320" height="52" rx="8"/><text class="name" x="34" y="30">VeilGardeCore</text><text class="count" x="326" y="30" text-anchor="end"></text><text class="what" x="34" y="48">the domain: features, boosters, heads, the store, results</text></a></g>
+<g class="layer" data-layer="VeilGardeLens"><a href="code.html"><title>VeilGardeLens</title><rect x="20" y="92" width="320" height="52" rx="8"/><text class="name" x="34" y="112">VeilGardeLens</text><text class="count" x="326" y="112" text-anchor="end"></text><text class="what" x="34" y="130">the extractors: capture, DINOv2, CLIP</text></a></g>
 <g class="layer" data-layer="VeilGardeInference"><a href="code.html"><title>VeilGardeInference</title><rect x="20" y="174" width="100" height="60" rx="8"/><text class="name" x="30" y="194">Inference</text><text class="what" x="30" y="210">the detector</text><text class="count" x="30" y="225"></text></a></g>
 <g class="layer" data-layer="VeilGardeTraining"><a href="code.html"><title>VeilGardeTraining</title><rect x="130" y="174" width="100" height="60" rx="8"/><text class="name" x="140" y="194">Training</text><text class="what" x="140" y="210">the trainers</text><text class="count" x="140" y="225"></text></a></g>
-<g class="layer" data-layer="VeilWatermark"><a href="code.html"><title>VeilWatermark</title><rect x="240" y="174" width="100" height="60" rx="8"/><text class="name" x="250" y="194">Watermark</text><text class="what" x="250" y="210">the signature</text><text class="count" x="250" y="225"></text></a></g>
+<g class="layer" data-layer="VeilWatermark"><a href="code.html"><title>VeilWatermark</title><rect x="240" y="174" width="100" height="60" rx="8"/><text class="name" x="250" y="194">Watermark</text><text class="what" x="250" y="210">residual, signature</text><text class="count" x="250" y="225"></text></a></g>
 <g class="layer" data-layer="VeilGardeFlywheel"><a href="code.html"><title>VeilGardeFlywheel</title><rect x="75" y="264" width="200" height="52" rx="8"/><text class="name" x="89" y="284">Flywheel</text><text class="count" x="261" y="284" text-anchor="end"></text><text class="what" x="89" y="302">acquire, stage, gate, promote</text></a></g>
 <g class="layer" data-layer="VeilGarde"><a href="code.html"><title>VeilGarde</title><rect x="20" y="346" width="320" height="52" rx="8"/><text class="name" x="34" y="366">VeilGarde</text><text class="count" x="326" y="366" text-anchor="end"></text><text class="what" x="34" y="384">the umbrella, and the doctor that checks every layer</text></a></g>
 <g class="layer" data-layer="VeilGardeCLI"><a href="code.html"><title>VeilGardeCLI</title><rect x="20" y="428" width="320" height="52" rx="8"/><text class="name" x="34" y="448">VeilGardeCLI</text><text class="count" x="326" y="448" text-anchor="end"></text><text class="what" x="34" y="466">veilgarde, the command line over all of it</text></a></g>
@@ -84,7 +84,7 @@
 <h2 id="commits-h">The run's commits</h2>
 <div id="commits"></div>
 
-<p class="close">One lens, the tiles it reads, and the two calls it makes.</p>
+<p class="close">Two lanes: one verdict, and one signature read off the residual.</p>
 </main>
 </div>
 <script src="js/veilgarde.js"></script>

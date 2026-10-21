@@ -5,8 +5,8 @@
 //
 //  WHAT: The MLX runtime controls the layers above need without importing MLX: the default device,
 //        a CPU run for A/B checks, the GPU buffer-cache bounds, and releasing cached buffers.
-//  PIN:  One MLX workload at a time. The cache bounds mirror Garde's clrConfigureGPUMemory: a
-//        sequence of inferences must not grow the Metal working set without bound.
+//  PIN:  One MLX workload at a time. The cache bounds mirror the reference app's GPU-memory
+//        settings: a sequence of inferences must not grow the Metal working set without bound.
 //
 
 import Foundation

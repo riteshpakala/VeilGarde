@@ -6,8 +6,8 @@
 //  WHAT: An image recompressed in memory, the way a platform recompresses an upload: encoded as
 //        JPEG or HEIC at a quality through ImageIO and decoded back the way every image here is
 //        decoded, and an image resized through CoreGraphics; first of all, an image flattened to
-//        the 8-bit device-RGB bitmap every lens reads. The noiseprint trainer's degradations and
-//        the watermark's acceptance run are built on it.
+//        the 8-bit device-RGB bitmap every lens reads. The watermark's acceptance run is built
+//        on it.
 //  PIN:  ImageIO's quality scale is its own: 0.75 here is not libjpeg's q75, which is what the
 //        cv2 recipes meant. macOS ImageIO has no WebP encoder, so HEIC stands in wherever the
 //        recipes call for WebP, and the stand-in is named wherever it is used. The resize draws

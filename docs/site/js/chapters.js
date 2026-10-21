@@ -1,7 +1,6 @@
 /*
- * The chapters' live parts: the shipped bundle's tables, read from the manifest the build re-hashed, and the checks
- * that hold a chapter's hand-written lists to the code they describe: the 19 warp feature names against
- * WarpFeatures.names, and the result JSON's keys against ResultJSON.swift.
+ * The chapters' live parts: the shipped bundle's tables, read from the manifest the build re-hashed, and the check
+ * that holds a chapter's hand-written list to the code it describes: the result JSON's keys against ResultJSON.swift.
  *
  * SPDX-License-Identifier: GPL-3.0-only
  */
@@ -43,14 +42,6 @@
   function fileText(path) { var m = V.model(), f = m && m.byPath[path]; return f && f.loaded ? f.text : null; }
   function checks() {
     var out = [];
-    var names = document.querySelector("[data-feature-names]");
-    if (names) {
-      var text = fileText("Sources/VeilGardeCore/Features/WarpFeatures.swift"), got = null;
-      var m = text && /static let names = \[([\s\S]*?)\]/.exec(text);
-      if (m) got = (m[1].match(/"([^"]+)"/g) || []).map(function (s) { return s.slice(1, -1); });
-      var shown = Array.prototype.map.call(names.querySelectorAll("tbody tr td:nth-child(2)"), function (td) { return td.textContent.trim(); });
-      out.push({ name: "the feature table lists WarpFeatures.names, in the model's order", ok: !!got && got.join() === shown.join(), detail: got ? got.length + " names in WarpFeatures.swift" : "WarpFeatures.swift is not loaded" });
-    }
     var keys = document.querySelectorAll("[data-json-key]");
     if (keys.length) {
       var src = fileText("Sources/VeilGardeCore/Result/ResultJSON.swift"), missing = [];

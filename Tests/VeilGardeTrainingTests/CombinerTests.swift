@@ -5,8 +5,8 @@
 //
 //  WHAT: The combiner's five columns equal the reference's first five (atlas_combiner.features;
 //        the sixth, the noiseprint's, left on 2026-10-21), the bounded solver reaches scipy's
-//        optimum on the reference fit, the rescue sweep follows its rule, and the shipped combiner's
-//        rescue weight is what the sweep picks on its own weights.
+//        optimum on the reference fit, the rescue sweep follows its rule, and on the shipped
+//        combiner's own weights no candidate passes, so the sweep falls back to the shipped 1.0.
 //
 
 import Foundation
@@ -92,11 +92,13 @@ struct CombinerTests {
         #expect(rescue == 0.5 && rows.count == settings.rescueSweep.count)
     }
 
-    @Test("the shipped combiner's rescue weight is what the sweep picks on its own weights")
+    @Test("on the shipped combiner's own weights no sweep candidate passes, and the fallback is the shipped rescue")
     func sweepShipped() throws {
         let c = try StackCombiner.load(Fixture.resource("stack_combiner_v3.json"))
         let w = [Double(c.wBase)] + c.wGen.map(Double.init) + [0]
-        let (rescue, _) = CombinerTrainer.chooseRescue(w0: Double(c.w0), w: w, settings: CombinerSettings())
-        #expect(rescue == Double(c.wRescue))
+        let settings = CombinerSettings()
+        let (rescue, sweep) = CombinerTrainer.chooseRescue(w0: Double(c.w0), w: w, settings: settings)
+        #expect(!sweep.contains { $0.probesReal == settings.probes.count && $0.maxProbe <= settings.maxProbe })
+        #expect(rescue == settings.rescueFallback && rescue == Double(c.wRescue))
     }
 }

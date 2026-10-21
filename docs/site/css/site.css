@@ -130,11 +130,9 @@ nav.prevnext .next { text-align: right; grid-column: 2; }
 .trail-grid [data-kind="training"] .tg-mark { color: var(--mod); }
 .trail-grid [data-kind="inference"] .tg-mark { color: var(--accent-ink); }
 .trail-grid [data-kind="signing"] .tg-mark, .trail-grid [data-kind="matching"] .tg-mark { color: var(--wm); }
-.trail-grid [data-kind="research"] .tg-mark { color: var(--link); }
 .trail-grid [data-kind="model"] .tg-mark { color: var(--accent-ink); }
 .trail-grid [data-kind="system"] .tg-mark { color: var(--mod); }
 .trail-grid [data-kind="signal"] .tg-mark { color: var(--wm); }
-.trail-grid [data-kind="method"] .tg-mark { color: var(--link); }
 .stepper .trail-say { margin: 0 0 .6rem; max-width: none; font-size: .86rem; color: var(--fg-2); }
 .stepper ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
 .stepper button.step { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 1.7rem 1fr; gap: .4rem; width: 100%; cursor: pointer; padding: .45rem .6rem; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--bg-raised); font-size: .9rem; line-height: 1.35; color: var(--fg-2); }

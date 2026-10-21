@@ -15,16 +15,16 @@
 
   V.pages = [
     { file: "index.html", short: "The change at a glance", start: true },
-    { file: "01-warp.html", n: 1, short: "How does the warp lens see a camera?" },
-    { file: "02-bundle.html", n: 2, short: "What does the detector ship?" },
-    { file: "03-fusion.html", n: 3, short: "How does the fusion base weigh the evidence?" },
-    { file: "04-specialists.html", n: 4, short: "What do the specialist heads add?" },
-    { file: "05-router.html", n: 5, short: "How does the router pick a path?" },
-    { file: "06-training.html", n: 6, short: "How is each shipped model trained?" },
-    { file: "07-flywheel.html", n: 7, short: "How does the flywheel grow the heads?" },
-    { file: "08-watermark.html", n: 8, short: "How does a warp signature survive a crop?" },
+    { file: "01-fusion.html", n: 1, short: "How does the fusion head read an image?" },
+    { file: "02-specialists.html", n: 2, short: "What do the specialist heads add?" },
+    { file: "03-router.html", n: 3, short: "How does the detector reach one verdict?" },
+    { file: "04-bundle.html", n: 4, short: "What does the detector ship?" },
+    { file: "05-training.html", n: 5, short: "How is each shipped model trained?" },
+    { file: "06-flywheel.html", n: 6, short: "How does the flywheel grow the detector?" },
+    { file: "07-residual.html", n: 7, short: "What does the warp residual measure?" },
+    { file: "08-watermark.html", n: 8, short: "How does a signature survive a crop?" },
     { file: "09-playground.html", n: 9, short: "How do I run each stage myself?" },
-    { file: "10-pruning.html", n: 10, short: "What could VeilGarde do without?" }
+    { file: "10-record.html", n: 10, short: "What did the research find?" }
   ];
   V.appendices = [
     { file: "code.html", short: "The change explorer" },
@@ -323,9 +323,6 @@
   };
 
   // MARK: The trail picker
-
-  /** Trail ids that were renamed, step by step to where each lives now, so a link written before still lands. */
-  V.trailRenamed = { "watermark-1": "watermark-signing-1", "watermark-2": "watermark-signing-3", "watermark-3": "watermark-matching-3" };
 
   /** The trails as one grid, laid out by src/trails.json's picker: a row for each flow, a column for each kind, so a
    *  flow's training and its inference sit side by side and every cell lines up with the cells above it. A section

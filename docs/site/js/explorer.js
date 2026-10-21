@@ -1,8 +1,8 @@
 /*
  * The explorers, one engine for two trail sets. On code.html, the change explorer: every file the run changed,
  * verbatim, before and after, with each Swift file's declarations, the trails that tell each flow in the order the
- * code runs (training and inference for the warp model, the fusion head, the specialists and the noiseprint, signing
- * and matching for the watermark, and the pruning study), picked from one grid with a row a flow and a column a kind,
+ * code runs (training and inference for the fusion head and the specialist stack, signing and matching for the
+ * watermark), picked from one grid with a row a flow and a column a kind,
  * and calls matched by name and argument labels when the page was built (src/build.py). On ml.html
  * (body[data-trails="ml"]), the ML explorer: the same files and declarations, walked by the models' trails
  * (src/mltrails.json), with each step's primer, a deeper line, live facts from the shipped bundle, the code-trail
@@ -21,19 +21,15 @@
   var NARROW = 900;
   var HONEST = "Matched by name and argument labels when this page was built, not by a compiler.";
   var FILTERS = [["all", "All files"], ["changed", "Changed since the base"], ["edited", "Edited, not added"], ["trail", "On a trail"]];
-  /** The one trail's steps before there were several, to where each lives now, so old links still land. */
-  var LEGACY = { 1: "warp-inference-1", 2: "warp-inference-2", 3: "warp-inference-3", 4: "warp-inference-4", 5: "warp-inference-5",
-                 6: "warp-inference-6", 7: "specialist-inference-1", 8: "warp-training-1", 9: "watermark-signing-1" };
 
-  /** What each trail set's page does differently: its storage, its old links, its words, what the ask orb is told,
+  /** What each trail set's page does differently: its storage, its words, what the ask orb is told,
    *  the tools it gets beyond the four, and whether it has the depth control. The trails themselves are data. */
   var SETS = {
     code: {
-      name: "code", page: "code.html", storage: "explorer:", legacy: true, overviewSteps: true, depth: false, unit: "function",
+      name: "code", page: "code.html", storage: "explorer:", overviewSteps: true, depth: false, unit: "function",
       pickerLabel: "The trails through the code", lead: "The reader is on the change explorer, looking at ", told: "told in the order it runs",
       mapTrails: "The trails through the code, each in the order it runs:", extraTools: [],
-      expect: ["warp-training", "fusion-training", "specialist-training", "noiseprint-training", "warp-inference", "fusion-inference",
-               "specialist-inference", "noiseprint-inference", "watermark-signing", "watermark-matching", "pruning"],
+      expect: ["fusion-training", "specialist-training", "fusion-inference", "specialist-inference", "watermark-signing", "watermark-matching"],
       voice: {
         reading: ["You can read the whole change. The map below lists every file and every trail, and your tools read any declaration, file or line of text.",
                   "Start from what the reader has selected. When a question reaches past it, read what you need before you answer, and name what you read. " +
@@ -45,14 +41,14 @@
       }
     },
     ml: {
-      name: "ml", page: "ml.html", storage: "ml:", legacy: false, overviewSteps: false, depth: true, unit: "declaration",
+      name: "ml", page: "ml.html", storage: "ml:", overviewSteps: false, depth: true, unit: "declaration",
       pickerLabel: "The trails through the models", lead: "The reader is on the ML explorer, looking at ", told: "told as its machine learning",
       mapTrails: "The trails through the models, each telling how a model learns and decides, step by step, with the declarations each step reads:", extraTools: ["read_step"],
       expect: null,
       voice: {
         reading: ["You are the guide on the ML explorer. Its trails tell how each shipped model learns and decides: the data, the features, the algorithm and why it was chosen, " +
-                  "the fit, the calibration, and what each model adds to the verdict. One trail follows the two verdicts the result keeps, the majority and the weighted, and " +
-                  "where the path crosses from one to the other. The map below gives the shipped models' facts, every ML trail with its steps, and every file; your tools read " +
+                  "the fit, and what each model adds to the verdict. One trail follows how the base, the stack and two revisions reach the one verdict the result keeps. " +
+                  "The map below gives the shipped models' facts, every ML trail with its steps, and every file; your tools read " +
                   "any step, declaration, file or line of text.",
                   "The reader may be new to machine learning or a senior engineer. Define a term the first time you use it, and match the depth of the question. " +
                   "Every number comes from the facts, a step's notes or the code: say which.",
@@ -82,7 +78,7 @@
     var m = model(), names = Object.keys(m.sets).filter(function (n) { return n !== m.set.name && m.sets[n].trailById[id]; });
     return names[0] || null;
   }
-  /** A trail's name inside a sentence: "the warp training trail", and "the warp model trail" for "The warp model". */
+  /** A trail's name inside a sentence: "the fusion training trail", and "the fusion head trail" for "The fusion head". */
   function trailName(t) { var s = t.title.replace(/^The /, ""); return s.charAt(0).toLowerCase() + s.slice(1); }
   /** The trail being walked; a declaration's places on the trails; its place on the walked one, or null. */
   function current() { var m = model(); return m.trailById[state.trail] || m.trails[0]; }
@@ -236,19 +232,17 @@
 
   // MARK: Deep links
 
-  /** "#<path>[:<line>|:<id tail>]", "#trail-<trail>-<n>[;n=<k>]", the older "#trail-<n>[;n=<k>]", or "#q=<text>" → what it names.
-   *  A step of a renamed trail lands where it lives now (V.trailRenamed). */
+  /** "#<path>[:<line>|:<id tail>]", "#trail-<trail>-<n>[;n=<k>]" or "#q=<text>" → what it names; a step of the other
+   *  explorer's trails is a redirect there. */
   function parseTarget(raw) {
     var m = model(), r;
     if (!m || !raw) return null;
     if ((r = /^trail-([a-z]+(?:-[a-z]+)*)-(\d+)(?:;n=(\d+))?$/.exec(raw))) {
       var t = m.trailById[r[1]], n = +r[2];
-      if (!t && policy().legacy && V.trailRenamed[r[1] + "-" + n]) return parseTarget("trail-" + V.trailRenamed[r[1] + "-" + n] + (r[3] ? ";n=" + r[3] : ""));
       if (!t && otherSet(r[1])) return { redirect: SETS[otherSet(r[1])].page + "#" + raw };
       if (!t || n < 1 || n > t.steps.length) return null;
       return { trail: t.id, step: n, pos: r[3] ? Math.max(0, Math.min(+r[3] - 1, t.steps[n - 1].entries.length - 1)) : 0 };
     }
-    if ((r = /^trail-(\d+)(?:;n=(\d+))?$/.exec(raw))) return policy().legacy && LEGACY[+r[1]] ? parseTarget("trail-" + LEGACY[+r[1]] + (r[2] ? ";n=" + r[2] : "")) : null;
     if ((r = /^q=([\s\S]*)$/.exec(raw))) return { query: r[1] };
     var file = m.byPath[raw], rest = null, cut = raw.indexOf(":");
     if (!file && cut > 0 && m.byPath[raw.slice(0, cut)]) { file = m.byPath[raw.slice(0, cut)]; rest = raw.slice(cut + 1); }
@@ -566,7 +560,7 @@
     var list = badges(places);
     return list.length ? h("span", { class: "xp-badges" }, list) : null;
   }
-  /** A trail's mark and the steps of it a file or a declaration takes: WI3,4 is steps 3 and 4 of warp inference. */
+  /** A trail's mark and the steps of it a file or a declaration takes: FI3,4 is steps 3 and 4 of fusion inference. */
   function badges(places) {
     var m = model(), by = {};
     places.forEach(function (o) { var s = by[o.trail.id] = by[o.trail.id] || []; if (s.indexOf(o.step) < 0) s.push(o.step); });
@@ -993,7 +987,7 @@
     if (typeof v === "number") return V.fmt.minus(f.round !== undefined ? v.toFixed(f.round) : Number.isInteger(v) ? V.fmt.int(v) : String(+v.toPrecision(6)));
     return v === undefined ? "not in the data" : String(v);
   }
-  /** The shipped file a fact was read from: a booster's JSON, the calibration, the combiner or the manifest. */
+  /** The shipped file a fact was read from: the fusion head's JSON, the combiner or the manifest. */
   function factSource(path) {
     var top = path.split(".");
     if (top[0] === "boosters") return V.factValue("boosters." + top[1] + ".file") || null;
@@ -1199,13 +1193,9 @@
         var b = f.boosters[k];
         out.push("  " + k + ", " + b.file + ": gradient-boosted trees, " + b.trees + " trees, depth " + b.depth + ", " + b.features + " features");
       });
-      var c = f.calibration;
-      if (c && c.cuts) out.push("  the camera-sensor call, " + base(c.path) + ": " + c.calibration + " on the " + c.score_semantics + ", real at or below " + c.cuts.real_at_or_below +
-        " and generated at or above " + c.cuts.generated_at_or_above + ", inconclusive between" + (c.derived_from ? "; the cuts are where the Platt contract it derives from turned, threshold " +
-        c.derived_from.decision_threshold + " with band " + c.derived_from.uncertain_band : "") + "; sensor variant " + c.sensor_variant + "; trust law " + c.trust_law);
       var s = f.combiner;
       if (s) out.push("  the stack combiner, " + base(s.path) + ": the " + s.formula + " formula, version " + s.version + "; inputs " + (s.inputs || []).join(", ") + "; w0 " + s.w0 + ", w_base " + s.w_base +
-        ", w_gen " + JSON.stringify(s.w_gen) + " for art, blur and human, w_rescue " + s.w_rescue + ", w_np " + s.w_np + "; caps " + s.cap_base + " on the base and " + s.cap_head + " on a head; gate ceiling " +
+        ", w_gen " + JSON.stringify(s.w_gen) + " for art, blur and human, w_rescue " + s.w_rescue + "; caps " + s.cap_base + " on the base and " + s.cap_head + " on a head; gate ceiling " +
         s.gate_ceiling + "; threshold " + s.threshold + "; the art-pair adjudicates: " + s.pair_adjudicates);
       if (f.frozenRoles && f.frozenRoles.roles) out.push("  frozen roles, which no automated path writes: " + f.frozenRoles.roles.join(", "));
       if (f.manifest && f.manifest.artifacts) out.push("  the bundle's artifacts: " + f.manifest.artifacts.map(function (a) { return a.file + " as " + a.role + (a.head ? " " + a.head : ""); }).join(", "));
@@ -1226,18 +1216,18 @@
 
   var TOOL_SPECS = [
     { type: "function", "function": { name: "find_declarations", description: "Find Swift declarations in the change by name, Type.method, or part of a name. Returns up to 20, each with its file, line and id.",
-      parameters: { type: "object", properties: { query: { type: "string", description: "A name such as run, WarpInference.run or WarpInference.run(cgImage:config:progress:)" } }, required: ["query"] } } },
+      parameters: { type: "object", properties: { query: { type: "string", description: "A name such as detect, Detector.detect or Detector.detect(cgImage:config:hint:)" } }, required: ["query"] } } },
     { type: "function", "function": { name: "read_declaration", description: "Read one declaration whole: its code with line numbers, its doc comment, its file's header, its change, its trail note, and what it calls and what calls it.",
       parameters: { type: "object", properties: { name: { type: "string", description: "Its qualified name, with argument labels when several share it, or an id from find_declarations" } }, required: ["name"] } } },
     { type: "function", "function": { name: "search_text", description: "Search every file in the change for a piece of text, ignoring case. Returns up to 40 matching lines with their file and line.",
-      parameters: { type: "object", properties: { text: { type: "string", description: "The text to look for, such as dual-warp or sensorRawProbability" } }, required: ["text"] } } },
+      parameters: { type: "object", properties: { text: { type: "string", description: "The text to look for, such as not blending or screenshotGate" } }, required: ["text"] } } },
     { type: "function", "function": { name: "read_file", description: "Read a file in the change. Without lines, returns its header and the outline of its declarations; with from and to, returns those lines, numbered, at most 300.",
-      parameters: { type: "object", properties: { path: { type: "string", description: "Its path, such as Sources/VeilGardeLens/Warp/WarpLens.swift, or its file name when unique" },
+      parameters: { type: "object", properties: { path: { type: "string", description: "Its path, such as Sources/VeilGardeInference/Route/Detector.swift, or its file name when unique" },
                                                    from: { type: "integer" }, to: { type: "integer" } }, required: ["path"] } } }
   ];
   var EXTRA_SPECS = {
     read_step: { type: "function", "function": { name: "read_step", description: "Read one step of a trail whole: its title, its primer, its lane, and every entry's declaration with its file and line, its note and cite, its deeper line, the facts it shows and its twins on the code trails.",
-      parameters: { type: "object", properties: { trail: { type: "string", description: "The trail's id or mark, such as warp-model or MW, from the map" }, n: { type: "integer", description: "The step's number, from 1" } }, required: ["trail", "n"] } } }
+      parameters: { type: "object", properties: { trail: { type: "string", description: "The trail's id or mark, such as fusion-model or MF, from the map" }, n: { type: "integer", description: "The step's number, from 1" } }, required: ["trail", "n"] } } }
   };
   /** The tools the page's chat gets: the four that read the change, and the page's own. */
   function toolSpecs() { return TOOL_SPECS.concat(policy().extraTools.map(function (n) { return EXTRA_SPECS[n]; })); }
@@ -1394,8 +1384,8 @@
     bad = idx.edges.filter(function (e) { return !m.scopes[e[0]] || !m.scopes[e[1]] || !(e[2] >= 0 && e[2] <= 2) || !(e[3] >= 1); });
     check("every call edge joins two declarations, with a tier and a line", !bad.length, V.fmt.int(idx.edges.length) + " edges");
     var trails = m.trails, pages = V.pages.map(function (p) { return p.file; }), code = m.sets.code, P = policy();
-    check("eleven trails: the four verdict flows trained and run, the watermark signed and matched, and the pruning study, each with a mark of its own and its steps numbered from 1",
-          code.trails.length === 11 && SETS.code.expect.every(function (id) { return code.trailById[id]; }) &&
+    check("six trails: the fusion head and the specialist stack trained and run, and the watermark signed and matched, each with a mark of its own and its steps numbered from 1",
+          code.trails.length === 6 && SETS.code.expect.every(function (id) { return code.trailById[id]; }) &&
           code.trails.every(function (t, i) { return t.mark && code.trails.findIndex(function (u) { return u.mark === t.mark; }) === i; }) &&
           code.trails.every(function (t) { return t.steps.length >= 3 && t.steps.length <= 9 && t.steps.every(function (st, i) { return st.n === i + 1 && st.entries.length > 0; }); }),
           code.trails.map(function (t) { return t.mark + " " + t.steps.length; }).join(" · "));
@@ -1462,14 +1452,13 @@
     var reindented = body.split("\n").map(function (l) { return "\t  " + l.trim(); }).join("\n");
     check("a pasted body, reindented, still finds it", top(reindented) === first);
     var a = parseTarget(first.file.path + ":" + first.sig), b = parseTarget(first.id), c = parseTarget("trail-" + trails[0].id + "-1;n=1");
-    if (P.legacy) {
-      var d = parseTarget("trail-3;n=2"), w = parseTarget("trail-watermark-3;n=2");
-      check("every deep-link form names its place: a line, an id, a trail step, an older step link through the map of old steps, and a step of a renamed trail",
-            a && b && a.sc === first && b.sc === first && c && c.trail === trails[0].id && c.step === 1 && c.pos === 0 && d && d.trail === "warp-inference" && d.step === 3 && d.pos === 1 &&
-            w && w.trail === "watermark-matching" && w.step === 3 && w.pos === 1);
+    var old = parseTarget("trail-3;n=2");
+    if (P.name === "code") {
+      check("every deep-link form names its place: a line, an id, a trail step; the one trail's old step links, retired with the warp's trails, name nothing",
+            a && b && a.sc === first && b.sc === first && c && c.trail === trails[0].id && c.step === 1 && c.pos === 0 && !old);
     } else {
-      var away = parseTarget("trail-" + code.trails[0].id + "-1"), old = parseTarget("trail-3;n=2");
-      check("every deep-link form names its place: a line, an id, a trail step; a step of the code explorer's trails leads there, and the code explorer's old step links name nothing here",
+      var away = parseTarget("trail-" + code.trails[0].id + "-1");
+      check("every deep-link form names its place: a line, an id, a trail step; a step of the code explorer's trails leads there, and no old step link names a place",
             a && b && a.sc === first && b.sc === first && c && c.trail === trails[0].id && c.step === 1 && c.pos === 0 && away && away.redirect === SETS.code.page + "#trail-" + code.trails[0].id + "-1" && !old);
     }
     var map = codeMap();
@@ -1478,10 +1467,10 @@
             return map.indexOf(at + (f.status === "added" ? ":" : "")) >= 0 || (f.status === "added" && (map.indexOf(at + "\n") >= 0 || map.slice(-at.length) === at));
           }) &&
           trails.every(function (t) { return map.indexOf(t.title + " (" + t.mark + ", ") >= 0; }) && map.length <= MAP_BUDGET + 2000, V.fmt.int(map.length) + " characters");
-    var reads = [runTool("read_declaration", { name: "WarpInference.run" }), runTool("read_file", { path: "WarpLens.swift" }), runTool("search_text", { text: "dual-warp" }),
-                 runTool("find_declarations", { query: "ResultJSON.encode" }), runTool("read_file", { path: "Sources/VeilGardeLens/Warp/WarpResidual.swift", from: 17, to: 20 })];
+    var reads = [runTool("read_declaration", { name: "Detector.detect" }), runTool("read_file", { path: "Detector.swift" }), runTool("search_text", { text: "not blending" }),
+                 runTool("find_declarations", { query: "ResultJSON.encode" }), runTool("read_file", { path: "Sources/VeilGardeCore/Result/ResultJSON.swift", from: 17, to: 20 })];
     check("the chat's tools read a declaration, a file, a search, a lookup and a range of lines",
-          /static func run\(cgImage/.test(reads[0].text) && /Declarations:/.test(reads[1].text) && /dual-warp/i.test(reads[2].text) && /ResultJSON\.encode/.test(reads[3].text) && /^17  /m.test(reads[4].text),
+          /func detect\(cgImage/.test(reads[0].text) && /Declarations:/.test(reads[1].text) && /not blending/i.test(reads[2].text) && /ResultJSON\.encode/.test(reads[3].text) && /^17  /m.test(reads[4].text),
           reads.map(function (r) { return r.text.length; }).join(", ") + " characters");
     if (P.extraTools.indexOf("read_step") >= 0) {
       var st0 = trails[0].steps[0], read = runTool("read_step", { trail: trails[0].mark, n: 1 });

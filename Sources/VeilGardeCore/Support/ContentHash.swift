@@ -3,9 +3,9 @@
 //  VeilGardeCore
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The hashes VeilGarde's provenance rests on: an artifact's SHA-256 (what the result JSON
-//        reports as base_model_sha256 and what a calibration contract is bound to), a file's
-//        bytes streamed, and the SHA-1 a feature-store row is named by.
+//  WHAT: The hashes VeilGarde's provenance rests on: an artifact's SHA-256 (what a manifest binds
+//        and the result JSON's bundle block reports), a file's bytes streamed, and the SHA-1 a
+//        feature-store row is named by.
 //  PIN:  Every hash is lowercase hex. SHA-256 binds artifacts; SHA-1 of the image bytes is the
 //        feature store's row id because the 138k-row seed store already uses it (store_ingest.py
 //        `_sha1`), so a row ingested here and one ingested by the Python ingest share an id.

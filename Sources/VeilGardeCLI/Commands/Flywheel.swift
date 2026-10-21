@@ -20,7 +20,7 @@ import VeilGarde
 
 struct FlywheelCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "flywheel", abstract: "Grow the specialist heads forever: the live bundle, the features-only store, candidates, the battery, promote and rollback.",
+        commandName: "flywheel", abstract: "Grow the fusion head and the specialist stack: the live bundle, the features-only store, candidates, the battery, promote and rollback.",
         discussion: "Run `flywheel init` once; then ingest or seed, `candidates`, review REVIEW.md, and `promote` what passes.",
         subcommands: [Init.self, Seed.self, Acquire.self, Gap.self, IngestImages.self, Candidates.self, AgreementCommand.self, Battery.self, Promote.self, Rollback.self, Status.self])
 

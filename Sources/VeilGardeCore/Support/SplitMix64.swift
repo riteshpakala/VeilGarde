@@ -4,8 +4,8 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The seeded generator every random choice in VeilGarde draws from: row subsamples and
-//        column samples in the tree trainer, patch picks in the noiseprint sampler, token picks
-//        for the semantic-tile head, the watermark acceptance crops.
+//        column samples in the tree trainer, token picks for the semantic-tile head, the
+//        watermark acceptance's sample and crops.
 //  PIN:  SplitMix64 (Steele, Lea and Flood), so a seed names one sequence on every machine and
 //        in every build. A stream is derived as `SplitMix64(seed: seed ^ index)` rather than by
 //        advancing a shared generator, so parallel work stays deterministic.

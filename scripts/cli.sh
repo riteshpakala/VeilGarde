@@ -17,7 +17,7 @@
 #
 #   scripts/cli.sh doctor
 #   scripts/cli.sh route photo.jpg --json
-#   VEILGARDE_CONFIG=release scripts/cli.sh train warp --dataset final_mixed
+#   VEILGARDE_CONFIG=release scripts/cli.sh train all
 #
 set -euo pipefail
 

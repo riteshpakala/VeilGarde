@@ -33,7 +33,7 @@ public struct BatterySpec: Codable, Sendable, Equatable {
     public enum Gate: String, Codable, Sendable, CaseIterable {
         /// HARD and HARD_SEM groups only: what a base promote must pass.
         case promote
-        /// Every group: what a head, combiner or calibration promote must pass.
+        /// Every group: what a head or combiner promote must pass.
         case full
     }
 

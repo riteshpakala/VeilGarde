@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>How do I run each stage myself? · VeilGarde</title>
-<meta name="description" content="On the playground: one program that runs both regimes on this Mac, from the base warp model's camera-sensor score to the stacked heads, a candidate trained in miniature, a promote and its rollback, and a watermark.">
+<meta name="description" content="On the playground: one program that runs both lanes on this Mac, the fusion head and the stacked specialists, a candidate trained in miniature, a promote and its rollback, and a watermark read off the warp residual.">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/site.css">
 </head>
-<body data-groups="Playground,Sources-VeilGardeTraining">
+<body data-groups="Playground">
 <a class="skip" href="#main">Skip to the chapter</a>
 <div class="shell">
 <nav class="side" aria-label="Chapters"></nav>
@@ -16,42 +16,54 @@
 <header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 9 of 10</span><a href="code.html#Playground/Sources/VeilGardePlayground/main.swift">Open the playground in the explorer</a></header>
 
 <h1 id="ch-playground">How do I run each stage myself?</h1>
-<p class="lede"><em>On the playground that walks both regimes stage by stage, from the warp model alone to the stacked heads.</em></p>
+<p class="lede"><em>On the playground that walks both lanes stage by stage, from the capture signature to a signature read off the warp residual.</em></p>
 
-<p>Each chapter before this one explains a layer. The playground runs them, one after another, on this Mac, and checks every step against something it must equal. It is one program, read top to bottom, and it exits with 0 only when every checkpoint holds.</p>
+<p>Each chapter before this one explains a part. The playground runs them, one after another, on this Mac, and checks every step against something it must equal. It is one program, read top to bottom, and it exits with 0 only when every checkpoint holds.</p>
 <pre class="cmd">Playground/run.sh</pre>
 <p>It writes nothing outside its own scratch folder, <code>Playground/.work</code>, and only from the training step on.</p>
 
-<h2 id="inference">The inference regime, one part at a time</h2>
-<p>The first six steps take one image through the detector the way chapters 1 to 5 tell it. The lens cuts it into 32-pixel tiles and prints the centre tile's 19 features by name. The base warp model alone then scores every tile. The camera-sensor score is worked out in the open: the tile vote, the two cuts that call it, and the trust the call deserves.</p>
-<p>The lens's whole result is held against Garde's, leaf for leaf but for the sensor fields the two cuts changed. Then come the capture signature, the 397 numbers the fusion head reads, and the full detector. The combiner's arithmetic is printed term by term and checked against the router's own score.</p>
+<h2 id="inference">The detector, one part at a time</h2>
+<p>Steps 0 and 1 load the Metal library, verify the shipped bundle against its manifest, and pick the images. They are the two parity crops with VeilGarde's own goldens, and a dozen final_mixed images when the T9 is mounted.</p>
+<p>Step 2 measures whether a sensor made the first crop: its capture signature at native resolution, and the screenshot gate. Step 3 reads what it depicts, through DINOv2's two views of one image, the fusion head's plain crop and the heads' forced resize.</p>
+<p>Step 4 builds the fusion head's 393 columns by hand, the embedding and then the capture values, and asks the head for P(AI). A checkpoint holds that number to the base the full detector reports.</p>
+<p>Step 5 runs the full detector and prints its stack. When the capture signature is absent, the combiner's sum is worked out term by term, and a checkpoint holds it to the router's own score before the semantic chain. Both crops' routed results are then held to VeilGarde's goldens, every label exact and every number within 1e-4.</p>
 
-<h2 id="training">The training regime, in miniature</h2>
-<p>Step 7 writes a recipe in Swift. It names a toy warp tile model of 20 trees, a two-tree warm start on the shipped fusion head, the human head, and the combiner. It prints the plan before anything trains, then runs the engine into a candidate bundle.</p>
+<h2 id="training">Training, in miniature</h2>
+<p>Step 6 writes a recipe in Swift: a two-tree warm start on the shipped fusion head, the human head, and the combiner. It prints the plan before anything trains, then runs the engine into a candidate bundle.</p>
+<p>The rows come from a seeded sample of the work area's feature store, copied and never written back. Without that store, seeded synthetic rows stand in, and the step says so.</p>
 <div class="code" data-excerpt="Playground/Sources/VeilGardePlayground/Toy.swift:Toy.writeStore()"></div>
-<p>A toy separates its own images perfectly, so its numbers mean little. What the step proves is the machinery. The toy model reads back through Frigate's evaluator with identical predictions. A calibration binds to the toy model's bytes and refuses the shipped model's, and the warm start keeps the shipped head's 940 trees byte for byte.</p>
+<p>A toy fit on a few hundred rows means little, so the step proves the machinery instead. The warm start keeps the shipped head's trees byte for byte and adds two. Frigate's evaluator reads the candidate's head with predictions identical to VeilGarde's own. The candidate verifies, every hash against its manifest.</p>
 
 <h2 id="flywheel">The flywheel, and the watermark</h2>
-<p>Step 8 copies the shipped bundle as a live bundle and builds a small battery: every image that must keep the call the shipped detector gives it today. Promote refuses the frozen warp tile model. The human head from step 7 goes through admission and the battery, and is rolled back. The checkpoints say the frozen artifacts never moved and live is byte for byte what it was.</p>
-<p>Step 9 signs the first image with its own fragility pattern and matches it against itself, then reports a half-area crop and a JPEG re-encode. Whether v1 holds on real crops is the acceptance run's question, chapter 8's.</p>
+<p>Step 7 copies the shipped bundle as a live bundle and builds a small battery: every image must keep the call the shipped detector gives it today. Promote refuses a frozen weight and a slot that no longer exists. The human head from step 6 goes through admission and the battery, and is rolled back. The checkpoints say the weights never moved and live is byte for byte what it was.</p>
+<p>Step 8 is the other lane. It signs the first crop with its own fragility pattern, read off the warp residual, and matches it against itself. It then reports a half-area crop and a JPEG re-encode; whether the signature holds on real crops is the acceptance run's question, chapter 8's.</p>
 
-<h2 id="showed">What it showed on 2026-10-19</h2>
-<p>The run took under two minutes in release, its build included, and held all 12 checkpoints. Step 3 worked out the first crop's camera-sensor score in the open:</p>
-<pre class="cmd">tile vote: 97 of 256 tiles above 0.5 → the camera-sensor score 0.3789
-two cuts on the vote: real at or under 0.7169, generated at or over 0.8365, inconclusive between
-→ real, trust low</pre>
-<p>The trust is low because a 512-pixel crop carries no capture signature. On the final_mixed sample the six iPhone originals read real, five of them with high trust, and the six generated images read real too, at low trust. The sensor score is a camera detector, and the stack after it catches the generators.</p>
-<p>On the same crop the fusion base read 0.9392 and the pooled verdict 0.9999, the combiner's sum done by hand equal to the router's. In step 9 a half-area crop matched its source at 0.789 over 379 bits, and a JPEG of it at 0.894.</p>
-
+<h2 id="showed">What it showed on 2026-10-21</h2>
+<p>The run after the warp left detection held all 12 checkpoints. Its numbers, by step:</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Step</th><th>What the run printed</th></tr></thead>
+<tbody>
+<tr><td>4, the fusion head</td><td>crop_ben's base P(AI) 0.6304, a generated call on its own, equal to the routed result's base</td></tr>
+<tr><td>5, the stack</td><td>no capture signature, so the combiner ran; its rescue pulled the pooled P(AI) to 0.1059, real, equal to the router's; both crops equal their goldens</td></tr>
+<tr><td>6, training</td><td>the shipped head's 500 trees kept byte for byte, 2 added; Frigate equal on 830 store rows; the candidate's 8 artifacts verified</td></tr>
+<tr><td>7, the flywheel</td><td>a battery of 13 images that must stay real and 1 that must stay generated; dinov2-small and fusion-reference refused; the human head promoted, the battery passed, then rolled back; the 3 weights unmoved</td></tr>
+<tr><td>8, the watermark</td><td>16×16 tiles and 930 measured bits; a self-match of 1.000; a half-area crop matched at 0.789 over 379 bits, found 0.12 tiles off; a JPEG at quality 0.75 matched at 0.894</td></tr>
+<tr><td>9, verify</td><td>12 of 12 checkpoints</td></tr>
+</tbody>
+</table>
+</div>
+<p>Crop_ben shows the stack at work. The base alone calls the crop generated, and the three heads, all reading it real, rescue it to real.</p>
 
 <h2 id="sources">Where the numbers come from</h2>
 <div class="scroll">
 <table class="data">
 <thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
 <tbody>
-<tr><td>The steps and their checkpoints</td><td class="mono"><a href="code.html#Playground/Sources/VeilGardePlayground/main.swift">main.swift</a> and Playground/README.md</td><td>Phases 4 to 8, 2026-10-19</td></tr>
-<tr><td>A toy of 20 trees; a two-tree warm start; 940 trees kept</td><td class="mono">main.swift, step 7</td><td>Every run</td></tr>
-<tr><td>12 of 12 checkpoints in 1 min 48 s; the step-3 lines; 0.9392 and 0.9999; 0.789 over 379 bits and 0.894</td><td>Ledger command for <code>Playground/run.sh</code>, phase 8</td><td>2026-10-19</td></tr>
+<tr><td>The steps and their checkpoints</td><td class="mono"><a href="code.html#Playground/Sources/VeilGardePlayground/main.swift">main.swift</a> and Playground/README.md</td><td>Rewritten for the two lanes, 2026-10-21</td></tr>
+<tr><td>12 of 12 checkpoints; 500 trees kept; the battery's 13 and 1; the refusals; the 3 weights</td><td><a href="index.html#command-102">Ledger command-102</a> and the run's output</td><td>2026-10-21</td></tr>
+<tr><td>crop_ben's base 0.6304 and pooled 0.1059</td><td><a href="index.html#command-94">Ledger command-94</a>, the goldens the playground holds itself to</td><td>2026-10-21</td></tr>
+<tr><td>930 bits; 0.789 over 379 bits; 0.894</td><td>The run's output, step 8; the same numbers as the run of 2026-10-19, since the residual is unchanged</td><td>2026-10-21</td></tr>
 </tbody>
 </table>
 </div>

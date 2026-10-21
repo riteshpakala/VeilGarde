@@ -3,8 +3,8 @@
 //  VeilGardeTraining
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: L2-regularized logistic regression solved exactly by Newton's method: every linear head,
-//        the art-pair adjudicator and the Platt calibration are fitted with it.
+//  WHAT: L2-regularized logistic regression solved exactly by Newton's method: every linear head
+//        is fitted with it.
 //  PIN:  sklearn's LogisticRegression objective, ½‖w‖² + C·Σ s_i·logloss_i with the intercept
 //        unpenalized, s_i the sample weight times the class weight (`balanced` = n / (2·n_class)).
 //        The problem is strictly convex, so Newton (the Hessian X̃ᵀ diag(C·s·p(1−p)) X̃ + I, solved

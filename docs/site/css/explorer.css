@@ -39,12 +39,10 @@ body.explorer .menu { display: inline-flex; align-items: center; gap: .4rem; fon
 .xp-badge[data-kind="training"] { border-color: var(--mod); color: var(--mod); }
 .xp-badge[data-kind="inference"] { border-color: var(--accent); color: var(--accent-ink); }
 .xp-badge[data-kind="signing"], .xp-badge[data-kind="matching"] { border-color: var(--wm); color: var(--wm); }
-.xp-badge[data-kind="research"] { border-color: var(--link); color: var(--link); }
-/* The ML explorer's kinds (ml.html): a model, the system the models make together, the watermark's signal, a method. */
+/* The ML explorer's kinds (ml.html): a model, the system the models make together, the watermark's signal. */
 .xp-badge[data-kind="model"] { border-color: var(--accent); color: var(--accent-ink); }
 .xp-badge[data-kind="system"] { border-color: var(--mod); color: var(--mod); }
 .xp-badge[data-kind="signal"] { border-color: var(--wm); color: var(--wm); }
-.xp-badge[data-kind="method"] { border-color: var(--link); color: var(--link); }
 .xp-chapters a { color: var(--link); }
 .xp-steps { list-style: none; display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: .35rem; margin: 0; padding: 0 0 .2rem; }
 .xp-steps li { display: flex; min-width: 0; }
@@ -61,8 +59,6 @@ body.explorer .menu { display: inline-flex; align-items: center; gap: .4rem; fon
 .xp-walk:disabled { opacity: .45; cursor: default; }
 /* The ML explorer's trail strip: a laned trail's key, the lane on each step, the depth control and the legend. */
 .xp-lane { display: inline-block; flex: none; font: 600 .62rem/1.5 var(--font-sans); letter-spacing: .03em; border-radius: 3px; padding: 0 .3rem; color: var(--fg-2); background: var(--bg-sunk); white-space: nowrap; }
-.xp-lane[data-lane="majority"] { color: var(--accent-ink); background: var(--accent-soft); }
-.xp-lane[data-lane="weighted"] { color: var(--mod); background: var(--mod-soft); }
 .xp-steps .xp-lane { margin-left: auto; }
 .xp-lanes { margin: .4rem 0 0; max-width: none; font-size: .8rem; color: var(--fg-2); }
 .xp-trail-foot { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem 1.2rem; margin-top: .55rem; }
@@ -201,9 +197,7 @@ body.explorer .menu { display: inline-flex; align-items: center; gap: .4rem; fon
   .xp-steps { grid-template-columns: repeat(var(--n, 6), minmax(0, 1fr)); }
   .xp-steps .xp-t { display: none; }
   .xp-steps .xp-lane { font-size: 0; width: .45rem; height: .45rem; padding: 0; border-radius: 50%; margin-left: .25rem; align-self: center; }
-  .xp-steps .xp-lane[data-lane="majority"] { background: var(--accent); }
-  .xp-steps .xp-lane[data-lane="weighted"] { background: var(--mod); }
-  .xp-steps .xp-lane:not([data-lane="majority"]):not([data-lane="weighted"]) { background: var(--fg-2); }
+  .xp-steps .xp-lane { background: var(--fg-2); }
   .xp-steps button { justify-content: center; }
   .xp-find .note { margin-left: 0; }
   .xp-find-label { flex-direction: column; align-items: stretch; gap: .3rem; }

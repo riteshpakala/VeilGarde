@@ -31,7 +31,7 @@ public struct WorkArea: Sendable, Equatable {
         return WorkArea(root: URL(fileURLWithPath: (named as NSString).expandingTildeInPath, isDirectory: true))
     }
 
-    /// Where the labelled datasets live (final_mixed and the noiseprint's families): VEILGARDE_DATASETS, else the work
+    /// Where the labelled datasets live (final_mixed and the iPhone originals): VEILGARDE_DATASETS, else the work
     /// area's datasets/; nil when neither is named.
     public static func datasets(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
         if let named = environment[datasetsKey], !named.isEmpty {

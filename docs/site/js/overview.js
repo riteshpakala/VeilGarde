@@ -120,11 +120,8 @@
       if (a && first) a.setAttribute("href", "code.html#" + first);
     });
     function fromHash() {
-      var r = /^#step-([a-z]+(?:-[a-z]+)*)-(\d+)$/.exec(location.hash || ""), old = /^#step-(\d+)$/.exec(location.hash || "");
-      var moved = r && V.trailRenamed[r[1] + "-" + r[2]];
-      if (moved) r = /^([a-z]+(?:-[a-z]+)*)-(\d+)$/.exec(moved);
+      var r = /^#step-([a-z]+(?:-[a-z]+)*)-(\d+)$/.exec(location.hash || "");
       if (r && idx.trails.some(function (t) { return t.id === r[1]; })) { var t = trailOf(r[1]); return [t.id, Math.max(1, Math.min(t.steps.length, +r[2]))]; }
-      if (old) { var first = idx.trails[0]; return [first.id, Math.max(1, Math.min(first.steps.length, +old[1]))]; }
       return null;
     }
     var at = fromHash() || [idx.trails[0].id, 1];
@@ -179,8 +176,10 @@
   }
   function renderDecisions(node) {
     node.appendChild(h("ul", { class: "decisions" }, (run().decisions || []).map(function (d) {
-      return h("li", { id: d.id }, [h("span", { class: "id" }, d.id), h("b", null, d.chose), " · shapes ", fileLink(d.file || ""),
-        h("span", { class: "why" }, "Rather than " + d.rejected + ". Why: " + d.reason)]);
+      var shapes = d.retired ? [" · shaped ", h("code", null, d.file || ""), h("span", { class: "dim" }, ", retired on " + d.retired + " and kept on the 2026-rnd branch")]
+                             : [" · shapes ", fileLink(d.file || "")];
+      return h("li", { id: d.id, class: d.retired ? "retired" : null }, [h("span", { class: "id" }, d.id), h("b", null, d.chose)].concat(shapes,
+        [h("span", { class: "why" }, "Rather than " + d.rejected + ". Why: " + d.reason)]));
     })));
   }
   function renderQuestions(node) {
@@ -257,8 +256,10 @@
     });
     out.push({ name: "the picker's cells line up: a column's cells start at one left edge, a row's share one top and one height",
                ok: cells.length === idx.trails.length && !misaligned.length, detail: misaligned.map(function (c) { return c.b.getAttribute("data-trail"); }).join(", ") });
-    var bad = (run().decisions || []).filter(function (d) { return d.file && !firstFileOf(d.file) && !excluded(d.file); });
-    out.push({ name: "every decision names a file in the change", ok: !bad.length, detail: bad.map(function (d) { return d.id + " → " + d.file; }).join(", ") });
+    var bad = (run().decisions || []).filter(function (d) { return d.file && !d.retired && !firstFileOf(d.file) && !excluded(d.file); });
+    var retired = (run().decisions || []).filter(function (d) { return d.retired; });
+    out.push({ name: "every decision in force names a file in the change; a retired one names its date", ok: !bad.length && retired.every(function (d) { return /^\d{4}-\d\d-\d\d$/.test(d.retired); }),
+               detail: bad.map(function (d) { return d.id + " → " + d.file; }).join(", ") || retired.length + " retired" });
     out.push({ name: "the ledger's commands all carry an exit code", ok: (run().commands || []).every(function (c) { return typeof c.exit === "number"; }) });
     return out;
   }

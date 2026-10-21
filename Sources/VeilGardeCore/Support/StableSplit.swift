@@ -6,8 +6,8 @@
 //  WHAT: Deterministic, auditable splits: a key (an image stem, a source, a row id) maps to a
 //        number in [0, 1) by its SHA-256, and fractions of that line make train, val and test.
 //  PIN:  The number is the first eight bytes of SHA-256("<salt>:<key>"), big-endian, over 2^64.
-//        A salt names the split ("split:v1" for the warp tiles, "platt:v1" for the calibration
-//        holdout, "head-split:v1", "combiner-split:v1"), so two splits of one corpus never
+//        A salt names the split ("fusion-eval:v1" for the fusion head's evaluation twin,
+//        "combiner:v1" for the combiner's test rows), so two splits of one corpus never
 //        correlate. The Python splits were seeded shuffles that Swift cannot replay; these are written
 //        into every manifest instead, so anyone can audit which row went where.
 //
