@@ -95,12 +95,14 @@ def strand(i, lane, phase):
 
 def rows(scores):
     """Every tile row feeds both lanes: a strand in the row's mean colour into the verdict's lane, and a fine grey one
-    into the signature's."""
+    into the signature's. The verdict's strands run on as one line, in the image's mean colour, to where the warps end."""
     out = []
     for i, row in enumerate(scores):
         mean = sum(row) / len(row)
         out.append(f'<polyline points="{strand(i, LANES[0], 0)}" fill="none" stroke="{colour(mean, 0.9)}" stroke-width="1.6" stroke-linecap="round"/>')
         out.append(f'<polyline points="{strand(i, LANES[1], 1.9)}" fill="none" stroke="{LINE}" stroke-width="1" stroke-opacity=".42" stroke-linecap="round"/>')
+    mean = sum(p for row in scores for p in row) / sum(len(row) for row in scores)
+    out.append(f'<line x1="{LENS[0] - 24}" y1="{LANES[0]}" x2="{LENS[1]}" y2="{LANES[0]}" stroke="{colour(mean, 0.9)}" stroke-width="2" stroke-linecap="round"/>')
     return "".join(out)
 
 
