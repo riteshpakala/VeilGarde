@@ -28,7 +28,63 @@ Three **revisions** read them. A small non-negative **combiner** anchors on the 
 | `VeilWatermark` | the warp residual and a crop-robust signature read off each tile's fragility |
 | `veilgarde` | the CLI over all of it |
 
+## Detection as a declaration
+
+The detector is one Swift value. Its shape in the code is its architecture: what reads the image, in what order, and what decides.
+
+```swift
+public static var v1: Pipeline {
+    Pipeline {
+        Stack {
+            Screenshot()
+            Camera()
+            Capture()
+            Specialist(.art)
+            Specialist(.blur)
+            Specialist(.human)
+            Specialist(.preview)
+            SemanticTiles()
+        }
+        Revisions {
+            Combine()
+            FrameSeam()
+            PreviewTail()
+        }
+    }
+}
+```
+
+An image moves through five stages:
+
+1. **Decode** reads the file the one way every model was trained on.
+2. **Shared Signals** computes what every member reads, once: the screenshot gate, the capture measurement, two DINOv2 readings and the patch tokens.
+3. **Stack** asks every member for its own take. A member reads only the shared signals, never another member, and reports its own P(AI), its verdict and what it measured.
+4. **Revisions** read the stack in order. The combiner sets the verdict around one anchor; the frame seam and the preview tail change it only on decisive evidence.
+5. **Result** keeps the verdict beside every member's score and every revision's record, as schema-v1 JSON.
+
+Training is declared the same way. The recipe lists the trainable members, and the engine trains each in dependency order without knowing any by name:
+
+```swift
+TrainingRecipe(id: "weekly") {
+    CameraHead().warmStart(add: 80, eta: 0.03)
+    for kind in HeadKind.flywheelCategories { SpecialistHead(kind) }
+    Combiner()
+}
+```
+
+That symmetry is what makes the engine iterative. A new detector for a new kind of generated image is a new member:
+
+1. one file that conforms to `StackMember`, a name and `score(_:)` from the shared signals to its own output, and one line in the `Stack`;
+2. if it learns from data, one file that conforms to `TrainableMember` and one line in the recipe;
+3. if the verdict should weigh it, its name in the combiner's file, which a refit writes.
+
+Nothing else changes. The new member's score appears in every result from its first run, so it is measured on its own and inside the verdict before anyone decides to trust it. The flywheel then grows it like the others: it finds where the stack is wrong, fetches images of that kind, keeps only their features, trains candidates and promotes one only behind the battery.
+
+DINOv2 and the capture measurement run on the GPU through MLX, by way of [Frigate](https://github.com/rao-studios/Frigate); every trainer runs on the CPU from stored features, so a retrain never touches an image. The pipeline took this shape on 2026-10-21, and no verdict or score moved in the change.
+
 ## Detection accuracy
+
+> **Work in progress.** The dataset, the training regime and the golden anchors are being revised, with the aim of raising accuracy on generated images to 80% in the coming weeks. The numbers below are v1's, measured on 2026-10-21, and will change as that work lands.
 
 **v1** is the shipped detector: the camera head over DINOv2 and the capture signature, and the specialist members, pooled by the combiner. Its battery, `battery_spec.json` version 1, passes on 96 images and is the baseline for testing; four generated images it misses are set aside for research. Measured on 2026-10-21. The same day the stack became a list of members, and no number moved: the census calls before and after are identical. A real image counts as right when it's called real; a generated image when it's called generated. "Inconclusive" counts as wrong.
 
