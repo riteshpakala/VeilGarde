@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>How does the detector reach one verdict? · VeilGarde</title>
-<meta name="description" content="On the full detector: the domain, the domain's base expert, the steps that compound on it in a fixed order, and the schema-v3 result it writes.">
+<meta name="description" content="On the full detector: five stages from a file to one result, a stack of independent members each with its own score, the revisions that read them, and the schema-v1 result it writes.">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/site.css">
 </head>
@@ -13,110 +13,114 @@
 <div class="shell">
 <nav class="side" aria-label="Chapters"></nav>
 <main class="page" id="main">
-<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 3 of 10</span><a href="code.html#trail-domain-1">Walk the router in the explorer</a></header>
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 3 of 10</span><a href="code.html#trail-stack-1">Walk the stack in the explorer</a></header>
 
 <h1 id="ch-router">How does the detector reach one verdict?</h1>
-<p class="lede"><em>On the one entry point of the full detector, the order in which its evidence compounds, and the result it writes.</em></p>
+<p class="lede"><em>On the five stages of the full detector, the stack of members that each say what they see, the revisions that read them, and the result it writes.</em></p>
 
-<p>The router is where the layers meet. It picks the image's domain, runs that domain's base expert, then lets a short list of high-precision steps revise the verdict, always in the same order. Every step is one file.</p>
-<p>The number that comes out keeps the base's meaning: the probability that the image was generated, called at 0.5.</p>
+<p>The detector is one declaration. It computes the image's signals once, asks every member of its stack for its own take, then runs a short list of revisions over what they said. Every member and every revision is one file.</p>
+<p>The number that comes out keeps the anchor's meaning: the probability that the image was generated, called at 0.5.</p>
 
-<h2 id="domain">Two domains</h2>
-<p>A photograph and a screenshot need different experts. The router reads the image's signals once, then picks the screenshot domain when the flat-UI gate fires and the camera domain otherwise. A caller's hint overrides the gate.</p>
-<p>Routing is never by image size. A small image is still a camera image, and the preview tail of chapter 2 handles what size does to the base.</p>
-<div class="code" data-excerpt="Sources/VeilGardeInference/Route/Domain.swift:DefaultDomainDetector.detect(_:hint:)"></div>
-<p>The camera domain's expert is the fusion head of chapter 1. The screenshot domain's expert is a content head trained on screenshots alone.</p>
-
-<h2 id="stages">Seven stages, one after another</h2>
+<h2 id="stages">Five stages, one after another</h2>
 <p>Detection is a chain of stages, each handing its output to the next. The change explorer walks each one as a trail of its own.</p>
 <div class="scroll">
 <table class="data">
 <thead><tr><th class="n">#</th><th>Stage</th><th>What it does</th><th>Trail</th></tr></thead>
 <tbody>
 <tr><td class="n">1</td><td>Decode</td><td>The file to the pixels every model saw: NSImage first, then ImageIO.</td><td><a href="code.html#trail-decode-1">DE</a></td></tr>
-<tr><td class="n">2</td><td>Shared Signals</td><td>Computed once: the screenshot gate, the capture signature and both DINOv2 readings.</td><td><a href="code.html#trail-shared-signals-1">SG</a></td></tr>
-<tr><td class="n">3</td><td>Domain</td><td>A hint, else the gate: camera or screenshot, never by size.</td><td><a href="code.html#trail-domain-1">DO</a></td></tr>
-<tr><td class="n">4</td><td>Base</td><td>The fusion head's P(AI), its row in the layout its width names.</td><td><a href="code.html#trail-base-1">BA</a></td></tr>
-<tr><td class="n">5</td><td>Stack</td><td>Capture first, then the specialist heads pooled onto the base.</td><td><a href="code.html#trail-stack-1">SK</a></td></tr>
-<tr><td class="n">6</td><td>Revisions</td><td>The frame seam, the semantic chain and the preview tail, each only on decisive evidence.</td><td><a href="code.html#trail-revisions-1">RV</a></td></tr>
-<tr><td class="n">7</td><td>Result</td><td>One verdict, written as schema-v3 JSON.</td><td><a href="code.html#trail-result-1">RS</a></td></tr>
+<tr><td class="n">2</td><td>Shared Signals</td><td>Computed once: the screenshot gate, the capture reading, both DINOv2 readings and the patch tokens.</td><td><a href="code.html#trail-shared-signals-1">SG</a></td></tr>
+<tr><td class="n">3</td><td>Stack</td><td>Every member reads the signals and says what it sees, each with its own score.</td><td><a href="code.html#trail-stack-1">SK</a></td></tr>
+<tr><td class="n">4</td><td>Revisions</td><td>The combiner sets the verdict around one anchor; the frame seam and the preview tail revise it only on decisive evidence.</td><td><a href="code.html#trail-revisions-1">RV</a></td></tr>
+<tr><td class="n">5</td><td>Result</td><td>The verdict, every member's output and every revision's record, written as schema-v1 JSON.</td><td><a href="code.html#trail-result-1">RS</a></td></tr>
 </tbody>
 </table>
 </div>
-<p>v1 does not read the warp residual. A candidate head could take its statistics as numbers from the watermark's code; none ships.</p>
+<div class="code" data-excerpt="Sources/VeilGardeInference/Stack/Pipeline.swift:Pipeline.v1"></div>
+<p>The declaration is the detector. A new member is one file that says what it sees and one line in the stack; a new revision is one file and one line after it. The training recipe of chapter 5 declares the trainable members the same way.</p>
 
-<h2 id="order">The order of the steps</h2>
-<div class="code" data-excerpt="Sources/VeilGardeInference/Route/Detector.swift:Detector.detect(cgImage:config:hint:)"></div>
-<p>The order is fixed because each step reads what the one before it wrote.</p>
+<h2 id="stack">The stack: every member speaks</h2>
+<p>A member reads only the shared signals and never another member's answer. It reports its own P(AI), its verdict, and the fields only it measures, and the result keeps all of it.</p>
 <div class="scroll">
 <table class="data">
-<thead><tr><th class="n">#</th><th>Step</th><th>What it does</th></tr></thead>
+<thead><tr><th>Member</th><th>What it reads</th><th>What it reports</th></tr></thead>
 <tbody>
-<tr><td class="n">1</td><td class="mono">CapturePriors</td><td>A valid, present capture signature suppresses every generated-side head. Otherwise the combiner of chapter 2 pools the base with the art, blur and human priors.</td></tr>
-<tr><td class="n">2</td><td class="mono">FrameSeam</td><td>When a real verdict hides a uniform dark frame, it runs the stack again on the interior and takes decisive interior evidence.</td></tr>
-<tr><td class="n">3</td><td class="mono">SemanticChain</td><td>The semantic-tile map and its majority, then the projection that lets only the production profile commit a probe's revision.</td></tr>
-<tr><td class="n">3a</td><td class="mono">PreviewTail</td><td>A small image read as generated with a clean semantic vote flips to real only when the preview head and the neutralized fusion head both read it real.</td></tr>
+<tr><td class="mono">screenshot</td><td>the flat-UI gate, the force-resized DINOv2 reading</td><td>the gate's three tells, whether they fire together, and the screenshot head's P(AI)</td></tr>
+<tr><td class="mono">camera</td><td>the plain DINOv2 reading and the nine capture values</td><td>the camera head's P(AI) at 0.5 with a band of 0.04, and p_neutral, its score with the capture flags set</td></tr>
+<tr><td class="mono">capture</td><td>the capture reading</td><td>the peak, whether the image is large enough to read it, the native short side, and whether a signature is present; no P(AI)</td></tr>
+<tr><td class="mono">art, blur, human</td><td>the force-resized reading</td><td>each head's P(AI) and its call at the head's threshold</td></tr>
+<tr><td class="mono">preview</td><td>the force-resized reading</td><td>the preview head's P(AI), real at or below 0.45</td></tr>
+<tr><td class="mono">semantic-tiles</td><td>the patch tokens</td><td>a 16 by 16 grid of P(AI) and its majority, the share above 0.5</td></tr>
 </tbody>
 </table>
 </div>
-<p>Zoom escalation, the x-domain gate and the render taxonomy were removed when the detector became two lanes; none of them ran by default.</p>
-<p>The verdict is frozen before the semantic chain as the pre-semantic state, and kept in the diagnostics. That is what makes a route replayable: the chain's revisions can be read against what came before them.</p>
+<p>Routing is never by image size, and nothing routes at all now. The screenshot gate is a signal: the screenshot member reports it, and the combiner reads it to choose its anchor.</p>
+
+<h2 id="order">The revisions, in order</h2>
+<p>The revisions run after the stack, in a fixed order, because each reads the verdict the one before it left. Each records what it did.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th class="n">#</th><th>Revision</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td class="mono">combiner</td><td>Anchors on the screenshot member when the gate fired and on the camera member otherwise. A valid, present capture signature leaves the anchor standing, capped at 0.10 under the screenshot anchor; otherwise the stack combiner of chapter 2 pools the anchor with the art, blur and human members.</td></tr>
+<tr><td class="n">2</td><td class="mono">frame-seam</td><td>When a real verdict hides a uniform dark frame, it runs the whole pipeline again on the interior and takes decisive interior evidence.</td></tr>
+<tr><td class="n">3</td><td class="mono">preview-tail</td><td>A small image read as generated with a clean semantic majority flips to real only when the preview member and the camera member's p_neutral both read it real, and only under the production profile.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The anchor rule is the old domain rule, written as a revision. On 2026-10-21 the restructure moved no number: the goldens, the battery and the census calls equal the two-lane detector's.</p>
 
 <h2 id="stacking">Stacking, not blending</h2>
-<p>Each step either keeps the verdict or revises it on decisive evidence, and each gate was measured before it went live. The frame seam takes the interior's verdict only when it reads at least 0.70 and sits at least 0.20 above the outer score. The preview tail flips only under three agreeing reads.</p>
-<p>The cost of a gate is a step that rarely fires. The alternative, one model that blends every signal, raised real false positives from 8% to as much as 92% in the research's measurement.</p>
+<p>Each revision either keeps the verdict or revises it on decisive evidence, and each gate was measured before it went live. The frame seam takes the interior's verdict only when it reads at least 0.70 and sits at least 0.20 above the outer score. The preview tail flips only under three agreeing reads.</p>
+<p>The cost of a gate is a revision that rarely fires. The alternative, one model that blends every signal, raised real false positives from 8% to as much as 92% in the research's measurement.</p>
 
 <h2 id="result">What the result holds</h2>
-<p>The result is one JSON object with one verdict. It names the base expert that ran, the verdict and its operating point, and the image's size. Around them sits the evidence: the capture signature, the stack's rows, the semantic map and a trace of which steps ran.</p>
-<p>The result is schema v3, VeilGarde's own. Schema v2 was the reference's bytes and carried a second verdict, the camera-sensor score and its calibration; none of them exists once the warp leaves detection.</p>
+<p>The result is one JSON object with one verdict. Beside it sit every member's output, in the stack's order, and every revision's record, in theirs.</p>
+<p>The result is schema v1, a clean break from schema v3 on 2026-10-21. Schema v3 named a domain and a base expert and kept a trace of the router's branches; the stack and the revisions are that trace now.</p>
 <div class="scroll">
 <table class="data">
 <thead><tr><th>Key</th><th>When</th><th>What it holds</th></tr></thead>
 <tbody>
-<tr><td class="mono" data-json-key="schema_version">schema_version</td><td>always</td><td>3</td></tr>
-<tr><td class="mono" data-json-key="route">route</td><td>always</td><td>the domain: camera or screenshot</td></tr>
-<tr><td class="mono" data-json-key="scorer">scorer</td><td>always</td><td>the base expert that ran: fusion, or screenshot</td></tr>
+<tr><td class="mono" data-json-key="schema_version">schema_version</td><td>always</td><td>1</td></tr>
 <tr><td class="mono" data-json-key="device">device</td><td>always</td><td>the command that wrote it</td></tr>
 <tr><td class="mono" data-json-key="image">image</td><td>always</td><td><code data-json-key="width">width</code> and <code data-json-key="height">height</code>, the native size</td></tr>
-<tr><td class="mono" data-json-key="verdict">verdict</td><td>always</td><td><code data-json-key="prediction">prediction</code>, <code data-json-key="p">p</code>, <code data-json-key="threshold">threshold</code> and <code data-json-key="band">band</code>: the one call, its P(AI) and the operating point</td></tr>
+<tr><td class="mono" data-json-key="verdict">verdict</td><td>always</td><td><code data-json-key="prediction">prediction</code>, <code data-json-key="p">p</code>, <code data-json-key="threshold">threshold</code> and <code data-json-key="band">band</code>: the one call, its P(AI) and the anchor's operating point</td></tr>
+<tr><td class="mono" data-json-key="stack">stack</td><td>always</td><td>one object a member, in order: its <code data-json-key="name">name</code>, its <code>p</code> or null, its <code>verdict</code>, and its own fields</td></tr>
+<tr><td class="mono" data-json-key="revisions">revisions</td><td>always</td><td>one object a revision, in order: its <code>name</code>, whether it <code data-json-key="applied">applied</code>, the <code>p</code> and <code>prediction</code> it left, and its own fields</td></tr>
+<tr><td class="mono" data-json-key="bundle">bundle</td><td>when the detector names its bundle</td><td><code data-json-key="manifest_sha256">manifest_sha256</code> and <code data-json-key="artifacts">artifacts</code>, every artifact's hash by its slot</td></tr>
 <tr><td class="mono" data-json-key="times_sec">times_sec</td><td>always</td><td>stage timings, empty from route</td></tr>
-<tr><td class="mono" data-json-key="bundle">bundle</td><td>when the detector names its bundle</td><td><code data-json-key="fusion_head_sha256">fusion_head_sha256</code>, <code data-json-key="combiner_sha256">combiner_sha256</code>, <code data-json-key="manifest_sha256">manifest_sha256</code></td></tr>
-<tr><td class="mono" data-json-key="route_diagnostics">route_diagnostics</td><td>from the router</td><td><code data-json-key="requested_hint">requested_hint</code>, <code data-json-key="semantic_profile">semantic_profile</code>, <code data-json-key="screenshot_gate">screenshot_gate</code>, <code data-json-key="base_p">base_p</code>, <code data-json-key="pre_semantic_p">pre_semantic_p</code>, <code data-json-key="pre_semantic_prediction">pre_semantic_prediction</code>, <code data-json-key="semantic_majority">semantic_majority</code>, <code data-json-key="semantic_evaluated">semantic_evaluated</code>, <code data-json-key="semantic_triggered">semantic_triggered</code>, <code data-json-key="semantic_decisive">semantic_decisive</code>, <code data-json-key="preview_evaluated">preview_evaluated</code>, <code data-json-key="preview_triggered">preview_triggered</code>, <code data-json-key="preview_decisive">preview_decisive</code>, and the route again</td></tr>
-<tr><td class="mono" data-json-key="semantic_tiles">semantic_tiles</td><td>when the map was built</td><td>16 by 16 token votes of P(AI)</td></tr>
-<tr><td class="mono" data-json-key="capture">capture</td><td>when measured</td><td><code data-json-key="peak">peak</code>, <code data-json-key="valid">valid</code>, <code data-json-key="native_px">native_px</code>, <code data-json-key="present">present</code></td></tr>
-<tr><td class="mono" data-json-key="specialists">specialists</td><td>from the router</td><td>the stack's rows, each <code data-json-key="name">name</code>, <code data-json-key="p_ai">p_ai</code>, <code>verdict</code> and <code data-json-key="weight">weight</code>, the base first</td></tr>
 </tbody>
 </table>
 </div>
-<div class="code" data-excerpt="Sources/VeilGardeCore/Result/ResultJSON.swift:ResultJSON.object(_:times:device:route:)"></div>
-<p>The keys are written sorted, so the same result is always the same bytes. A golden file can hold it, and the battery reads its verdict from it.</p>
+<div class="code" data-excerpt="Sources/VeilGardeCore/Result/ResultJSON.swift:ResultJSON.object(_:times:device:)"></div>
+<p>The keys are written sorted, so the same result is always the same bytes. A golden file can hold it, and the battery reads its verdict, the semantic tiles' grid and the capture member's present from it.</p>
 
 <h2 id="goldens">The goldens</h2>
-<p>Two crops hold the whole path. Their routed results are VeilGarde's own, written by <code>veilgarde route --json</code>, and the golden tests compare every later run with them: every label exact, every number within 1e-4.</p>
+<p>Two crops hold the whole path. Their results are VeilGarde's own, written by <code>veilgarde route --json</code>, and the golden tests compare every later run with them: every label exact, every number within 1e-4.</p>
 <div class="scroll">
 <table class="data">
-<thead><tr><th>Golden</th><th class="n">base_p</th><th class="n">p</th><th>Call</th><th>Capture</th></tr></thead>
+<thead><tr><th>Golden</th><th class="n">camera p</th><th class="n">p</th><th>Call</th><th>Capture</th></tr></thead>
 <tbody>
 <tr><td class="mono">crop_ben</td><td class="n">0.6304</td><td class="n">0.1059</td><td>real, by the rescue</td><td>valid, absent</td></tr>
 <tr><td class="mono">crop_fox</td><td class="n">0.3590</td><td class="n">0.0182</td><td>real</td><td>valid, absent</td></tr>
 </tbody>
 </table>
 </div>
-<p>The tolerance is MLX's. DINOv2's matrix kernels move with Frigate's MLX revision by about 1e-5, so the numbers are held close and the labels exact.</p>
-<p>Until the two lanes the goldens were Garde's own runs, and VeilGarde's route equalled Garde's byte for byte on 37 images with Garde's Metal library. That comparison retired with schema v2; chapter 10 keeps its record.</p>
+<p>The goldens were rewritten in schema v1 on 2026-10-21, after every member's score, the combiner's and the verdict were checked equal to the schema-v3 goldens': the largest difference was 0.</p>
+<p>The tolerance is MLX's. DINOv2's matrix kernels move with Frigate's MLX revision by about 1e-5, so the numbers are held close and the labels exact. Until the two lanes the goldens were Garde's own runs; chapter 10 keeps that record.</p>
 
 <h2 id="sources">Where the numbers come from</h2>
 <div class="scroll">
 <table class="data">
 <thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
 <tbody>
-<tr><td>The steps and their order</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Route/Detector.swift">Detector.swift</a> PIN: the reference router's order</td><td>Ported in phase 4, 2026-10-19</td></tr>
-<tr><td>The operating point 0.5</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Result/Verdict.swift">Verdict.swift</a>, DecisionRule.fusion</td><td>Every build</td></tr>
+<tr><td>The stages, the members and the revisions</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Stack/Pipeline.swift">Pipeline.swift</a>; <a href="index.html#decision-124">ledger decision-124</a></td><td>2026-10-21</td></tr>
+<tr><td>The operating point 0.5</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Result/Verdict.swift">Verdict.swift</a>, DecisionRule.camera</td><td>Every build</td></tr>
+<tr><td>The combiner's anchor rule</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Revisions/Combine.swift">Combine.swift</a>; <a href="index.html#decision-126">ledger decision-126</a></td><td>2026-10-21</td></tr>
 <tr><td>Zoom escalation, the x-domain gate and the render taxonomy removed</td><td><a href="index.html#decision-106">Ledger decision-106</a></td><td>2026-10-21</td></tr>
-<tr><td>The frame seam's 0.70 and 0.20</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Route/Mechanisms/FrameSeam.swift">FrameSeam.swift</a> PIN</td><td>v3.3</td></tr>
-<tr><td>8% to as much as 92% under a monolithic combiner</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Route/Detector.swift">Detector.swift</a> PIN, quoting the research</td><td>Not recorded</td></tr>
-<tr><td>Schema v3 and its keys</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Result/ResultJSON.swift">ResultJSON.swift</a>; <a href="index.html#decision-103">ledger decision-103</a>; the self-check compares this page's keys with the file</td><td>2026-10-21</td></tr>
-<tr><td>The two goldens' numbers</td><td class="mono">Tests/VeilGardeInferenceTests/Fixtures/crops/crop_*.route.json, <a href="index.html#command-94">ledger command-94</a></td><td>2026-10-21</td></tr>
+<tr><td>The frame seam's 0.70 and 0.20</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Revisions/FrameSeam.swift">FrameSeam.swift</a> PIN</td><td>v3.3</td></tr>
+<tr><td>8% to as much as 92% under a monolithic combiner</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Stack/Pipeline.swift">Pipeline.swift</a> PIN, quoting the research</td><td>Not recorded</td></tr>
+<tr><td>Schema v1 and its keys</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Result/ResultJSON.swift">ResultJSON.swift</a>; <a href="index.html#decision-127">ledger decision-127</a>; the self-check compares this page's keys with the file</td><td>2026-10-21</td></tr>
+<tr><td>The two goldens' numbers, and their check against schema v3's</td><td class="mono">Tests/VeilGardeInferenceTests/Fixtures/crops/crop_*.route.json, <a href="index.html#command-94">ledger command-94</a> and <a href="index.html#command-117">command-117</a></td><td>2026-10-21</td></tr>
 <tr><td>The goldens' tolerance, 1e-4</td><td class="mono"><a href="code.html#Tests/VeilGardeInferenceTests/RouteGoldenTests.swift">RouteGoldenTests.swift</a></td><td>Every test run</td></tr>
 <tr><td>37 images byte-identical with Garde's Metal library; within 1.04e-5 with Frigate's</td><td><a href="index.html#command-14">Ledger command-14</a> and <a href="index.html#command-15">command-15</a></td><td>2026-10-19</td></tr>
 </tbody>
@@ -125,9 +129,9 @@
 
 <details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
 <ul class="plain">
-<li>DetectionSignals reads each signal at most once and caches it; RouteState carries the verdict, the stack's rows and the semantic state between steps.</li>
-<li>PublicSurface.routed joins the base's operating point with the router's verdict, and ResultJSON writes it; RouteBatch runs a JSONL manifest through the same path.</li>
-<li>The route golden tests hold this path to its own goldens; rewrite the goldens with <code>veilgarde route --json</code> only when a change is meant to move them, and say so in the ledger.</li>
+<li>DetectionSignals reads each signal at most once and caches it; Pipeline.run asks every StackMember, then hands the outputs to every Revision with a WorkingVerdict, and builds the InferenceResult.</li>
+<li>Members live in Stack/Members, revisions in Revisions; ResultJSON writes the result, and RouteBatch runs a JSONL manifest through the same path.</li>
+<li>The route golden tests hold this path to its own goldens and pin the two verdicts by value; rewrite the goldens with <code>veilgarde route --json</code> only when a change is meant to move them, and say so in the ledger.</li>
 </ul>
 </div></details>
 </main>

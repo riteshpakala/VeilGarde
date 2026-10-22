@@ -133,6 +133,11 @@
       "id": "amendment-26",
       "date": "2026-10-21",
       "text": "let's clean up the golden anchors and the batteries so they pass and we have a new baseline for testing, put HNUFoy2bcAA0vDW aside for research purposes. Let's call this entire stack v1 essentially. Prior to doing so can you create a brief simple table in the README showing the detection accuracy stats for real and generated"
+    },
+    {
+      "id": "amendment-27",
+      "date": "2026-10-21",
+      "text": "The way we should be designing this is that the fusion head is meant for detecting cameras and that should be apart of the stack as its own lane rather than treated as a stage. Our entire detection stage pipeline can be even more simplified. Decode -> Shared Signals -> Stack -> Revisions -> Result. Screenshot and Fusion Head (Camera) should be apart of the stack with its own score. The only goal is to show all scores all specialists providing an unbiased overall mapped take on where this image came from and whether it could have been generated in that sector of visuals. Do you understand what I am getting at? And then over time the main goal is to simply add to the shared signals and stack to improve our detection mechanism a flywheel that increases in accuracy indefinitely no matter how robust image generation gets. Creating very easy pipelines to add to a modular stack. Where the inference and training even match this DSL like syntax where the code itself stylizes the modularity as written. After adjusting this once more let's update this schema to just be v1, remove legacy code and let's start fresh with this as the baseline."
     }
   ],
   "answers": [
@@ -333,6 +338,34 @@
       "date": "2026-10-21",
       "question": "Which bundle becomes v1, the new baseline: the residual head with the out-of-fold combiner, with the in-sample combiner, or today's shipped two lanes, whose battery then needs IMG_0291, IMG_0345 and IMG_0354 set aside as well?",
       "answer": "Today's shipped two lanes"
+    },
+    {
+      "id": "answer-32",
+      "date": "2026-10-21",
+      "question_id": "question-22",
+      "question": "How should the overall verdict pool the members' scores: today's arithmetic expressed per member and refit later, a symmetric combiner refit now, or the asymmetric one refit now?",
+      "answer": "all heads are parallel with their own output format, that's the stack's job. then there is a follow-up combiner (this) stage that gathers each to assess to re-valuate each verdict (revision stage)."
+    },
+    {
+      "id": "answer-33",
+      "date": "2026-10-21",
+      "question_id": "question-23",
+      "question": "Which unshipped code leaves in the fresh start: the residual column, the 777 and 815 layouts and the out-of-fold combiner; the art-pair and cgi heads; domain hints and overrides; the no-combiner fallback and the noiseprint refusal?",
+      "answer": "Residual column, 777/815 layouts, OOF; Domain hints and overrides; Art-pair and cgi heads; No-combiner fallback and w_np refusal; full clean to properly start a new RnD and training regime"
+    },
+    {
+      "id": "answer-34",
+      "date": "2026-10-21",
+      "question_id": "question-24",
+      "question": "What does schema v1 cover: the result, the combiner and the battery; the result JSON only; or everything, the store included?",
+      "answer": "Everything, including the store"
+    },
+    {
+      "id": "answer-35",
+      "date": "2026-10-21",
+      "question_id": "question-25",
+      "question": "Where should the screenshot member's score come from when the gate does not fire: an inactive row with no score, or always scored?",
+      "answer": "doesn't make sense in the new format. the screenshot is considered a specialist in the stack"
     }
   ],
   "base": {
@@ -489,7 +522,9 @@
       "chose": "The router is synchronous and split one mechanism per file (CapturePriors, FrameSeam, SemanticChain with ZoomEscalation and PreviewTail)",
       "rejected": "Garde's single async router run",
       "reason": "MLX work is synchronous on one thread anyway; one file per mechanism makes the compounding order readable",
-      "file": "Sources/VeilGardeInference/Route/Detector.swift"
+      "file": "Sources/VeilGardeInference/Route/Detector.swift",
+      "retired": "2026-10-21",
+      "superseded": "decision-124"
     },
     {
       "id": "decision-22",
@@ -539,7 +574,7 @@
       "chose": "The fusion head's new-generator recall is measured on a 30% holdout that is left out of training",
       "rejected": "the research's v199_warmstart.py, which reported recall on rows it also trained on",
       "reason": "a recall on training rows cannot show a regression; the holdout is StableSplit on the row id, so it is the same rows on every run",
-      "file": "Sources/VeilGardeTraining/Fusion/FusionTrainer.swift"
+      "file": "Sources/VeilGardeTraining/Camera/CameraTrainer.swift"
     },
     {
       "id": "decision-29",
@@ -804,7 +839,9 @@
       "chose": "Battery v2: v1's eight non-atlas groups with the same images (copied, byte-checked, into <work area>/battery/images, the spec's {IMAGES}), modes and floors; the twelve atlas groups listed as retired; lion_hard's floor row left out",
       "rejected": "marking the atlas groups skip_if_empty in the work-area spec; rebaselining",
       "reason": "the owner retired the atlas groups (answer-5). Carrying v1's floors unchanged is not a rebaseline. lion_hard's v1 row was recorded while its label was generated (want: generated), and a HARD group reads no floor, so copying it would carry a stale label into a new file",
-      "file": "Sources/VeilGardeFlywheel/Resources/battery_spec_v3.json"
+      "file": "Sources/VeilGardeFlywheel/Resources/battery_spec_v3.json",
+      "retired": "2026-10-21",
+      "superseded": "decision-131"
     },
     {
       "id": "decision-66",
@@ -1043,7 +1080,9 @@
       "chose": "Measurement switches for the full detector: InferenceConfig.baseExpert, fusion by default and warp to pool the warp lens's own weighted score where the fusion head's would go, replacing the dead useFusion flag; --base on route, batch, research census and flywheel battery; research census gains --bundle, --label and folders and records the sensor call, the warp-only score and the bundle it ran; bundle derive makes a variant from a parent with one recorded, re-pinned combiner edit, in place of the hand edits behind the prune candidates",
       "rejected": "dropping the fusion head from a bundle, which makes the camera route throw; hand-edited bundles",
       "reason": "the fusion test is the bypass on the shipped stack as it stands (answer-13). Promote and rollback keep the default, and the result JSON's keys and the golden tests do not move",
-      "file": "Sources/VeilGardeInference/Route/Heads/CameraFusionHead.swift"
+      "file": "Sources/VeilGardeInference/Route/Heads/CameraFusionHead.swift",
+      "retired": "2026-10-21",
+      "superseded": "decision-124"
     },
     {
       "id": "decision-99",
@@ -1078,35 +1117,41 @@
       "chose": "The result JSON is schema v3, VeilGarde's own: schema_version, route, scorer, device, image, verdict {prediction, p, threshold, band}, times_sec, and when present bundle, route_diagnostics, semantic_tiles, capture and specialists. The goldens are VeilGarde's own route on the two parity crops, numbers within 1e-4",
       "rejected": "schema v2 with its warp, majority, sensor and patch fields emptied or zeroed",
       "reason": "with the warp gone every v2 field but a few would be a constant, and a reader trusting them would read a detector that no longer exists; the owner chose the clean break (answer-17)",
-      "file": "Sources/VeilGardeCore/Result/ResultJSON.swift"
+      "file": "Sources/VeilGardeCore/Result/ResultJSON.swift",
+      "retired": "2026-10-21",
+      "superseded": "decision-127"
     },
     {
       "id": "decision-104",
       "chose": "The warp leaves detection: the camera base is the fusion head over 393 values, DINOv2-small's CLS embedding and the nine capture values; the warp lens, its tile model, the sensor model, its two cuts, the majority surface and sharpness go",
       "rejected": "keeping the warp score as one of the head's inputs; keeping the warp lens as a second base",
       "reason": "the reduction study measured the fusion head without the warp score at -0.0012 AUC on 22,703 held-out store rows (command-53, 2026-10-19), and the owner's two lanes put the warp in the watermark only (amendment-20, amendment-21)",
-      "file": "Sources/VeilGardeCore/Features/FusionVector.swift"
+      "file": "Sources/VeilGardeCore/Features/FusionVector.swift",
+      "retired": "2026-10-21",
+      "superseded": "decision-124"
     },
     {
       "id": "decision-105",
       "chose": "The noiseprint is dropped end to end: no lens, no weight in the bundle, no store column, no trainer, no w_np in the combiner; StackCombiner.load and the promote check refuse a combiner that carries w_np",
       "rejected": "keeping the term at its 2026-10-19 weight; keeping the store column for a later study",
       "reason": "with the shipped warp model the battery and 738 census and iPhone images kept every call without it (command-84), it adds nothing once DINOv2 and capture are present (command-79), and the owner chose to drop it (answer-18)",
-      "file": "Sources/VeilGardeCore/Heads/StackCombiner.swift"
+      "file": "Sources/VeilGardeCore/Heads/StackCombiner.swift",
+      "retired": "2026-10-21",
+      "superseded": "decision-128"
     },
     {
       "id": "decision-106",
       "chose": "Zoom escalation, the render taxonomy with its arbiter, the x-domain gate and its centroids are removed; the semantic chain keeps the token map, its majority, the preview tail and the projection",
       "rejected": "keeping the three behind switches that are off",
       "reason": "none of them ran by default, the census never saw them decide, and the owner chose to remove them (answer-19)",
-      "file": "Sources/VeilGardeInference/Route/Mechanisms/SemanticChain.swift"
+      "file": "Sources/VeilGardeInference/Revisions/PreviewTail.swift"
     },
     {
       "id": "decision-107",
       "chose": "The preview tail asks the live fusion head with the capture flags neutralized, cap[1] set to 1 and cap[3] to at least 576, instead of the frozen fusion reference, which leaves the bundle; its cuts stay 0.45 and 0.30",
       "rejected": "keeping the frozen 397-column reference beside a 393-column head",
       "reason": "the reference read the warp score, which no longer exists at inference; the cuts were set against the old head and are inherited as they were, reported through route_diagnostics.preview_*",
-      "file": "Sources/VeilGardeInference/Route/Mechanisms/PreviewTail.swift"
+      "file": "Sources/VeilGardeInference/Revisions/PreviewTail.swift"
     },
     {
       "id": "decision-108",
@@ -1127,7 +1172,7 @@
       "chose": "The fusion head and the combiner shipped on 2026-10-21 are trained here: the head from scratch, 500 trees at eta 0.04, depth 5, on the store's 393-column rows, with an evaluation twin fitted without a 10% hash holdout, salt fusion-eval:v1, to report a held-out AUC; the combiner refit on five inputs. A warm start onto a parent of another width is refused",
       "rejected": "warm-starting the 397-column head; shipping the head with no held-out number",
       "reason": "the warp-era head read 397 columns and cannot be continued on 393; the twin is the only held-out measure of a head trained on every row, and the written head still trains on all of them",
-      "file": "Sources/VeilGardeTraining/Fusion/FusionTrainer.swift"
+      "file": "Sources/VeilGardeTraining/Camera/CameraTrainer.swift"
     },
     {
       "id": "decision-111",
@@ -1141,14 +1186,18 @@
       "chose": "The store's columns are three, dino_norm, dino_fusion and cap; older shards read as they are, their extra tensors and warp_model ignored",
       "rejected": "rewriting the 59 seed shards",
       "reason": "the fusion head reads dino_fusion and cap and the heads read dino_norm, nothing else; reading past the old columns keeps the seed store's 138,247 rows without touching them",
-      "file": "Sources/VeilGardeCore/Store/FeatureRow.swift"
+      "file": "Sources/VeilGardeCore/Store/FeatureRow.swift",
+      "retired": "2026-10-21",
+      "superseded": "decision-130"
     },
     {
       "id": "decision-113",
       "chose": "The cgi head leaves the shipped bundle and the shipped recipe with the render arbiter, its only reader; the flywheel trains art, blur and human, and HeadKind.cgi stays a store category a recipe can still train",
       "rejected": "shipping a head nothing reads",
       "reason": "six heads ship: screenshot, art, blur, human, semtile and preview",
-      "file": "Sources/VeilGardeTraining/Recipe/TrainingRecipe.swift"
+      "file": "Sources/VeilGardeTraining/Recipe/TrainingRecipe.swift",
+      "retired": "2026-10-21",
+      "superseded": "decision-133"
     },
     {
       "id": "decision-114",
@@ -1190,7 +1239,9 @@
       "chose": "The fusion row has two layouts, the plain DINOv2 CLS and capture, 393 columns, or both DINOv2 readings and capture, 777, and a head's width names its layout; the detector, the combiner trainer, agreement and the gap miner build the row in the head's own layout",
       "rejected": "a second detector path for the wider head; replacing the 393-column row outright",
       "reason": "the second reading is the specialist heads' cached embedding, so the wider row costs no DINOv2 pass, and a bundle of either kind keeps running; on 22,656 held-out store rows, both readings with a bigger booster lifted the photoreal corpus's AUC from 0.835 to 0.885–0.893 (command-107)",
-      "file": "Sources/VeilGardeCore/Features/FusionVector.swift"
+      "file": "Sources/VeilGardeCore/Features/FusionVector.swift",
+      "retired": "2026-10-21",
+      "superseded": "decision-133"
     },
     {
       "id": "decision-120",
@@ -1204,14 +1255,18 @@
       "chose": "warp19 comes back inside VeilWatermark, its 19 tile features at the 512-px cap summarised as each feature's mean and spread, 38 numbers detection reads as the store's residual column and the 815-column fusion layout; older shards carry the column in side files bound to their rows' ids; the combiner can fit on 5-fold out-of-fold base predictions",
       "rejected": "a warp model inside detection; rewriting the seed shards; the in-sample combiner for a high-capacity head",
       "reason": "the pre-test picked the 38 statistics by its rule (0.8836 to 0.9009 AUC on final_mixed's split); the restored features equal the research's dumps value for value; an in-sample combiner gave a high-capacity head's heads no weight",
-      "file": "Sources/VeilWatermark/Residual/ResidualStatistics.swift"
+      "file": "Sources/VeilWatermark/Residual/ResidualStatistics.swift",
+      "retired": "2026-10-21",
+      "superseded": "decision-133"
     },
     {
       "id": "decision-122",
       "chose": "Detection in the code explorer is seven stage trails that hand off to each other: Decode, Shared Signals, Domain, Base, Stack, Revisions and Result; the warp residual's statistics sit under Shared Signals as numbers from the watermark's code",
       "rejected": "two inference trails, the fusion base and the specialist stack",
       "reason": "the owner reads detection as one chain of stages (amendment-25); the training and watermark trails stay as they were",
-      "file": "docs/site/src/trails.json"
+      "file": "docs/site/src/trails.json",
+      "retired": "2026-10-21",
+      "superseded": "decision-134"
     },
     {
       "id": "decision-123",
@@ -1219,6 +1274,90 @@
       "rejected": "keeping the four in their HARD groups; moving the image files",
       "reason": "the owner chose the shipped detector as v1 and a passing battery as the baseline for testing (amendment-26, answer-31); no image file moves, so the watermark's invariance set holds",
       "file": "Sources/VeilGardeFlywheel/FlywheelResources.swift"
+    },
+    {
+      "id": "decision-124",
+      "chose": "Detection is five stages, Decode, Shared Signals, Stack, Revisions and Result, declared as one Pipeline value: the stack a flat list of members that read only the shared signals, the revisions a list that reads the stack after it",
+      "rejected": "the seven stages of 2026-10-21, a domain picking a base expert that every later part compounds on",
+      "reason": "amendment-27: the camera head is for cameras and is one member among others, each with its own score; answer-32 puts the combiner in a revision after the parallel stack, and answer-35 makes the screenshot a member",
+      "file": "Sources/VeilGardeInference/Stack/Pipeline.swift"
+    },
+    {
+      "id": "decision-125",
+      "chose": "Each member reports its own output: a name, its own P(AI) or none for a member that measures, its verdict, and fields only it reports, written into the result as they are",
+      "rejected": "one row shape for every member, a weight per row; keeping the specialists' rows only when they fire",
+      "reason": "amendment-27 asks for every member's score in an unbiased take on where an image came from; a member's own fields keep what it measured beside its score",
+      "file": "Sources/VeilGardeCore/Result/MemberOutput.swift"
+    },
+    {
+      "id": "decision-126",
+      "chose": "The combiner is the first revision: it anchors on the screenshot member when the gate fired and on the camera member otherwise, leaves the anchor standing under a present capture, under the screenshot anchor capped at 0.10, and otherwise pools the evidence members its file names with the arithmetic of 2026-10-21. No number changed",
+      "rejected": "a symmetric combiner with no anchor; refitting the weights in the same change",
+      "reason": "answer-32; the anchor rule is the old domain rule, so the route goldens, the battery and the census calls reproduce v1.0.0 exactly, and a refit is a later, measured step",
+      "file": "Sources/VeilGardeInference/Revisions/Combine.swift"
+    },
+    {
+      "id": "decision-127",
+      "chose": "The result JSON is schema v1: schema_version, device, image, verdict, stack, revisions, bundle and times_sec, a clean break from v3",
+      "rejected": "keeping schema v3's route, scorer, route_diagnostics, specialists, semantic_tiles and capture keys beside the new ones",
+      "reason": "answer-34 resets every version to v1; the stack and the revisions are the result now, and the old trace fields described stages that no longer exist",
+      "file": "Sources/VeilGardeCore/Result/ResultJSON.swift"
+    },
+    {
+      "id": "decision-128",
+      "chose": "The combiner file is stack_combiner.json, version 1, keyed by member: w0, the anchor's weight, cap and gate ceiling, the evidence members by name with their weights in summation order, the evidence cap and the rescue weight. The shipped file holds the numbers of 2026-10-21 digit for digit",
+      "rejected": "the v3 file's positional w_gen and its art-pair and noiseprint keys",
+      "reason": "a member added to the stack can be pooled by naming it; the combiner revision reads its evidence by name and refuses a member the stack lacks",
+      "file": "Sources/VeilGardeCore/Heads/StackCombiner.swift"
+    },
+    {
+      "id": "decision-129",
+      "chose": "The bundle's role for the fusion head is camera and its file camera.xgb.json, the same bytes and hash; the manifest's history starts again with one seed event, v1",
+      "rejected": "keeping the fusion-head role and its file name",
+      "reason": "answer-34: everything v1; the camera head's name now says what it detects",
+      "file": "Sources/VeilGardeCore/Bundle/Artifact.swift"
+    },
+    {
+      "id": "decision-130",
+      "chose": "The store's shards are format veilgarde-feature-shard-v1, three columns, dino_norm, dino_fusion and cap; a shard of any other format is refused with the migrate hint, and veilgarde store migrate rewrites a folder of older shards into a new one, checking every shard's rows and each column's bytes",
+      "rejected": "reading older shards as they are; rewriting the shards in place",
+      "reason": "answer-34 puts the store in v1; the old folder is moved aside and never written, so the warp-era tensors stay with it",
+      "file": "Sources/VeilGardeCore/Store/StoreMigration.swift"
+    },
+    {
+      "id": "decision-131",
+      "chose": "The battery's files are battery_spec.json and battery_baseline.json, version 1: the same groups, floors and staged images as spec v3, the retired atlas list dropped",
+      "rejected": "keeping the v3 names",
+      "reason": "answer-34; the floors are the same bytes, so v1's passing battery stays the baseline for testing",
+      "file": "Sources/VeilGardeFlywheel/FlywheelResources.swift"
+    },
+    {
+      "id": "decision-132",
+      "chose": "Training is declared as inference is: a recipe lists trainable members, CameraHead, SpecialistHead and Combiner, each a value that plans and trains itself, and the engine loops over them in dependency order without knowing any by name. A new member is one file and one line on each side",
+      "rejected": "the closed ModelRecipe enum and the engine's switch over it",
+      "reason": "amendment-27 asks that inference and training match one DSL and that the stack grow by small additions",
+      "file": "Sources/VeilGardeTraining/Recipe/TrainableMember.swift"
+    },
+    {
+      "id": "decision-133",
+      "chose": "Removed: the 777 and 815 fusion layouts, the store's residual column, its side files and backfill, the out-of-fold combiner, domains, hints and overrides, the art-pair and cgi heads, the no-combiner fallback, the noiseprint refusals and the compatibility with older censuses. The residual's code stays in VeilWatermark",
+      "rejected": "keeping unshipped candidates' code in main",
+      "reason": "answer-33: a full clean to start a new research and training regime; a candidate that reads the residual again is one new member",
+      "file": "Package.swift"
+    },
+    {
+      "id": "decision-134",
+      "chose": "The code explorer has nine trails: camera training and specialist training, detection in five stage trails, Decode, Shared Signals, Stack, Revisions and Result, and the watermark's two; the ML explorer's fusion trail is the camera head's, MC",
+      "rejected": "keeping the Domain and Base trails",
+      "reason": "amendment-27; the trails follow the code's five stages",
+      "file": "docs/site/src/trails.json"
+    },
+    {
+      "id": "decision-135",
+      "chose": "The restructured stack is v1: version 1.0.0, the tag v1.0.0 moved to its commit, local and never pushed",
+      "rejected": "a new version number for a change that moved no number",
+      "reason": "amendment-27 asks to start fresh with this as the baseline; the goldens, the battery and the census calls equal v1.0.0's",
+      "file": "Sources/VeilGardeCore/Support/Version.swift"
     }
   ],
   "commands": [
@@ -2544,6 +2683,103 @@
         "BATTERY: PASS on 96 images: every HARD group 1.00, gen_semantic 1.00, wildlife_real 0.92 at its floor",
         "the floors recorded as v1's baseline and shipped as battery_v3_baseline.json"
       ]
+    },
+    {
+      "id": "command-115",
+      "phase": 19,
+      "date": "2026-10-21",
+      "cmd": "before any change, with the v1.0.0 binary in release (kept in research/v1-stack-20261021/ref/bin): flywheel battery --gate full; research census; research census <datasets>/iphone --label real",
+      "exit": 0,
+      "lines": [
+        "BATTERY: PASS on 96 images, every group at its floor",
+        "census: 296 images; generated 76 of 135 right, real 154 of 161",
+        "iPhone originals: 435 of 438 routed real",
+        "these are the reference the restructure is held to"
+      ]
+    },
+    {
+      "id": "command-116",
+      "phase": 19,
+      "date": "2026-10-21",
+      "cmd": "store migrate --from <work area>/store/shards-v2-20261021 --to <work area>/store/shards, after moving the old folder aside",
+      "exit": 0,
+      "lines": [
+        "60 shards, 138,267 rows in, 138,267 rows out",
+        "every kept column's tensor bytes equal by SHA-256: yes",
+        "left in the old folder: noiseprint, sharp, warp, and the residual side files"
+      ]
+    },
+    {
+      "id": "command-117",
+      "phase": 19,
+      "date": "2026-10-21",
+      "cmd": "route --json on crop_ben and crop_fox, release, compared with the schema-v3 goldens: the verdict, the camera member against base_p, the combiner against pre_semantic_p, the art, blur and human members, the semantic grid",
+      "exit": 0,
+      "lines": [
+        "crop_ben: real, real; max |Δ| 0",
+        "crop_fox: real, real; max |Δ| 0",
+        "re-recorded as the schema-v1 goldens"
+      ]
+    },
+    {
+      "id": "command-118",
+      "phase": 19,
+      "date": "2026-10-21",
+      "cmd": "flywheel init after moving live/ to live-v1pre-20261021/; flywheel init --battery; flywheel battery --gate full, release",
+      "exit": 0,
+      "lines": [
+        "live seeded from the v1 bundle, 8 artifacts",
+        "the v3 spec and floors moved to battery/retired/20261022T003252Z; battery_spec.json version 1 installed, the floors' bytes unchanged",
+        "BATTERY: PASS on 96 images, wildlife_real 0.92 at its floor"
+      ]
+    },
+    {
+      "id": "command-119",
+      "phase": 19,
+      "date": "2026-10-21",
+      "cmd": "research census and research census <datasets>/iphone --label real with the restructured binary, release, each call compared by path with command-115",
+      "exit": 0,
+      "lines": [
+        "census: 296 of 296 calls identical; generated 76 of 135, real 154 of 161",
+        "iPhone originals: 438 of 438 calls identical; 435 routed real",
+        "the screenshot member reads generated on 186 of 296 images; it counts only when the gate fires"
+      ]
+    },
+    {
+      "id": "command-120",
+      "phase": 19,
+      "date": "2026-10-21",
+      "cmd": "Playground/run.sh",
+      "exit": 0,
+      "lines": [
+        "12 of 12 checkpoints",
+        "crop_ben: the camera member 0.6304, the combiner by hand 0.1059, equal to the revision's",
+        "500 trees kept and 2 added; Frigate equal on 830 store rows; the candidate's 8 artifacts verified",
+        "dinov2-small and fusion-head refused; the human head promoted behind the battery and rolled back"
+      ]
+    },
+    {
+      "id": "command-121",
+      "phase": 19,
+      "date": "2026-10-21",
+      "cmd": "watermark invariance --images <work area>/battery/images --baseline <work area>/watermark/invariance-baseline-20261020.json, release, after the residual statistics' names moved into VeilWatermark",
+      "exit": 0,
+      "lines": [
+        "signed 105 images, 0 skipped, in 346.3 s",
+        "all 105 signatures equal the baseline"
+      ]
+    },
+    {
+      "id": "command-122",
+      "phase": 19,
+      "date": "2026-10-21",
+      "cmd": "docs/site/src/build.sh --prose, after the trails, the ML trails, the chapters and the ledger were rewritten for the stack",
+      "exit": 0,
+      "lines": [
+        "9 trails, 107 entries over 38 steps, every anchor found; 4 ML trails, 57 entries, every anchor, fact, twin and cite found",
+        "data: 2.44 MB of 3 MB",
+        "check: ok, every page's self-check passed in Chrome; prose: 0 problems, 16 warnings"
+      ]
     }
   ],
   "assumptions": [
@@ -2664,6 +2900,22 @@
     {
       "id": "question-21",
       "text": "No fusion2 candidate passed the bar (command-109). The closest, F2-r2, misses HNUFoy2bcAA0vDW, which every candidate misses, and wild_117757583; on unseen final_mixed it lifts generated recall from 0.345 to 0.563 at a real false-positive rate of 0.174 against 0.100. Next: a combiner fitted on held-out base predictions, since the in-sample fit gave the heads no weight; the residual views; a photoreal specialist; or keep the shipped bundle?"
+    },
+    {
+      "id": "question-22",
+      "text": "How should the overall verdict pool the members' scores: today's arithmetic expressed per member and refit later, a symmetric combiner refit now, or the asymmetric one refit now?"
+    },
+    {
+      "id": "question-23",
+      "text": "Which unshipped code leaves in the fresh start: the residual column, the 777 and 815 layouts and the out-of-fold combiner; the art-pair and cgi heads; domain hints and overrides; the no-combiner fallback and the noiseprint refusal?"
+    },
+    {
+      "id": "question-24",
+      "text": "What does schema v1 cover: the result, the combiner and the battery; the result JSON only; or everything, the store included?"
+    },
+    {
+      "id": "question-25",
+      "text": "Where should the screenshot member's score come from when the gate does not fire: an inactive row with no score, or always scored?"
     }
   ],
   "tests": [
@@ -2956,6 +3208,16 @@
       "failed": 0,
       "skipped": 0,
       "note": "the spec and floors pinned at v3, every HARD group passing, the four set aside in staged[]"
+    },
+    {
+      "id": "test-30",
+      "phase": 19,
+      "date": "2026-10-21",
+      "suite": "all targets (scripts/test.sh, the GPU suites included), the stack as a list",
+      "passed": 135,
+      "failed": 0,
+      "skipped": 0,
+      "note": "the schema-v1 goldens with the verdicts pinned by value, a pipeline declared in place, the v1 combiner on the 19 pair-free reference tuples, the store's migration, the recipes as trainable members"
     }
   ],
   "request_note": "Verbatim but for the research projects' names and the paths on the owner's Mac, which the owner asked to leave out of the project (amendment-4, item 1, and amendment-6); each bracket stands for a name or a path."

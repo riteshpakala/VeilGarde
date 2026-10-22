@@ -1,14 +1,14 @@
 # VeilGarde's site
 
-The site is VeilGarde's docs and its two explorers in one folder of plain HTML. It shows every file the run changed, verbatim, before and after; each Swift declaration with what it calls and what calls it; eleven trails, which tell each flow in the order the code runs; four ML trails, which tell each model as machine learning and how the models reach one verdict together; the run's ledger; and the chapters that explain each layer. Double-click `scripts/site.command`, or open `docs/site/index.html`. Nothing to install, no server, no network, except the ask orb's one call when a reader sends it a message.
+The site is VeilGarde's docs and its two explorers in one folder of plain HTML. It shows every file the run changed, verbatim, before and after; each Swift declaration with what it calls and what calls it; nine trails, which tell each flow in the order the code runs; four ML trails, which tell each model as machine learning and how the models reach one verdict together; the run's ledger; and the chapters that explain each layer. Double-click `scripts/site.command`, or open `docs/site/index.html`. Nothing to install, no server, no network, except the ask orb's one call when a reader sends it a message.
 
 | Page | What it is |
 |---|---|
-| `index.html` | the change at a glance: the request, the trail grid and the layers lit by each step, the counts, the ledger's commands, tests and decisions, open questions, what was left out |
+| `index.html` | the change at a glance: the request, the trail grid and the layers lit by each step, the counts, the ledger's commands, tests and decisions, open questions, what was left out; a retired decision names its date and, through `superseded`, the decision that replaced it, else the 2026-rnd branch that keeps it |
 | `code.html` | the change explorer: the tree, the source with old, new and diff, the declaration's card, the trails, find |
 | `ml.html` | the ML explorer: the same engine walked by the ML trails, each step's primer, deeper line, live facts and code-trail twins, a depth control, and the orb reading the ML side |
 | `selfcheck.html` | every check the browser can make, run when the page opens |
-| `01-fusion.html` … `10-record.html` | the chapters: the two lanes and then the machinery, the fusion head, the specialists, the router, the bundle, training, the flywheel, the warp residual, the watermark, the playground, and the record of the research |
+| `01-fusion.html` … `10-record.html` | the chapters: the two lanes and then the machinery, the camera head, the specialists, the stages and the result, the bundle, training, the flywheel, the warp residual, the watermark, the playground, and the record of the research |
 
 ## Rebuilding and checking
 
@@ -70,7 +70,7 @@ A cite is one of: `ledger#<id>`; `PIN` or `WHAT`, the entry's own file's header,
 
 A note is one or two plain sentences: what the declaration does, then why it is built this way. The build warns when an entry has no call to or from the entry before it and is not called by an earlier entry, unless it says `"link": "none"` because the hand-off is through data. A declaration takes one place on a trail and may sit on several trails, anchored differently on each.
 
-There are eleven trails. Training: the fusion head (FT), the specialist heads and the combiner (ST). Detection, seven stages that hand off to each other: Decode (DE), the file to its pixels; Shared Signals (SG), the gate, the capture signature and both DINOv2 readings; Domain (DO); Base (BA), the fusion head in the layout its width names; Stack (SK), capture and the specialist heads pooled; Revisions (RV), the frame seam, the semantic chain and the preview tail; Result (RS). The watermark: signing (WS) and matching (WM). The warp model's, the noiseprint's and the pruning study's trails live on the 2026-rnd branch. To change one, edit `src/trails.json` where the code runs, keep `n` from 1, and rebuild. The overview's grid and stepper, the picture's lit layers and the explorer's grid, steps, badges and card follow the data.
+There are nine trails. Training: the camera head (CT), the specialist heads and the combiner (ST). Detection, five stages that hand off to each other: Decode (DE), the file to its pixels; Shared Signals (SG), the gate, the capture reading, both DINOv2 readings and the patch tokens; Stack (SK), the pipeline's declaration and every member, each with its own score; Revisions (RV), the combiner around its anchor, the frame seam and the preview tail; Result (RS). The Domain and Base trails left on 2026-10-21, when the screenshot gate and the camera head became members of the stack. The watermark: signing (WS) and matching (WM). The warp model's, the noiseprint's and the pruning study's trails live on the 2026-rnd branch. To change one, edit `src/trails.json` where the code runs, keep `n` from 1, and rebuild. The overview's grid and stepper, the picture's lit layers and the explorer's grid, steps, badges and card follow the data.
 
 `src/trails.json`'s `picker` lays the trails out as one grid, read the same on the overview and in the explorer: sections of rows, each section `{title, kinds, rows}`, each row `{label, trails}` with one trail for each of the section's kinds, in their order. A row is a flow and a column a kind, so a flow's training and its inference sit side by side, and every cell is as wide as the cells above it. The build fails when the picker misses a trail, holds one twice, or puts one in another kind's column. The arrow keys move between cells.
 
@@ -84,10 +84,10 @@ There are eleven trails. Training: the fusion head (FT), the specialist heads an
 - `primer` on every step: a few plain sentences for a reader new to the idea. Prose-checked like a note; past six sentences warns.
 - `lanes` on a trail, `[{id, label}]`, and then `lane` on every one of its steps, so a reader sees where a path crosses from one lane to another. No trail declares lanes since the two verdicts became one on 2026-10-21; a trail without `lanes` gives no step a lane.
 - `deeper` on an entry, `{text, cite}`: the trade-off, the alternative rejected or the measured number, for a practitioner. Its cite is required and resolved like a note's.
-- `facts` on an entry, `[{label, path, round?}]`: numbers read live from `index.facts`, the shipped bundle's manifest, combiner and fusion head. The build fails on a path that is not a number or a word there; the card names the file each fact came from.
+- `facts` on an entry, `[{label, path, round?}]`: numbers read live from `index.facts`, the shipped bundle's manifest, combiner and camera head. The build fails on a path that is not a number or a word there; the card names the file each fact came from.
 - `code` on an entry: the code-trail steps that are its twins, as `<trail id>-<n>`, each checked against `trails.json`.
 
-The ML trails carry no call-gap warning: they follow the ideas, not the calls. A new cite form serves both files, `chapter:<NN-slug.html>#<id>`, for a number quoted from the research that lives in a chapter's prose; the build checks the page holds that id and labels the cite with its heading. The four trails are the fusion head (MF), the specialist heads (MS), one verdict (MV) and the watermark (MK). Edit `src/mltrails.json` directly and rebuild.
+The ML trails carry no call-gap warning: they follow the ideas, not the calls. A new cite form serves both files, `chapter:<NN-slug.html>#<id>`, for a number quoted from the research that lives in a chapter's prose; the build checks the page holds that id and labels the cite with its heading. The four trails are the camera head (MC), the specialist heads (MS), one verdict (MV) and the watermark (MK). Edit `src/mltrails.json` directly and rebuild.
 
 The card adds, on an ML step, the primer, the deeper line with its source, the facts with the file they came from, and the twins as links into `code.html`. The depth control shows the primer and the note, the note and the deeper line, or all three; CSS does the hiding, and the choice is kept under `ml:depth`. Both explorers carry a legend under the trail grid, What the marks mean, built from the data: every trail of the page's set with its mark and steps, and on `ml.html` the code marks its twins name.
 
@@ -105,7 +105,7 @@ A chapter is `NN-<slug>.html`, listed in `VeilGarde.pages` in `js/veilgarde.js`,
     <p class="lede"><em>On what the chapter is about, in one line.</em></p>
     <p>Prose…</p>
     <div class="code" data-excerpt="<declaration id>"></div>
-    <span data-fact="combiner.w_base" data-round="4">1.6641</span>
+    <span data-fact="combiner.anchor.w" data-round="4">1.6641</span>
     <h2 id="sources">Where the numbers come from</h2> … a table: number, source, when …
   </main></div>
   <script src="js/veilgarde.js"></script><script src="data/index.js"></script>
@@ -115,7 +115,7 @@ A chapter is `NN-<slug>.html`, listed in `VeilGarde.pages` in `js/veilgarde.js`,
 ```
 
 - `data-excerpt` quotes a declaration by its id from the same verbatim data the explorer holds; a renamed declaration fails the self-check.
-- `data-fact` names a path into `index.facts`, which the build reads from the shipped manifest, combiner and fusion head; `data-round` or `data-prefix` says how it is written; the self-check compares the page's number with the data.
+- `data-fact` names a path into `index.facts`, which the build reads from the shipped manifest, combiner and camera head; `data-round` or `data-prefix` says how it is written; the self-check compares the page's number with the data.
 - `js/chapters.js` holds a chapter's live tables and its check against the code: the result keys against `ResultJSON.swift`.
 - To write a placeholder chapter, replace its `later-block` with prose, add `data-groups` for any excerpt's file, add `chapters.js` if it uses a live table, and drop `later: true` from its entry in `VeilGarde.pages`.
 

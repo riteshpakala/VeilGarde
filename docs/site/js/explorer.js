@@ -1,7 +1,7 @@
 /*
  * The explorers, one engine for two trail sets. On code.html, the change explorer: every file the run changed,
  * verbatim, before and after, with each Swift file's declarations, the trails that tell each flow in the order the
- * code runs (training for the fusion head and the specialist stack, detection in seven stages, signing and matching for
+ * code runs (training for the camera head and the specialist stack, detection in five stages, signing and matching for
  * the watermark), picked from one grid with a row a flow and a column a kind,
  * and calls matched by name and argument labels when the page was built (src/build.py). On ml.html
  * (body[data-trails="ml"]), the ML explorer: the same files and declarations, walked by the models' trails
@@ -29,7 +29,7 @@
       name: "code", page: "code.html", storage: "explorer:", overviewSteps: true, depth: false, unit: "function",
       pickerLabel: "The trails through the code", lead: "The reader is on the change explorer, looking at ", told: "told in the order it runs",
       mapTrails: "The trails through the code, each in the order it runs:", extraTools: [],
-      expect: ["fusion-training", "specialist-training", "decode", "shared-signals", "domain", "base", "stack", "revisions", "result", "watermark-signing", "watermark-matching"],
+      expect: ["camera-training", "specialist-training", "decode", "shared-signals", "stack", "revisions", "result", "watermark-signing", "watermark-matching"],
       voice: {
         reading: ["You can read the whole change. The map below lists every file and every trail, and your tools read any declaration, file or line of text.",
                   "Start from what the reader has selected. When a question reaches past it, read what you need before you answer, and name what you read. " +
@@ -47,7 +47,7 @@
       expect: null,
       voice: {
         reading: ["You are the guide on the ML explorer. Its trails tell how each shipped model learns and decides: the data, the features, the algorithm and why it was chosen, " +
-                  "the fit, and what each model adds to the verdict. One trail follows how the base, the stack and two revisions reach the one verdict the result keeps. " +
+                  "the fit, and what each model adds to the verdict. One trail follows how the stack's members and three revisions reach the one verdict the result keeps. " +
                   "The map below gives the shipped models' facts, every ML trail with its steps, and every file; your tools read " +
                   "any step, declaration, file or line of text.",
                   "The reader may be new to machine learning or a senior engineer. Define a term the first time you use it, and match the depth of the question. " +
@@ -78,7 +78,7 @@
     var m = model(), names = Object.keys(m.sets).filter(function (n) { return n !== m.set.name && m.sets[n].trailById[id]; });
     return names[0] || null;
   }
-  /** A trail's name inside a sentence: "the fusion training trail", and "the fusion head trail" for "The fusion head". */
+  /** A trail's name inside a sentence: "the camera training trail", and "the camera head trail" for "The camera head". */
   function trailName(t) { var s = t.title.replace(/^The /, ""); return s.charAt(0).toLowerCase() + s.slice(1); }
   /** The trail being walked; a declaration's places on the trails; its place on the walked one, or null. */
   function current() { var m = model(); return m.trailById[state.trail] || m.trails[0]; }
@@ -560,7 +560,7 @@
     var list = badges(places);
     return list.length ? h("span", { class: "xp-badges" }, list) : null;
   }
-  /** A trail's mark and the steps of it a file or a declaration takes: FI3,4 is steps 3 and 4 of fusion inference. */
+  /** A trail's mark and the steps of it a file or a declaration takes: SK3,4 is steps 3 and 4 of the stack. */
   function badges(places) {
     var m = model(), by = {};
     places.forEach(function (o) { var s = by[o.trail.id] = by[o.trail.id] || []; if (s.indexOf(o.step) < 0) s.push(o.step); });
@@ -987,7 +987,7 @@
     if (typeof v === "number") return V.fmt.minus(f.round !== undefined ? v.toFixed(f.round) : Number.isInteger(v) ? V.fmt.int(v) : String(+v.toPrecision(6)));
     return v === undefined ? "not in the data" : String(v);
   }
-  /** The shipped file a fact was read from: the fusion head's JSON, the combiner or the manifest. */
+  /** The shipped file a fact was read from: the camera head's JSON, the combiner or the manifest. */
   function factSource(path) {
     var top = path.split(".");
     if (top[0] === "boosters") return V.factValue("boosters." + top[1] + ".file") || null;
@@ -1194,9 +1194,9 @@
         out.push("  " + k + ", " + b.file + ": gradient-boosted trees, " + b.trees + " trees, depth " + b.depth + ", " + b.features + " features");
       });
       var s = f.combiner;
-      if (s) out.push("  the stack combiner, " + base(s.path) + ": the " + s.formula + " formula, version " + s.version + "; inputs " + (s.inputs || []).join(", ") + "; w0 " + s.w0 + ", w_base " + s.w_base +
-        ", w_gen " + JSON.stringify(s.w_gen) + " for art, blur and human, w_rescue " + s.w_rescue + "; caps " + s.cap_base + " on the base and " + s.cap_head + " on a head; gate ceiling " +
-        s.gate_ceiling + "; threshold " + s.threshold + "; the art-pair adjudicates: " + s.pair_adjudicates);
+      if (s && s.anchor) out.push("  the stack combiner, " + base(s.path) + ", version " + s.version + ": w0 " + s.w0 + "; the anchor, the camera member or the screenshot member when the gate fires, weight " + s.anchor.w +
+        ", cap " + s.anchor.cap + ", gate ceiling " + s.anchor.gate_ceiling + "; evidence " + (s.evidence || []).map(function (e) { return e.member + " " + e.w; }).join(", ") +
+        ", each capped at " + s.evidence_cap + "; rescue " + (s.rescue || {}).w + "; threshold " + s.threshold);
       if (f.frozenRoles && f.frozenRoles.roles) out.push("  frozen roles, which no automated path writes: " + f.frozenRoles.roles.join(", "));
       if (f.manifest && f.manifest.artifacts) out.push("  the bundle's artifacts: " + f.manifest.artifacts.map(function (a) { return a.file + " as " + a.role + (a.head ? " " + a.head : ""); }).join(", "));
       return out;
@@ -1227,7 +1227,7 @@
   ];
   var EXTRA_SPECS = {
     read_step: { type: "function", "function": { name: "read_step", description: "Read one step of a trail whole: its title, its primer, its lane, and every entry's declaration with its file and line, its note and cite, its deeper line, the facts it shows and its twins on the code trails.",
-      parameters: { type: "object", properties: { trail: { type: "string", description: "The trail's id or mark, such as fusion-model or MF, from the map" }, n: { type: "integer", description: "The step's number, from 1" } }, required: ["trail", "n"] } } }
+      parameters: { type: "object", properties: { trail: { type: "string", description: "The trail's id or mark, such as camera-model or MC, from the map" }, n: { type: "integer", description: "The step's number, from 1" } }, required: ["trail", "n"] } } }
   };
   /** The tools the page's chat gets: the four that read the change, and the page's own. */
   function toolSpecs() { return TOOL_SPECS.concat(policy().extraTools.map(function (n) { return EXTRA_SPECS[n]; })); }
@@ -1384,8 +1384,8 @@
     bad = idx.edges.filter(function (e) { return !m.scopes[e[0]] || !m.scopes[e[1]] || !(e[2] >= 0 && e[2] <= 2) || !(e[3] >= 1); });
     check("every call edge joins two declarations, with a tier and a line", !bad.length, V.fmt.int(idx.edges.length) + " edges");
     var trails = m.trails, pages = V.pages.map(function (p) { return p.file; }), code = m.sets.code, P = policy();
-    check("eleven trails: the fusion head and the specialist stack trained, detection in seven stages from decode to result, and the watermark signed and matched, each with a mark of its own and its steps numbered from 1",
-          code.trails.length === 11 && SETS.code.expect.every(function (id) { return code.trailById[id]; }) &&
+    check("nine trails: the camera head and the specialist stack trained, detection in five stages from decode to result, and the watermark signed and matched, each with a mark of its own and its steps numbered from 1",
+          code.trails.length === 9 && SETS.code.expect.every(function (id) { return code.trailById[id]; }) &&
           code.trails.every(function (t, i) { return t.mark && code.trails.findIndex(function (u) { return u.mark === t.mark; }) === i; }) &&
           code.trails.every(function (t) { return t.steps.length >= 3 && t.steps.length <= 9 && t.steps.every(function (st, i) { return st.n === i + 1 && st.entries.length > 0; }); }),
           code.trails.map(function (t) { return t.mark + " " + t.steps.length; }).join(" · "));

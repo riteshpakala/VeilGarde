@@ -176,7 +176,8 @@
   }
   function renderDecisions(node) {
     node.appendChild(h("ul", { class: "decisions" }, (run().decisions || []).map(function (d) {
-      var shapes = d.retired ? [" · shaped ", h("code", null, d.file || ""), h("span", { class: "dim" }, ", retired on " + d.retired + " and kept on the 2026-rnd branch")]
+      var gone = d.superseded ? [", retired on " + d.retired + ", superseded by ", h("a", { href: "#" + d.superseded }, d.superseded)] : [", retired on " + d.retired + " and kept on the 2026-rnd branch"];
+      var shapes = d.retired ? [" · shaped ", h("code", null, d.file || ""), h("span", { class: "dim" }, gone)]
                              : [" · shapes ", fileLink(d.file || "")];
       return h("li", { id: d.id, class: d.retired ? "retired" : null }, [h("span", { class: "id" }, d.id), h("b", null, d.chose)].concat(shapes,
         [h("span", { class: "why" }, "Rather than " + d.rejected + ". Why: " + d.reason)]));

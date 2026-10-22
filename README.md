@@ -1,4 +1,4 @@
-[![VeilGarde: one verdict, and a signature that survives a crop. An image's 16 by 16 tiles, coloured by how generated each reads and lit by its fragility, feed two lanes: above, the fusion base and the stacked verdict, ending in a gold mark; below, sixteen warps and the signature's id, ending in a square.](README_Assets/hero.png)](README_Assets/hero.png)
+[![VeilGarde: one verdict, and a signature that survives a crop. An image's 16 by 16 tiles, coloured by how generated each reads and lit by its fragility, feed two lanes: above, the stack's members and the combined verdict, ending in a gold mark; below, sixteen warps and the signature's id, ending in a square.](README_Assets/hero.png)](README_Assets/hero.png)
 
 # VeilGarde
 
@@ -6,42 +6,50 @@ VeilGarde is a detector for AI-generated images, with a crop-robust watermark, a
 
 It runs in two lanes.
 
-**Detection.** A **fusion head** reads what an image depicts, from a frozen DINOv2 embedding, and whether a camera captured its pixels, from the **capture signature** measured at native resolution. Its probability is the base. **Specialist heads** for art, blur, faces, previews and screenshots then add their evidence under a small non-negative **stacked combiner**, two mechanisms revise it only on decisive evidence, and one verdict comes out. A **flywheel** trains and improves the fusion head and the specialist stack from a store of features, without ever storing an image.
+**Detection** is five stages: Decode, Shared Signals, Stack, Revisions, Result. The **stack** is a flat list of independent members, each with its own score:
+
+- the **camera head**, reading what an image depicts, from a frozen DINOv2 embedding, and whether a camera captured its pixels, from the **capture signature** measured at native resolution;
+- the screenshot gate and its content head;
+- the capture signature itself;
+- **specialist heads** for art, blur, faces and previews;
+- the semantic tiles.
+
+Three **revisions** read them. A small non-negative **combiner** anchors on the camera head, or on the screenshot head when the gate fires, and pools the specialists' evidence; the frame seam and the preview tail act only on decisive evidence. The result lists every member's score. A **flywheel** trains and improves the members from a store of features, without ever storing an image. Inference and training are declared the same way, so a new member is one file and one line on each side.
 
 **The watermark.** Every 32×32 tile of an image is perspective-warped through 16 fixed homographies and back. A camera sensor's mosaic and noise do not survive the round trip the way a generator's output does. Each tile's **fragility**, how much more of it the stronger warp loses, becomes four ordinal bits against its neighbours. The signature adds nothing to the pixels, and a crop or a re-encode is matched against it.
 
 | Subpackage | Holds |
 |---|---|
-| `VeilGardeCore` | the domain, with no MLX: the fusion row, the XGBoost codec, heads and the combiner, bundles, the result JSON, the feature store |
+| `VeilGardeCore` | the domain, with no MLX: the camera row, the XGBoost codec, heads and the combiner, bundles, the schema-v1 result, the feature store and its migration |
 | `VeilGardeLens` | the extractors: capture, DINOv2, CLIP, and the boosted-tree evaluator |
-| `VeilGardeInference` | the detector: the fusion base, the specialist stack, the router, the verdict |
-| `VeilGardeTraining` | the trainers for the fusion head, the heads and the combiner, driven by a recipe DSL, and the backbone imports |
+| `VeilGardeInference` | the detector as one pipeline: the shared signals, the stack's members, the revisions, the result |
+| `VeilGardeTraining` | the trainers for the camera head, the heads and the combiner, declared as trainable members in a recipe DSL that mirrors the pipeline, and the backbone imports |
 | `VeilGardeFlywheel` | acquisition into a features-only store, candidates, the battery, promote and rollback |
 | `VeilWatermark` | the warp residual and a crop-robust signature read off each tile's fragility |
 | `veilgarde` | the CLI over all of it |
 
 ## Detection accuracy
 
-**v1** is the shipped two lanes: the fusion head over DINOv2 and the capture signature, then the specialist stack. Its battery, spec v3, passes on 96 images and is the baseline for testing; four generated images it misses are set aside for research. Measured on 2026-10-21. A real image counts as right when it's called real; a generated image when it's called generated. "Inconclusive" counts as wrong.
+**v1** is the shipped detector: the camera head over DINOv2 and the capture signature, and the specialist members, pooled by the combiner. Its battery, `battery_spec.json` version 1, passes on 96 images and is the baseline for testing; four generated images it misses are set aside for research. Measured on 2026-10-21. The same day the stack became a list of members, and no number moved: the census calls before and after are identical. A real image counts as right when it's called real; a generated image when it's called generated. "Inconclusive" counts as wrong.
 
 | Detector | Real, final_mixed census | Generated, final_mixed census | Real, unseen final_mixed | Generated, unseen final_mixed | Real, iPhone originals |
 |---|---|---|---|---|---|
-| **v1**, shipped: fusion head + stack | 95% | 41% | 90.0% | 34.5% | 99.3% |
+| **v1**, shipped: camera head + stack | 95% | 41% | 90.0% | 34.5% | 99.3% |
 | Residual head, in-sample combiner | 97% | 91% | 85.3% | 56.6% | 99.8% |
 | Residual head, out-of-fold combiner | 97% | 89% | 87.6% | 52.0% | 99.8% |
 | The warp era, for reference | 91% | 70% | not measured | not measured | 99.8% |
 
-- **Census:** 100 real and 100 generated final_mixed images. Most of them are rows the fusion heads trained on, so these columns read high.
+- **Census:** 100 real and 100 generated final_mixed images. Most of them are rows the camera heads trained on, so these columns read high.
 - **Unseen:** the 3,217 final_mixed images in no store shard (1,602 real, 1,615 generated). This is the honest measure.
 - **iPhone originals:** 438 camera photos, all real.
-- **Residual head:** both DINOv2 readings, capture and the warp residual's statistics, 815 columns, 1,000 trees of depth 7.
+- **Residual head:** both DINOv2 readings, capture and the warp residual's statistics, 815 columns, 1,000 trees of depth 7. It did not ship, and its code left on 2026-10-21; its rows are the record.
 
 ## The CLI at a glance
 
 ```sh
 scripts/cli.sh doctor                                   # builds veilgarde, installs MLX's Metal library, checks the setup
-scripts/cli.sh route photo.jpg                          # the full detector: domain, verdict, base, capture, the stack
-scripts/cli.sh route photo.jpg --json                   # the same, as the schema-v3 result
+scripts/cli.sh route photo.jpg                          # the full detector: the verdict, every member's score, every revision
+scripts/cli.sh route photo.jpg --json                   # the same, as the schema-v1 result
 scripts/cli.sh train plan --preset                      # what the shipped recipe would train, without training
 VEILGARDE_CONFIG=release scripts/cli.sh train heads     # a candidate bundle under <work area>/candidates/
 scripts/cli.sh flywheel init && scripts/cli.sh flywheel battery --gate full
@@ -53,7 +61,7 @@ scripts/cli.sh watermark sign photo.jpg > photo.vw1 && scripts/cli.sh watermark 
 
 ## The playground
 
-[Playground/](Playground/README.md) runs both regimes on this Mac in one program and exits 0 only when every checkpoint holds: one image's capture signature and DINOv2 embeddings, the fusion base built by hand, the specialist stack and the combiner's arithmetic term by term, then each trainer in miniature, the flywheel's promote and rollback, and the watermark. [The site's chapter 9](docs/site/09-playground.html) walks through it.
+[Playground/](Playground/README.md) runs both regimes on this Mac in one program and exits 0 only when every checkpoint holds: one image's capture signature and DINOv2 embeddings, the camera head's row built by hand, every member of the stack and the combiner revision's arithmetic term by term, then each trainer in miniature, the flywheel's promote and rollback, and the watermark. [The site's chapter 9](docs/site/09-playground.html) walks through it.
 
 ```sh
 Playground/run.sh
@@ -61,7 +69,7 @@ Playground/run.sh
 
 ## VeilGarde docsite
 
-A site that explains each layer and shows every file this build changed, verbatim, with each Swift declaration's calls and callers, and the run's ledger of commands, tests and decisions. Eleven trails walk the code in the order it runs: how the fusion head and the specialist stack are trained, detection stage by stage from Decode through Shared Signals, Domain, Base, Stack and Revisions to Result, and how the watermark signs an image and matches a crop of it. A grid picks them, a row for each flow and a column for each kind. Double-click scripts/site.command, or open [docs/site/index.html](docs/site/index.html); it is plain HTML with no build step. [docs/site/README.md](docs/site/README.md) says how it is rebuilt and checked.
+A site that explains each layer and shows every file this build changed, verbatim, with each Swift declaration's calls and callers, and the run's ledger of commands, tests and decisions. Nine trails walk the code in the order it runs: how the camera head and the specialist stack are trained, detection stage by stage from Decode through Shared Signals, Stack and Revisions to Result, and how the watermark signs an image and matches a crop of it. A grid picks them, a row for each flow and a column for each kind. Double-click scripts/site.command, or open [docs/site/index.html](docs/site/index.html); it is plain HTML with no build step. [docs/site/README.md](docs/site/README.md) says how it is rebuilt and checked.
 
 The site's chat asks Mistral about what you are reading. On a Mac that holds a Mistral key in its key store, `scripts/site.command` hands the site that key; anyone else is asked for their own key in a dialog when the chat opens, and it stays in their browser.
 
@@ -77,6 +85,6 @@ Inside each target, folders follow the order of operations. The site's chapters 
 
 ## Where it came from
 
-VeilGarde consolidates the detector's research into one tool. It was ported from Garde on 2026-10-19, ([CLR](https://rao.nyc/thoughts/2026-04-25), [CLR (Journey)](https://paka.la/blog/clr-journey)), the R&D it supersedes, and its trainers reproduce the research's Python recipes, whose numbers it quotes with their dates. On 2026-10-21 it was cut to its two lanes: the warp model, its calibration, the noiseprint and the reduction studies left the detector, and the code before the cut lives on the `2026-rnd` branch. It takes MLX from Frigate, and its layout, recipes, docs site and explorer from Braid.
+VeilGarde consolidates the detector's research into one tool. It was ported from Garde on 2026-10-19, ([CLR](https://rao.nyc/thoughts/2026-04-25), [CLR (Journey)](https://paka.la/blog/clr-journey)), the R&D it supersedes, and its trainers reproduce the research's Python recipes, whose numbers it quotes with their dates. On 2026-10-21 it was cut to its two lanes: the warp model, its calibration, the noiseprint and the reduction studies left the detector, and the code before the cut lives on the `2026-rnd` branch. The same day the detector became a stack of independent members with one DSL on both sides, and the goldens, the battery and the census did not move. It takes MLX from Frigate, and its layout, recipes, docs site and explorer from Braid.
 
 GNU General Public License v3.0 (see [LICENSE](LICENSE)).

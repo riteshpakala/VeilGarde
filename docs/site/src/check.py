@@ -414,14 +414,14 @@ def explore(page):
     page.wait_for_timeout(200)
     if "Detector.detect" not in (root.get_attribute("data-scope") or ""):
         errors.append(f"Enter on the first match selected {root.get_attribute('data-scope')!r}")
-    page.click('#explorer .xp-trails button[data-trail="base"]')
+    page.click('#explorer .xp-trails button[data-trail="stack"]')
     page.wait_for_timeout(200)
     page.click('#explorer .xp-steps button[data-step="3"]')
     page.wait_for_timeout(200)
-    want = page.evaluate("VeilGarde.explorer.trailFile('base', 3)")
-    if root.get_attribute("data-file") != want or root.get_attribute("data-step") != "3" or root.get_attribute("data-trail") != "base":
-        errors.append(f"base step 3 opened {root.get_attribute('data-file')}, not {want}")
-    for target, attr, value in [(f"{info['path']}:{info['sig']}", "data-scope", info["id"]), ("trail-base-4", "data-step", "4"), (info["id"], "data-scope", info["id"]),
+    want = page.evaluate("VeilGarde.explorer.trailFile('stack', 3)")
+    if root.get_attribute("data-file") != want or root.get_attribute("data-step") != "3" or root.get_attribute("data-trail") != "stack":
+        errors.append(f"stack step 3 opened {root.get_attribute('data-file')}, not {want}")
+    for target, attr, value in [(f"{info['path']}:{info['sig']}", "data-scope", info["id"]), ("trail-stack-4", "data-step", "4"), (info["id"], "data-scope", info["id"]),
                                 ("trail-shared-signals-4;n=2", "data-pos", "1"), ("trail-specialist-training-2", "data-trail", "specialist-training"),
                                 ("q=WarpResidual.batch", "data-scope", None), ("README.md:3", "data-line", "3")]:
         page.evaluate("t => { location.hash = t; }", target)
@@ -437,17 +437,17 @@ def explore(page):
     if not seen:
         errors.append("the selected declaration's signature line is not inside the source pane's view")
     # A declaration on two trails keeps its place when the reader switches between them.
-    page.evaluate("() => { location.hash = 'trail-fusion-training-5;n=1'; }")
+    page.evaluate("() => { location.hash = 'trail-camera-training-5;n=1'; }")
     page.wait_for_timeout(250)
     shared = root.get_attribute("data-scope")
     page.click('#explorer .xp-trails button[data-trail="specialist-training"]')
     page.wait_for_timeout(250)
     switched = (root.get_attribute("data-scope"), root.get_attribute("data-trail"), root.get_attribute("data-step"), root.get_attribute("data-pos"))
     if "Promoter.promote" not in (shared or "") or switched != (shared, "specialist-training", "5", "0"):
-        errors.append(f"switching from fusion training to specialist training on {shared} left {switched}")
+        errors.append(f"switching from camera training to specialist training on {shared} left {switched}")
     # The trail grid answers the arrow keys as a grid: across a row, down a column into the next section, back up and
     # across; Enter picks the cell.
-    page.focus('#explorer .tg-cell[data-trail="fusion-training"]')
+    page.focus('#explorer .tg-cell[data-trail="camera-training"]')
     visited = []
     for key in ("ArrowDown", "ArrowDown", "ArrowDown", "ArrowUp"):
         page.keyboard.press(key)
@@ -475,7 +475,7 @@ def explore(page):
     if (root.get_attribute("data-step"), root.get_attribute("data-pos")) != expected[-2]:
         errors.append("[ did not step back to the entry before the last")
     # A body pasted from the editor, reindented, lands on its declaration.
-    page.evaluate("() => { location.hash = 'trail-base-4'; }")
+    page.evaluate("() => { location.hash = 'trail-stack-4'; }")
     page.wait_for_timeout(250)
     reindented = "\n".join("\t  " + line.strip() for line in info["body"].split("\n"))
     box.evaluate("(e, t) => { e.focus(); e.value = t; e.dispatchEvent(new Event('paste', { bubbles: true })); e.dispatchEvent(new Event('input', { bubbles: true })); }", reindented)

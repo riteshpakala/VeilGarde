@@ -1737,7 +1737,7 @@ def ml_fields(entry, where, f, changes, graph, ids, tests, ledger_ids, ml):
 # MARK: Facts the chapters read
 
 def bundle_facts():
-    """The shipped bundle's manifest, its combiner and its fusion head's shape, read from Resources/, each artifact
+    """The shipped bundle's manifest, its combiner and its camera head's shape, read from Resources/, each artifact
     re-hashed and each file found through the manifest's role."""
     import hashlib
     res = REPO / "Sources" / "VeilGardeInference" / "Resources"
@@ -1750,22 +1750,22 @@ def bundle_facts():
             p = res / a.get("file", "")
             a["onDisk"] = p.is_file()
             a["matches"] = p.is_file() and hashlib.sha256(p.read_bytes()).hexdigest() == a.get("sha256") and p.stat().st_size == a.get("bytes")
-            if a.get("role") in ("combiner", "fusion-head"):
+            if a.get("role") in ("combiner", "camera"):
                 files[a["role"]] = p
         out["manifest"] = dict(path=manifest.relative_to(REPO).as_posix(), bytes=manifest.stat().st_size, **m)
     comb = files.get("combiner")
     if comb and comb.is_file():
         out["combiner"] = dict(path=comb.relative_to(REPO).as_posix(), **json.loads(comb.read_text(encoding="utf-8")))
-    # The fusion head's shape, read from its XGBoost JSON: trees, the deepest tree, features.
+    # The camera head's shape, read from its XGBoost JSON: trees, the deepest tree, features.
     boosters = {}
-    head = files.get("fusion-head")
+    head = files.get("camera")
     if head and head.is_file():
         model = json.loads(head.read_text(encoding="utf-8"))["learner"]
         trees = model["gradient_booster"]["model"]["trees"]
         def depth(tree, node=0):
             left, right = tree["left_children"][node], tree["right_children"][node]
             return 0 if left == -1 else 1 + max(depth(tree, left), depth(tree, right))
-        boosters["fusionHead"] = {"file": head.name, "trees": len(trees), "depth": max(depth(t) for t in trees),
+        boosters["camera"] = {"file": head.name, "trees": len(trees), "depth": max(depth(t) for t in trees),
                                   "features": int(model["learner_model_param"]["num_feature"])}
     out["boosters"] = boosters
     out["frozenRoles"] = frozen_roles()

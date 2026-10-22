@@ -21,9 +21,9 @@
    ],
    "rows": [
     {
-     "label": "Fusion head",
+     "label": "Camera head",
      "trails": [
-      "fusion-model"
+      "camera-model"
      ]
     },
     {
@@ -65,25 +65,25 @@
  ],
  "trails": [
   {
-   "id": "fusion-model",
-   "mark": "MF",
+   "id": "camera-model",
+   "mark": "MC",
    "kind": "model",
-   "title": "The fusion head",
+   "title": "The camera head",
    "subtitle": "a frozen DINOv2 embedding beside a measured capture signature, read by a booster",
-   "say": "How the fusion head learns the base verdict for a camera image: a frozen DINOv2 embedding of what the image depicts and the measured capture signature in one row, a features-only store of such rows, a booster grown from scratch or by warm start, and the base's weight in the final verdict.",
+   "say": "How the camera head learns its take on a camera image: a frozen DINOv2 embedding of what the image depicts and the measured capture signature in one row, a features-only store of such rows, a booster grown from scratch or by warm start, and its place in the stack as the combiner's anchor.",
    "steps": [
     {
      "n": 1,
-     "title": "Why one base, and why these two inputs",
+     "title": "Why a camera head, and why these two inputs",
      "chapters": [
       "01-fusion.html"
      ],
-     "primer": "The base is the detector's first answer for a camera image, before any specialist speaks. It reads two kinds of evidence in one row: what the image depicts, from a frozen DINOv2 embedding, and how it was captured, from the capture signature. Joining different evidence as columns of one model is called feature-level fusion. Until 2026-10-21 the row also held a warp score and three sharpness values, and the research measured that they added almost nothing beside the other two.",
+     "primer": "The camera head is one member of the stack: the detector's take on whether a camera made the image. It reads two kinds of evidence in one row: what the image depicts, from a frozen DINOv2 embedding, and how it was captured, from the capture signature. Joining different evidence as columns of one model is called feature-level fusion. Until 2026-10-21 the row also held a warp score and three sharpness values, and the research measured that they added almost nothing beside the other two.",
      "entries": [
       {
-       "scope": "FusionVector",
-       "anchor": "public var asVector: [Float] { dino + (dinoNorm ?? []) + capture.asVector }",
-       "note": "The fusion head's row: DINOv2's 384-value embedding, then the nine capture values, 393 columns in the head's own order. A model trained on one column order and run on another would read the capture peak where it expects an embedding value.",
+       "scope": "CameraRow",
+       "anchor": "public var asVector: [Float] { dino + capture.asVector }",
+       "note": "The camera head's row: DINOv2's 384-value embedding, then the nine capture values, 393 columns in the head's own order. A model trained on one column order and run on another would read the capture peak where it expects an embedding value.",
        "cite": "chapter:01-fusion.html#vector",
        "deeper": {
         "text": "Scratch refits scored on 22,703 held-out store rows on 2026-10-19: without the warp score the head lost 0.0012 AUC, without sharpness it gained 0.0002, both at the noise floor of a re-seed; without DINOv2 or without capture it lost more than 0.02.",
@@ -92,11 +92,11 @@
        "facts": [
         {
          "label": "columns",
-         "path": "boosters.fusionHead.features"
+         "path": "boosters.camera.features"
         }
        ],
        "code": [
-        "base-2"
+        "stack-2"
        ]
       }
      ]
@@ -148,12 +148,12 @@
       "01-fusion.html",
       "02-specialists.html"
      ],
-     "primer": "Preprocessing is part of a model. A network that learned from images resized one way gives a different embedding of the same image resized another way, so each model on top must be fed the way it was trained. VeilGarde reads DINOv2 three ways: the fusion reads the CLS of a plain crop, every specialist head reads the CLS after a forced 360 by 640 resize, and the semantic-tile head reads the patch tokens. The store keeps both CLS embeddings as separate columns.",
+     "primer": "Preprocessing is part of a model. A network that learned from images resized one way gives a different embedding of the same image resized another way, so each model on top must be fed the way it was trained. VeilGarde reads DINOv2 three ways: the camera head reads the CLS of a plain crop, every specialist head reads the CLS after a forced 360 by 640 resize, and the semantic-tile head reads the patch tokens. The store keeps both CLS embeddings as separate columns.",
      "entries": [
       {
        "scope": "SemanticLens.fusionEmbedding(_:variant:)",
        "anchor": "try shared.vit(variant)(Dinov2Preprocess.input(cg)).reshaped(-1).asArray(Float.self)",
-       "note": "The fusion head's embedding: the CLS after the plain preprocessing, the short edge to 256 and a centre crop of 224. The fusion head reads this path and every linear head the force-resized one, two embeddings of one image that the store keeps apart.",
+       "note": "The camera head's embedding: the CLS after the plain preprocessing, the short edge to 256 and a centre crop of 224. The camera head reads this path and every linear head the force-resized one, two embeddings of one image that the store keeps apart.",
        "cite": "PIN:Sources/VeilGardeLens/Semantic/Dinov2Preprocess.swift",
        "code": [
         "shared-signals-4"
@@ -173,15 +173,15 @@
      "chapters": [
       "01-fusion.html"
      ],
-     "primer": "The capture signature is measured, not learned. A camera's sensor and demosaicing leave a periodic trace at the highest frequencies of its native pixels; a generator's output and an image that was resized lose it. Its nine values enter the row as they are, and when the trace is present it also silences every generated-side head. It is read at native resolution, so a crop keeps it and a resize removes it.",
+     "primer": "The capture signature is measured, not learned. A camera's sensor and demosaicing leave a periodic trace at the highest frequencies of its native pixels; a generator's output and an image that was resized lose it. Its nine values enter the camera row as they are, and the capture member reports it in the stack, where a present trace silences every generated-side member. It is read at native resolution, so a crop keeps it and a resize removes it.",
      "entries": [
       {
-       "scope": "CaptureLens.signature(_:)",
-       "anchor": "return features.signature",
-       "note": "The signature the verdict reads: the spectral peak, whether the image is large enough to measure, its native short side, and whether the peak is present.",
+       "scope": "CaptureLens.reading(_:)",
+       "anchor": "return CaptureReading(features: features, signature: features.signature)",
+       "note": "One measurement in two forms: the nine values the camera head reads, and the signature the capture member reports: the spectral peak, whether the image is large enough to measure, its native short side, and whether the peak is present.",
        "cite": "PIN:Sources/VeilGardeLens/Capture/CaptureLens.swift",
        "code": [
-        "shared-signals-4"
+        "shared-signals-3"
        ]
       },
       {
@@ -192,9 +192,9 @@
       {
        "scope": "CaptureSignature",
        "anchor": "public let present: Bool",
-       "note": "The four fields every result carries under capture, and the store's rows carry as nine values with the measurements behind them.",
+       "note": "The four fields the capture member reports in every result's stack, and the store's rows carry as nine values with the measurements behind them.",
        "code": [
-        "stack-1"
+        "stack-2"
        ]
       }
      ]
@@ -206,23 +206,23 @@
       "01-fusion.html",
       "06-flywheel.html"
      ],
-     "primer": "The fusion head trains on stored features, not images. Each row holds what the head reads, already measured, so a retrain reads the store and never an image. Rows are weighted, so the kinds of image the head must learn hardest count more. A share of the newest generators' rows is held out, so the recall reported on them is on rows the head never trained on.",
+     "primer": "The camera head trains on stored features, not images. Each row holds what the head reads, already measured, so a retrain reads the store and never an image. Rows are weighted, so the kinds of image the head must learn hardest count more. A share of the newest generators' rows is held out, so the recall reported on them is on rows the head never trained on.",
      "entries": [
       {
-       "scope": "FusionDataset.assemble(_:settings:)",
-       "anchor": "for column in layout.columns { x.append(contentsOf: selection.vector(column, row: i)) }",
-       "note": "Takes every store row that is not golden, not NSFW and carries the fusion embedding, ordered by id, and stacks its DINOv2 and capture columns. An older shard's other columns are read past.",
+       "scope": "CameraDataset.assemble(_:settings:)",
+       "anchor": "for column in CameraRow.columns { x.append(contentsOf: selection.vector(column, row: i)) }",
+       "note": "Takes every store row that is not golden, not NSFW and carries the plain embedding, ordered by id, and stacks its DINOv2 and capture columns. The store keeps three columns since 2026-10-21.",
        "cite": "PIN",
        "deeper": {
         "text": "On 2026-10-21 that was 113,195 rows, with 1,569 of 5,263 new-generator rows held out and 11,212 rows set aside for the evaluation twin.",
         "cite": "ledger#command-89"
        },
        "code": [
-        "fusion-training-2"
+        "camera-training-2"
        ]
       },
       {
-       "scope": "FusionSettings",
+       "scope": "CameraSettings",
        "anchor": "public var evaluationFraction = 0.1",
        "note": "The row weights and two holdouts: new-generator rows, the flux family at 0.7, preview rows and emphasized ids each carry a weight; 30% of the new-generator rows stay out of training, and a twin is fitted without a further 10% of all rows to report a held-out AUC.",
        "cite": "ledger#decision-110"
@@ -236,12 +236,12 @@
       "01-fusion.html",
       "05-training.html"
      ],
-     "primer": "The fusion head is a gradient-boosted ensemble of shallow decision trees over 393 columns: each tree is fitted to the errors the trees before it leave, at a small learning rate. A booster retrained from scratch does not reproduce the old one's decision boundary, so it can lose cases the old one got right. A warm start keeps every existing tree and adds a few, so the boundary moves a little at a time. The shipped head was trained from scratch on 2026-10-21, because the 397-column head before it could not be continued on 393 columns.",
+     "primer": "The camera head is a gradient-boosted ensemble of shallow decision trees over 393 columns: each tree is fitted to the errors the trees before it leave, at a small learning rate. A booster retrained from scratch does not reproduce the old one's decision boundary, so it can lose cases the old one got right. A warm start keeps every existing tree and adds a few, so the boundary moves a little at a time. The shipped head was trained from scratch on 2026-10-21, because the 397-column head before it could not be continued on 393 columns.",
      "entries": [
       {
-       "scope": "FusionMode",
-       "anchor": "public static let flywheel = FusionMode.warmStart(add: 80, eta: 0.03)",
-       "note": "Two ways to train: a warm start that adds 80 trees at a learning rate of 0.03, the flywheel's way to move the base, or 500 trees from scratch at 0.04, the way the shipped head was trained.",
+       "scope": "CameraMode",
+       "anchor": "public static let flywheel = CameraMode.warmStart(add: 80, eta: 0.03)",
+       "note": "Two ways to train: a warm start that adds 80 trees at a learning rate of 0.03, the flywheel's way to move the camera head, or 500 trees from scratch at 0.04, the way the shipped head was trained.",
        "cite": "chapter:01-fusion.html#moves",
        "deeper": {
         "text": "Under the warp era a warm start of 80 trees raised held-out recall from 0.9955 to 0.9975 and still failed the battery, flipping IMG_0291 from 0.757 to 0.184; a 20-tree start passed. Measured on the 397-column head on 2026-10-19.",
@@ -250,20 +250,20 @@
        "facts": [
         {
          "label": "trees",
-         "path": "boosters.fusionHead.trees"
+         "path": "boosters.camera.trees"
         },
         {
          "label": "deepest tree",
-         "path": "boosters.fusionHead.depth"
+         "path": "boosters.camera.depth"
         }
        ],
        "code": [
-        "fusion-training-1"
+        "camera-training-1"
        ]
       },
       {
-       "scope": "FusionTrainer.train(_:settings:parent:note:)",
-       "anchor": "guard let parent else { throw VeilGardeFailure.missing(\"a warm start needs the parent fusion head\") }",
+       "scope": "CameraTrainer.train(_:settings:parent:note:)",
+       "anchor": "guard let parent else { throw VeilGardeFailure.missing(\"a warm start needs the parent camera head\") }",
        "note": "Fits the evaluation twin and scores it on rows it never saw, then trains on every row not held out. A warm start hands the parent to the booster, which keeps its trees byte for byte, and a parent of another width is refused.",
        "cite": "PIN",
        "deeper": {
@@ -271,51 +271,51 @@
         "cite": "ledger#command-89"
        },
        "code": [
-        "fusion-training-3"
+        "camera-training-3"
        ]
       }
      ]
     },
     {
      "n": 7,
-     "title": "What it adds to the verdict",
+     "title": "What it adds to the result",
      "chapters": [
       "01-fusion.html",
       "02-specialists.html"
      ],
-     "primer": "The fusion head's probability is the base, where the verdict starts for every camera image, called at 0.5. On an image with no capture signature, a combiner then weighs the base against the specialist heads, and the base enters with the largest weight under a cap no head can outweigh.",
+     "primer": "The camera head's probability is its own row of the stack, called at 0.5. The combiner revision anchors on it unless the screenshot gate fired, and on an image with no capture signature weighs the specialist members against it: the anchor enters with the largest weight, under a cap no member can outweigh.",
      "entries": [
       {
-       "scope": "Fusion.verdict(_:)",
-       "anchor": "return InferenceResult(scorer: \"fusion\", prediction: s.gate.isScreenshot ? \"real\" : rule.label(p), p: p,",
-       "note": "Calls the head's probability at 0.5 with a band of 0.04 either side. When the flat-UI gate fires, the screenshot head takes the verdict instead, because the camera-anchored base would read a screenshot as generated.",
+       "scope": "Camera.score(_:)",
+       "anchor": "return MemberOutput(name: name, p: p, verdict: s.config.decision.label(p), fields: [Field(\"p_neutral\", .number(pNeutral))])",
+       "note": "Calls the head's probability at 0.5 with a band of 0.04 either side, its own verdict in the stack. The screenshot member reports beside it, and the combiner, not the camera member, decides which one anchors.",
        "cite": "chapter:01-fusion.html#booster",
        "code": [
-        "base-1"
+        "stack-2"
        ]
       },
       {
        "scope": "StackCombiner.lg(_:_:)",
        "anchor": "return min(max(log(r / (1 - r)), -cap), cap)",
-       "note": "The bounded logit every input enters the combiner through. The base's cap is twice a head's and its weight the largest, so a saturated head cannot overturn a confident base.",
+       "note": "The bounded logit every input enters the combiner through. The anchor's cap is twice an evidence member's and its weight the largest, so a saturated member cannot overturn a confident anchor.",
        "cite": "PIN",
        "facts": [
         {
-         "label": "w_base",
-         "path": "combiner.w_base",
+         "label": "the anchor's weight",
+         "path": "combiner.anchor.w",
          "round": 4
         },
         {
          "label": "cap on the base",
-         "path": "combiner.cap_base"
+         "path": "combiner.anchor.cap"
         },
         {
          "label": "cap on a head",
-         "path": "combiner.cap_head"
+         "path": "combiner.evidence_cap"
         }
        ],
        "code": [
-        "stack-3"
+        "revisions-1"
        ]
       }
      ]
@@ -328,7 +328,7 @@
    "title": "The specialist heads",
    "mark": "MS",
    "subtitle": "linear probes on DINOv2's frozen embedding, stacked under a non-negative combiner",
-   "say": "How the specialist heads learn the families the base misses: each a standardized logistic probe trained on DINOv2's frozen embedding from a features-only store, split by source, admitted only if it leaves real photographs alone, pooled with the base by a small non-negative combiner, and grown every week by the flywheel.",
+   "say": "How the specialist heads learn the sectors the camera head misses: each a standardized logistic probe trained on DINOv2's frozen embedding from a features-only store, split by source, admitted only if it leaves real photographs alone, a member of the stack with its own score, pooled around the camera head by a small non-negative combiner, and grown every week by the flywheel.",
    "steps": [
     {
      "n": 1,
@@ -337,25 +337,25 @@
       "02-specialists.html",
       "03-router.html"
      ],
-     "primer": "The fusion base is strong where it was trained and weaker on a few families: AI art against human art, generative blur against a camera's, photoreal people against real portraits. A specialist is a small model that knows one of those questions well. The specialists are stacked, not blended: each adds evidence in one direction, and a combiner weighs it against the base under caps it cannot exceed.",
+     "primer": "The camera head is strong where it was trained and weaker in a few sectors: AI art against human art, generative blur against a camera's, photoreal people against real portraits. A specialist is a small model that knows one of those questions well. Each is its own member of the stack with its own score, and the combiner revision weighs their evidence against the anchor under caps no member can exceed.",
      "entries": [
       {
        "scope": "HeadKind",
        "anchor": "public static let combinerOrder: [HeadKind] = [.art, .blur, .human]",
-       "note": "Names every head by its role: the screenshot domain's expert, the three atlas priors the combiner pools, and the arbiters the semantic chain asks. The three priors enter the combiner in a fixed order, art, blur, human, the order its weights are written in.",
+       "note": "Names every linear head by its role: the screenshot member's content head, the three category heads the combiner pools, the preview head the preview tail reads, and the semantic-tile head. The three category heads enter the combiner in a fixed order, art, blur, human.",
        "cite": "PIN"
       },
       {
-       "scope": "AtlasPriors.evaluate(_:)",
-       "anchor": "kinds.compactMap { prior($0.name, $0.kind, s) }",
-       "note": "Scores the art, blur and human heads on the image and records each in the stack, at full weight when it fires at 0.80 and at a quarter when only consulted. A head that is not in the bundle is inert, so a head is added or removed by a file, not by code.",
+       "scope": "Specialist.score(_:)",
+       "anchor": "guard let head = HeadRegistry.shared.head(kind, in: s.config.bundle) else { return nil }",
+       "note": "Scores one head on the image and records it as its own row of the stack. A head that is not in the bundle leaves no row, so a head is added by a file and one line in the pipeline, not by new code.",
        "cite": "PIN",
        "deeper": {
         "text": "The research tried a monolithic combiner that blended every signal, and real false positives rose from 8% to between 50% and 92%; the stack holds them at 0%. Quoted from the research.",
         "cite": "chapter:02-specialists.html#why"
        },
        "code": [
-        "stack-2"
+        "stack-3"
        ]
       }
      ]
@@ -372,19 +372,19 @@
       {
        "scope": "SemanticLens.normalizedEmbedding(_:variant:normW:normH:)",
        "anchor": "try shared.vit(variant)(Dinov2Preprocess.inputNormalized(cg, normW: normW, normH: normH)).reshaped(-1).asArray(Float.self)",
-       "note": "The heads' embedding: the CLS token after the image is force-resized to 360 by 640. Every head was trained on this embedding, and the store keeps it as its own column, dino_norm, apart from the fusion's.",
+       "note": "The heads' embedding: the CLS token after the image is force-resized to 360 by 640. Every head was trained on this embedding, and the store keeps it as its own column, dino_norm, apart from the camera head's.",
        "cite": "chapter:02-specialists.html#head",
        "code": [
-        "stack-2"
+        "shared-signals-4"
        ]
       },
       {
        "scope": "FeatureExtractor.extract(_:)",
        "anchor": "let dinoNorm = columns.contains(.dinoNorm) ? try SemanticLens.normalizedEmbedding(cg, variant: variant) : nan384",
-       "note": "Measures one image into the store's six columns with the detector's own calls, in the detector's order, so a stored row is what inference would compute for that image. The image is read, measured and dropped.",
+       "note": "Measures one image into the store's three columns with the detector's own calls, in the detector's order, so a stored row is what inference would compute for that image. The image is read, measured and dropped.",
        "cite": "PIN",
        "deeper": {
-        "text": "The seed store holds 138,247 rows in 59 shards; the heads, the fusion head and the combiner all train on such rows.",
+        "text": "The store holds 138,267 rows in 60 shards, migrated to the v1 shard format on 2026-10-21; the heads, the camera head and the combiner all train on such rows.",
         "cite": "ledger#command-25"
        }
       }
@@ -405,7 +405,7 @@
        "note": "Computes P(AI) as the sigmoid of the coefficients times the standardized embedding plus the intercept, in Float and in index order, as the reference does. Every specialist is this one primitive with its own numbers.",
        "cite": "WHAT",
        "code": [
-        "stack-2"
+        "stack-3"
        ]
       },
       {
@@ -488,8 +488,8 @@
       },
       {
        "scope": "Promoter.check(_:data:live:current:store:)",
-       "anchor": "guard c.wBase >= 0, c.wRescue >= 0, c.wGen.allSatisfy({ $0 >= 0 }) else {",
-       "note": "Every promote check runs before live is touched: an atlas head must pass admission, a base must keep live's trees byte for byte, a combiner's weights must all be at least zero. A refusal leaves live as it was.",
+       "anchor": "guard c.anchor.w >= 0, c.rescue.w >= 0, c.evidence.allSatisfy({ $0.w >= 0 }) else {",
+       "note": "Every promote check runs before live is touched: a category head must pass admission, the camera head must keep live's trees byte for byte, a combiner's weights must all be at least zero and its members held by live. A refusal leaves live as it was.",
        "cite": "ledger#decision-40",
        "code": [
         "specialist-training-5"
@@ -503,12 +503,12 @@
      "chapters": [
       "02-specialists.html"
      ],
-     "primer": "The combiner is a second, tiny model on top: logistic regression over the base and the heads, which is called stacking. Its weights are held at zero or above, so a head that reads real can never push toward generated. Generated evidence adds; real evidence subtracts only while the base is unsure, under 0.75. When every head reads real, a rescue pulls toward real by the weakest of their real readings.",
+     "primer": "The combiner is a second, tiny model on top: logistic regression over the anchor and the evidence members, which is called stacking. Its weights are held at zero or above, so a member that reads real can never push toward generated. Generated evidence adds; real evidence subtracts only while the anchor is unsure, under 0.75. When every evidence member reads real, a rescue pulls toward real by the weakest of their real readings.",
      "entries": [
       {
-       "scope": "StackCombiner.pool(base:heads:pairAI:)",
-       "anchor": "if base < gateCeiling { z -= wRescue * max(0, -maxHeadLogit) }",
-       "note": "Pools the capped base logit and each head's positive logit times its weight, then, while the base is under the gate, subtracts the rescue. A saturated head can never overturn a confident base.",
+       "scope": "StackCombiner.pool(anchor:evidence:)",
+       "anchor": "if a < anchor.gateCeiling { z -= rescue.w * max(0, -maxLogit) }",
+       "note": "Pools the capped anchor logit and each evidence member's positive logit times its weight, then, while the anchor is under the gate, subtracts the rescue. A saturated member can never overturn a confident anchor.",
        "cite": "WHAT",
        "facts": [
         {
@@ -517,21 +517,21 @@
          "round": 4
         },
         {
-         "label": "w_gen for human",
-         "path": "combiner.w_gen.2",
+         "label": "the human weight",
+         "path": "combiner.evidence.2.w",
          "round": 4
         },
         {
-         "label": "w_rescue",
-         "path": "combiner.w_rescue"
+         "label": "the rescue weight",
+         "path": "combiner.rescue.w"
         },
         {
          "label": "gate ceiling",
-         "path": "combiner.gate_ceiling"
+         "path": "combiner.anchor.gate_ceiling"
         }
        ],
        "code": [
-        "stack-3"
+        "revisions-1"
        ]
       },
       {
@@ -540,7 +540,7 @@
        "note": "Fits the weights as a logistic regression held at zero or above, real rows counted three times, with the rescue column zeroed because the corpus cannot teach it.",
        "cite": "PIN",
        "deeper": {
-        "text": "Refit on 97,166 capture-absent store rows, the pooled test AUC is 0.9901 against the base's 0.9896 and the real false-positive rate falls from 3.1% to 1.2%. It is a new fit, not a reproduction of the shipped weights, which were fitted on another cache.",
+        "text": "Refit on 97,166 capture-absent store rows, the pooled test AUC is 0.9901 against the camera head's 0.9896 and the real false-positive rate falls from 3.1% to 1.2%. It is a new fit, not a reproduction of the shipped weights, which were fitted on another cache.",
         "cite": "ledger#command-20"
        },
        "code": [
@@ -561,18 +561,18 @@
      "chapters": [
       "06-flywheel.html"
      ],
-     "primer": "A detector trained once falls behind as generators change. The flywheel finds where the base is wrong, fetches images of that kind, keeps only their features, and every week trains candidate heads and a warm-started base on top of the live bundle. A candidate reaches live only through promote, behind admission and a battery of images the detector must never get wrong. The backbones never move.",
+     "primer": "A detector trained once falls behind as generators change. The flywheel finds where the camera head is wrong, fetches images of that kind, keeps only their features, and every week trains candidate heads and a warm-started camera head on top of the live bundle. A candidate reaches live only through promote, behind admission and a battery of images the detector must never get wrong. The backbones never move.",
      "entries": [
       {
        "scope": "WeeklyCandidates.recipe(id:)",
-       "anchor": "for kind in HeadKind.flywheelCategories { DinoHead(kind).version(\"weekcand\") }",
-       "note": "The weekly recipe: the four atlas heads from the whole store, and the base warm-started by 80 trees at 0.03, trained on top of live into a candidate bundle. Nothing here writes live.",
+       "anchor": "for kind in HeadKind.flywheelCategories { SpecialistHead(kind).version(\"weekcand\") }",
+       "note": "The weekly recipe: the three category heads from the whole store, and the camera head warm-started by 80 trees at 0.03, trained on top of live into a candidate bundle. Nothing here writes live.",
        "cite": "WHAT"
       },
       {
-       "scope": "Agreement.measure(_:store:label:)",
-       "anchor": "w[k] = combiner.pool(base: p, heads: heads.map { $0.pAI(norm) }, pairAI: pair?.pAI(norm))",
-       "note": "The flywheel's north-star number: how often the base alone reaches the same call as the pooled verdict. The flywheel's job is to make the base trustworthy on more images, so the agreement should climb.",
+       "scope": "StoreScoring.scores(_:_:rows:)",
+       "anchor": "w[k] = combiner.pool(anchor: p, evidence: heads.map { $0.pAI(norm) })",
+       "note": "The flywheel's north-star number: how often the camera head alone reaches the same call as the pooled verdict. The flywheel's job is to make the camera head trustworthy on more images, so the agreement should climb.",
        "cite": "WHAT",
        "deeper": {
         "text": "The first weekly candidate raised it from 0.9857 to 0.9894 on the store. The live models were trained on store rows, so these are not held-out numbers.",
@@ -585,12 +585,12 @@
        "note": "Promote is the only writer of live: it snapshots live, writes the slot, re-pins the manifest and runs the battery the slot needs, and restores the snapshot on a failure.",
        "cite": "WHAT",
        "deeper": {
-        "text": "On its first day it refused the weekly base: the 80 new trees flipped IMG_0291 from 0.757 to 0.184, and live was restored.",
+        "text": "On its first day it refused the weekly camera head: the 80 new trees flipped IMG_0291 from 0.757 to 0.184, and live was restored.",
         "cite": "ledger#command-29"
        },
        "code": [
         "specialist-training-5",
-        "fusion-training-5"
+        "camera-training-5"
        ]
       }
      ]
@@ -602,8 +602,8 @@
    "mark": "MV",
    "kind": "system",
    "title": "One verdict",
-   "subtitle": "one base, a stack of evidence and two revisions, from an image to one number",
-   "say": "How several models give one answer: the router computes the signals once and runs one base, capture and the specialist heads are stacked onto it, two mechanisms revise it only on decisive evidence, one result records it all, and fixed rules ask whether each part earns its place.",
+   "subtitle": "a stack of independent members, three revisions, one result",
+   "say": "How several models give one answer: the signals computed once, every member of the stack its own score, the combiner anchored on one of them, two more revisions on decisive evidence, one result that records it all, and fixed rules that ask whether each part earns its place.",
    "steps": [
     {
      "n": 1,
@@ -611,81 +611,82 @@
      "chapters": [
       "03-router.html"
      ],
-     "primer": "A detector built from several models still has to give one answer. VeilGarde's router computes the shared signals once, runs one base model, then lets a few high-precision mechanisms revise it in a fixed order. Each mechanism moves the probability only on evidence it is built to trust, so the final number keeps the base's meaning: P(AI), called at 0.5.",
+     "primer": "A detector built from several models still has to give one answer. VeilGarde computes the shared signals once, runs every member of its stack, then three revisions in a fixed order. The first sets the verdict around one anchor; the others move it only on evidence they are built to trust, so the final number keeps the anchor's meaning: P(AI), called at 0.5.",
      "entries": [
       {
-       "scope": "Detector.detect(cgImage:config:hint:)",
-       "anchor": "let base = try (registered[domain] ?? registered[.camera]!).verdict(s)",
-       "note": "Picks the domain, runs that domain's base expert, then compounds capture and the pooled specialists, the frame seam and the semantic chain on it, and keeps the state before the semantic chain so a route can be replayed.",
+       "scope": "Pipeline.run(cgImage:config:)",
+       "anchor": "for revision in revisions.steps {",
+       "note": "Computes the signals once, collects every member's output in the declared order, then runs the revisions in theirs, each reading the stack and recording what it did.",
        "cite": "PIN",
        "code": [
-        "domain-1"
+        "stack-1"
        ]
       },
       {
        "scope": "InferenceResult",
        "anchor": "public let prediction: String",
-       "note": "The one result: the base expert that ran, the label and P(AI), the operating point, the image's size, and the evidence around them.",
+       "note": "The one result: the verdict and its operating point, the image's size, every member's output and every revision's record.",
        "cite": "WHAT"
       }
      ]
     },
     {
      "n": 2,
-     "title": "The domain and the base",
+     "title": "The stack: every member speaks",
      "chapters": [
       "03-router.html",
       "01-fusion.html"
      ],
-     "primer": "Routing picks which base model reads the image. A flat UI screenshot goes to a head trained on screenshots; everything else goes to the fusion head. The choice is made by a cheap measured gate, never by image size, because size says little about where an image came from.",
+     "primer": "No member routes the image to another. The screenshot gate is a signal: the screenshot member reports it beside its head's score, and the combiner uses it to choose its anchor, never image size, because size says little about where an image came from. Every other member reads the same signals and says what it sees.",
      "entries": [
       {
-       "scope": "DefaultDomainDetector.detect(_:hint:)",
-       "anchor": "if let hint { return hint }",
-       "note": "A hint wins; otherwise the screenshot gate decides between the screenshot domain and the camera domain.",
-       "cite": "PIN:Sources/VeilGardeInference/Route/Domain.swift",
+       "scope": "Stack.score(_:)",
+       "anchor": "try members.compactMap { try $0.score(s) }",
+       "note": "Asks every member in turn; each answers from the shared signals alone, and none reads another's answer.",
+       "cite": "WHAT:Sources/VeilGardeInference/Stack/Stack.swift",
        "code": [
-        "domain-1"
+        "stack-1"
        ]
       },
       {
-       "scope": "RouteState.init(base:)",
-       "anchor": "verdict = base.prediction",
-       "note": "The route starts from the base's probability and label, the first row of the stack.",
+       "scope": "Screenshot.score(_:)",
+       "anchor": "Field(\"gate\", .flag(s.gate.isScreenshot))",
+       "note": "Reports the gate's three tells and whether they fire together, beside the screenshot head's own score.",
+       "cite": "PIN",
        "code": [
-        "base-4"
+        "stack-3"
        ]
       }
      ]
     },
     {
      "n": 3,
-     "title": "Capture first, then the stack",
+     "title": "The combiner revision",
      "chapters": [
       "02-specialists.html"
      ],
-     "primer": "Stacking means each specialist adds evidence on top of the base instead of being blended with it. A valid, present capture signature is the strongest sign of a camera, so it is consulted first and silences the generated-side heads. Without one, a small non-negative combiner pools the base with the heads, and a rescue term pulls an image toward real when every head agrees it is real.",
+     "primer": "Stacking means each member adds evidence around an anchor instead of being blended with it. The combiner anchors on the camera member, or the screenshot member when the gate fired. A valid, present capture signature is the strongest sign of a camera, so it leaves the anchor standing and silences the generated-side members. Without one, a small non-negative combiner pools the anchor with the art, blur and human members, and a rescue term pulls an image toward real when every one of them reads real.",
      "entries": [
       {
-       "scope": "CapturePriors.apply(_:_:domain:capture:)",
-       "anchor": "let pooled = comb.pool(base: state.p, heads: hp, pairAI: pairAI)",
-       "note": "Consults the capture signature first, then pools the art, blur and human priors onto the base when it is absent.",
-       "cite": "WHAT",
+       "scope": "Combine.apply(_:stack:signals:pipeline:)",
+       "anchor": "if capture.flag(\"valid\") == true && capture.flag(\"present\") == true {",
+       "note": "Reads the anchor, then the capture member: a present signature leaves the anchor standing, otherwise the evidence members are pooled around it.",
+       "cite": "ledger#decision-126",
        "code": [
-        "stack-1"
+        "revisions-1"
        ]
       },
       {
-       "scope": "StackCombiner.contribution(_:base:heads:pairAI:)",
-       "anchor": "return (base < gateCeiling && maxHeadLogit < 0) ? wRescue * (-maxHeadLogit) : 0",
-       "note": "A head's weight in the stack's rows: its generated push, or the shared rescue while every head reads real under the gate.",
+       "scope": "StackCombiner.contribution(_:anchor:evidence:)",
+       "anchor": "if l > 0 { return (k < evidence.count ? evidence[k].w : 0) * l }",
+       "note": "An evidence member's influence, kept in the combiner's record: its generated push, or the shared rescue while every member reads real under the gate.",
        "cite": "WHAT",
        "deeper": {
         "text": "The research tried a monolithic combiner that blended every signal, and real false positives rose from 8% to between 50% and 92%; the stack holds them at 0%. Quoted from the research.",
         "cite": "chapter:02-specialists.html#why"
        },
        "code": [
-        "stack-3"
+        "revisions-1"
        ]
       }
      ]
@@ -696,11 +697,11 @@
      "chapters": [
       "03-router.html"
      ],
-     "primer": "Two mechanisms can overturn the stack, each only on evidence that is decisive for its own case. A dark frame around the content can hide it, so the frame seam runs the stack again on the interior. A small preview has no valid capture signature, so the preview tail asks the fusion head again with that shortcut neutralized.",
+     "primer": "Two more revisions can overturn the combiner, each only on evidence that is decisive for its own case. A dark frame around the content can hide it, so the frame seam runs the pipeline again on the interior. A small preview has no valid capture signature, so the preview tail reads the camera member's p_neutral, its score with that shortcut neutralized.",
      "entries": [
       {
-       "scope": "FrameSeam.apply(_:_:capture:hint:detector:)",
-       "anchor": "let decisive = pi >= 0.70 && (pi - state.p) >= 0.20",
+       "scope": "FrameSeam.apply(_:stack:signals:pipeline:)",
+       "anchor": "let decisive = pi >= 0.70 && (pi - v.p) >= 0.20",
        "note": "Takes the interior's verdict only when it reads at least 0.70 and at least 0.20 above the framed one.",
        "cite": "ledger#command-52",
        "deeper": {
@@ -708,13 +709,13 @@
         "cite": "ledger#command-52"
        },
        "code": [
-        "revisions-1"
+        "revisions-2"
        ]
       },
       {
-       "scope": "PreviewTail.apply(_:_:_:capture:semanticMajority:canDecide:)",
-       "anchor": "let fires = phv >= 0 && phv <= 0.45 && (pn ?? 1.0) <= 0.30",
-       "note": "Flips a small image to real only when the preview head and the neutralized fusion head both read it real.",
+       "scope": "PreviewTail.apply(_:stack:signals:pipeline:)",
+       "anchor": "let fires = triggered && (pn ?? 1.0) <= 0.30",
+       "note": "Flips a small image to real only when the preview member and the camera member's p_neutral both read it real.",
        "cite": "ledger#decision-107",
        "deeper": {
         "text": "Zoom escalation, the render taxonomy and the x-domain gate were removed on 2026-10-21; none of them ran by default.",
@@ -733,23 +734,24 @@
       "03-router.html",
       "04-bundle.html"
      ],
-     "primer": "The result is one JSON object: the verdict and its operating point, the base it started from, the stack's rows, the semantic map and a trace of which mechanisms ran. Schema v3, since 2026-10-21, holds only what the two-lane detector computes. Sorted keys make the same result the same bytes, so a golden file can hold it.",
+     "primer": "The result is one JSON object: the verdict and its operating point, every member's output in the stack, every revision's record, and the bundle's hashes. Schema v1, since 2026-10-21, a clean break from v3. Sorted keys make the same result the same bytes, so a golden file can hold it.",
      "entries": [
       {
-       "scope": "PublicSurface.routed(base:prediction:p:capture:specialists:semanticTiles:routeDiagnostics:bundle:)",
-       "anchor": "imageWidth: base.imageWidth, imageHeight: base.imageHeight, captureSignature: capture,",
-       "note": "Joins the base's operating point and image size with the router's verdict and its evidence.",
+       "scope": "RevisionRecord",
+       "anchor": "public let prediction: String",
+       "note": "What each revision left: the P(AI) and prediction after it, whether it changed them, and its own fields.",
+       "cite": "WHAT",
        "code": [
         "result-1"
        ]
       },
       {
-       "scope": "ResultJSON.object(_:times:device:route:)",
-       "anchor": "\"schema_version\": schemaVersion,",
-       "note": "Writes exactly schema v3's keys, each block only when the result holds it.",
-       "cite": "ledger#decision-103",
+       "scope": "ResultJSON.object(_:times:device:)",
+       "anchor": "\"revisions\": r.revisions.map(object),",
+       "note": "Writes exactly schema v1's keys: schema_version, device, image, verdict, stack, revisions, bundle and times_sec.",
+       "cite": "ledger#decision-127",
        "code": [
-        "result-1"
+        "result-2"
        ]
       }
      ]
@@ -776,7 +778,7 @@
       {
        "scope": "ResearchCommand.Census.run()",
        "anchor": "census.provenance = config.bundle.provenance",
-       "note": "Routes the battery's images and 200 of final_mixed's, records every call with its base and its stack, and names the bundle it ran.",
+       "note": "Runs the battery's images and 200 of final_mixed's, records every call with every member's score and every revision's record, and names the bundle it ran.",
        "cite": "WHAT:Sources/VeilGardeCLI/Commands/Research.swift"
       },
       {

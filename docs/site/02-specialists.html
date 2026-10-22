@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>What do the specialist heads add? · VeilGarde</title>
-<meta name="description" content="On the specialist stack: linear heads on DINOv2's embedding for the families the base misses, the asymmetric combiner that pools them with the base, and the two mechanisms that revise the verdict on decisive evidence.">
+<meta name="description" content="On the specialist members of the stack: linear heads on DINOv2's embedding for the sectors the camera head misses, the combiner revision that pools them around the camera head, and the two revisions that act on decisive evidence.">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/site.css">
 </head>
@@ -16,65 +16,67 @@
 <header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 2 of 10</span><a href="code.html#trail-stack-3">Walk the stack in the explorer</a></header>
 
 <h1 id="ch-specialists">What do the specialist heads add?</h1>
-<p class="lede"><em>On the families the base misses, the heads that read them, and the pooling that keeps a head from overturning a confident base.</em></p>
+<p class="lede"><em>On the sectors the camera head misses, the members that read them, and the pooling that keeps a member from overturning a confident anchor.</em></p>
 
-<p>The fusion base of chapter 1 is strong where it was trained. It is weaker on AI art against human art, on generative blur against a camera's, on photoreal people against real portraits. Each of those families gets a specialist: a head that knows one question well.</p>
-<p>A head never replaces the base. It adds evidence in one direction, and a combiner weighs that evidence against the base under caps it cannot exceed.</p>
+<p>The camera head of chapter 1 is strong where it was trained. It is weaker on AI art against human art, on generative blur against a camera's, on photoreal people against real portraits. Each of those sectors gets a specialist: a head that knows one question well.</p>
+<p>Each specialist is its own member of the stack, with its own score in every result. The combiner revision then weighs their evidence against the anchor under caps no member can exceed.</p>
 
 <h2 id="head">A head is a line in DINOv2's space</h2>
-<p>Every specialist is the same primitive: a standardized linear probe on a 384-value DINOv2 embedding. It subtracts each value's mean, divides by its spread, takes a weighted sum and a sigmoid. A new specialist is a new head file, not new code.</p>
+<p>Every specialist is the same primitive: a standardized linear probe on a 384-value DINOv2 embedding. It subtracts each value's mean, divides by its spread, takes a weighted sum and a sigmoid. A new specialist is a new head file and one line in the pipeline, not new arithmetic.</p>
 <div class="code" data-excerpt="Sources/VeilGardeCore/Heads/LinearHead.swift:LinearHead.pAI(_:)"></div>
-<p>The heads read a different embedding from the fusion head's. The image is force-resized to 360 by 640 before DINOv2 sees it, so a portrait and a landscape are read at the same shape. Every head was trained on that embedding, and the store keeps it as its own column.</p>
+<p>The heads read a different embedding from the camera head's. The image is force-resized to 360 by 640 before DINOv2 sees it, so a portrait and a landscape are read at the same shape. Every head was trained on that embedding, and the store keeps it as its own column.</p>
 
 <h2 id="heads">The heads the bundle ships</h2>
 <div class="scroll">
 <table class="data">
-<thead><tr><th>Head</th><th>Asks</th><th>Where the router uses it</th></tr></thead>
+<thead><tr><th>Head</th><th>Asks</th><th>Its member in the stack</th></tr></thead>
 <tbody>
-<tr><td class="mono">art v2</td><td>AI art against museum and human art</td><td>the combiner's art prior</td></tr>
-<tr><td class="mono">blur v1</td><td>generative blur against optical blur</td><td>the combiner's blur prior</td></tr>
-<tr><td class="mono">human v4</td><td>photoreal AI people against real portraits</td><td>the combiner's human prior</td></tr>
-<tr><td class="mono">preview v1</td><td>small previews of generated against real images</td><td>the preview tail</td></tr>
-<tr><td class="mono">screenshot v1.10</td><td>generated against real screenshots</td><td>the screenshot domain's base, and the flat-UI guard inside the camera base</td></tr>
-<tr><td class="mono">semtile v1</td><td>generated against real, per patch token</td><td>the semantic-tile map: 256 token votes and their majority</td></tr>
+<tr><td class="mono">art v2</td><td>AI art against museum and human art</td><td>art, pooled as evidence by the combiner</td></tr>
+<tr><td class="mono">blur v1</td><td>generative blur against optical blur</td><td>blur, pooled as evidence by the combiner</td></tr>
+<tr><td class="mono">human v4</td><td>photoreal AI people against real portraits</td><td>human, pooled as evidence by the combiner</td></tr>
+<tr><td class="mono">preview v1</td><td>small previews of generated against real images</td><td>preview, read by the preview tail</td></tr>
+<tr><td class="mono">screenshot v1.10</td><td>generated against real screenshots</td><td>screenshot, beside the gate's tells; the combiner's anchor when the gate fires</td></tr>
+<tr><td class="mono">semtile v1</td><td>generated against real, per patch token</td><td>semantic-tiles: 256 token votes and their majority</td></tr>
 </tbody>
 </table>
 </div>
-<p>The bundle's manifest lists the heads, and the registry loads exactly those. A head that is not in the bundle is inert, and a bundle with a head that fails its hash does not load.</p>
-<p>The cgi head left the bundle with the render arbiter, its only reader in the router, when the detector became two lanes. A recipe can still train it, and the store keeps its category.</p>
+<p>The bundle's manifest lists the heads, and the registry loads exactly those. A member whose head is not in the bundle leaves no entry, and a bundle with a head that fails its hash does not load.</p>
+<p>The cgi head left the bundle with the render arbiter, its only reader, when the detector became two lanes, and its code left with the restructure of 2026-10-21. The store keeps its category.</p>
 
-<h2 id="combiner">The combiner's arithmetic</h2>
-<p>For an image with no capture signature, the combiner pools the base and the three atlas priors, art, blur and human, into one probability. It is asymmetric: generated evidence adds, and real evidence subtracts only while the base is unsure.</p>
-<p>The base's logit is capped at <span data-fact="combiner.cap_base" data-round="1">4.0</span> and each head's at <span data-fact="combiner.cap_head" data-round="1">2.0</span>. Each head adds its weight times its logit, and only when that logit is positive: a head that reads real adds nothing.</p>
-<p>While the base sits under <span data-fact="combiner.gate_ceiling" data-round="2">0.75</span>, one real-side term subtracts. When every head reads real, the rescue pulls by <span data-fact="combiner.w_rescue" data-round="1">1.0</span> times the weakest of their real logits, so it is only as strong as the least sure head.</p>
-<div class="code" data-excerpt="Sources/VeilGardeCore/Heads/StackCombiner.swift:StackCombiner.pool(base:heads:pairAI:)"></div>
-<p>The weights make the base dominant. It enters at <span data-fact="combiner.w_base" data-round="4">1.6641</span> and the intercept is <span data-fact="combiner.w0" data-round="4">−1.0216</span>.</p>
-<p>All three priors carry generated weight: art <span data-fact="combiner.w_gen.0" data-round="4">0.1533</span>, blur <span data-fact="combiner.w_gen.1" data-round="4">0.2198</span>, human <span data-fact="combiner.w_gen.2" data-round="4">0.2999</span>. They also decide whether the rescue fires.</p>
-<p>The golden crop crop_ben shows the rescue at work. The base read it at 0.630, every head read it real and the base sat under the gate, so the rescue pulled the pooled probability to 0.106.</p>
+<h2 id="combiner">The combiner revision</h2>
+<p>The combiner is the first revision, and it sets the verdict. It anchors on the screenshot member when the flat-UI gate fired and on the camera member otherwise, and takes that member's operating point.</p>
+<p>A valid, present capture signature leaves the anchor standing and silences the generated-side members; under the screenshot anchor it also caps the probability at 0.10. Otherwise the combiner pools the anchor with the evidence members its file names, art, blur and human, into one probability.</p>
+<div class="code" data-excerpt="Sources/VeilGardeInference/Revisions/Combine.swift:Combine.apply(_:stack:signals:pipeline:)"></div>
+<p>The pool is asymmetric: generated evidence adds, and real evidence subtracts only while the anchor is unsure. The anchor's logit is capped at <span data-fact="combiner.anchor.cap" data-round="1">4.0</span> and each evidence member's at <span data-fact="combiner.evidence_cap" data-round="1">2.0</span>. Each member adds its weight times its logit, and only when that logit is positive: a member that reads real adds nothing.</p>
+<p>While the anchor sits under <span data-fact="combiner.anchor.gate_ceiling" data-round="2">0.75</span>, one real-side term subtracts. When every evidence member reads real, the rescue pulls by <span data-fact="combiner.rescue.w" data-round="1">1.0</span> times the weakest of their real logits, so it is only as strong as the least sure member.</p>
+<div class="code" data-excerpt="Sources/VeilGardeCore/Heads/StackCombiner.swift:StackCombiner.pool(anchor:evidence:)"></div>
+<p>The weights make the anchor dominant. It enters at <span data-fact="combiner.anchor.w" data-round="4">1.6641</span> and the intercept is <span data-fact="combiner.w0" data-round="4">−1.0216</span>. The file names each evidence member, so a new member is pooled by naming it.</p>
+<p>All three evidence members carry generated weight: art <span data-fact="combiner.evidence.0.w" data-round="4">0.1533</span>, blur <span data-fact="combiner.evidence.1.w" data-round="4">0.2198</span>, human <span data-fact="combiner.evidence.2.w" data-round="4">0.2999</span>. They also decide whether the rescue fires.</p>
+<p>The golden crop crop_ben shows the rescue at work. The camera member read it at 0.630, every evidence member read it real and the anchor sat under the gate, so the rescue pulled the pooled probability to 0.106.</p>
 
 <h2 id="refit">The combiner refit for two lanes</h2>
-<p>VeilGarde refit the combiner on its own store when the detector became two lanes, over the new base. It has five inputs: the base, the three generated-evidence weights and the rescue. A bounded fit keeps every weight at or above zero, so no evidence can be counted backwards.</p>
+<p>VeilGarde refit the combiner on its own store when the detector became two lanes, over the new camera head. It has five inputs: the anchor, the three generated-evidence weights and the rescue. A bounded fit keeps every weight at or above zero, so no evidence can be counted backwards.</p>
 <p>The rescue weight is chosen by a sweep against seven protect-real probes. No candidate kept the top probe under 0.42, so the rescue took the trainer's fallback.</p>
 <div class="scroll">
 <table class="data">
-<thead><tr><th>On 19,302 capture-absent test rows of the store</th><th class="n">The base</th><th class="n">The combined stack</th></tr></thead>
+<thead><tr><th>On 19,302 capture-absent test rows of the store</th><th class="n">The camera head</th><th class="n">The combined stack</th></tr></thead>
 <tbody>
 <tr><td>AUC</td><td class="n">0.9908</td><td class="n">0.9883</td></tr>
 <tr><td>real false-positive rate</td><td class="n">0.034</td><td class="n">0.015</td></tr>
 </tbody>
 </table>
 </div>
-<p>The base trained on these rows, so its column is in-sample, and the stack's trade is visible: fewer real images called generated, at a small cost in AUC.</p>
-<p>Two terms of the earlier combiner are gone. An art-pair head that pulled the art logit down broke 19 of the store's calls to fix 10, and it left on 2026-10-19. The noiseprint's camera term left with the noiseprint itself, at the two lanes.</p>
+<p>The camera head trained on these rows, so its column is in-sample, and the stack's trade is visible: fewer real images called generated, at a small cost in AUC.</p>
+<p>Two terms of the earlier combiner are gone. An art-pair head that pulled the art logit down broke 19 of the store's calls to fix 10, and it left on 2026-10-19. The noiseprint's camera term left with the noiseprint itself, at the two lanes, and the code for both left with the restructure.</p>
 
-<h2 id="why">Why a head cannot flip a confident base</h2>
+<h2 id="why">Why a member cannot flip a confident anchor</h2>
 <p>Stacking with caps is a measured choice. The research tried a monolithic combiner that blended every signal, and real false positives rose from 8% to between 50% and 92%.</p>
-<p>The stack holds them at 0%, and the caps are the reason. A head at its cap adds at most twice its weight, under 0.6 for every head. A confident base at its cap adds four times its own, over 6.6.</p>
-<p>When a user's own image slips past the base, the fix the research found is denser data for both, not a stronger override.</p>
+<p>The stack holds them at 0%, and the caps are the reason. An evidence member at its cap adds at most twice its weight, under 0.6 for every one. A confident anchor at its cap adds four times its own, over 6.6.</p>
+<p>When a user's own image slips past the camera head, the fix the research found is denser data for both, not a stronger override.</p>
 
 <h2 id="admission">Admission</h2>
-<p>A head that blocks real images is worse than no head. Before an atlas head is promoted, it is scored on the golden reals outside Bluesky, and it must block at most 10% of them at 0.8.</p>
-<p>Retrained from the seed store on 2026-10-19, every atlas head was admitted.</p>
+<p>A head that blocks real images is worse than no head. Before a category head is promoted, it is scored on the golden reals outside Bluesky, and it must block at most 10% of them at 0.8.</p>
+<p>Retrained from the seed store on 2026-10-19, every category head was admitted.</p>
 <div class="scroll">
 <table class="data">
 <thead><tr><th>Head</th><th class="n">Blocked at 0.8, retrained</th><th class="n">Blocked at 0.8, shipped</th></tr></thead>
@@ -86,10 +88,10 @@
 </table>
 </div>
 
-<h2 id="seam">A dark frame hiding the content</h2>
-<p>A fake film border can drag the pooled evidence toward real while the content inside is generated. When the verdict is real and the image wears a uniform dark frame, the frame seam runs the whole stack again on the interior.</p>
+<h2 id="seam">The second revision: a dark frame hiding the content</h2>
+<p>A fake film border can drag the pooled evidence toward real while the content inside is generated. When the verdict is real and the image wears a uniform dark frame, the frame seam runs the whole pipeline again on the interior.</p>
 <p>It takes the interior's evidence only when it is decisive: at least 0.70, and at least 0.20 above the framed verdict.</p>
-<div class="code" data-excerpt="Sources/VeilGardeInference/Route/Mechanisms/FrameSeam.swift:FrameSeam.apply(_:_:capture:hint:detector:)"></div>
+<div class="code" data-excerpt="Sources/VeilGardeInference/Revisions/FrameSeam.swift:FrameSeam.apply(_:stack:signals:pipeline:)"></div>
 <div class="scroll">
 <table class="data">
 <thead><tr><th>Census of 300 images</th><th class="n">Ran</th><th class="n">Decided</th></tr></thead>
@@ -100,16 +102,16 @@
 </table>
 </div>
 
-<h2 id="chain">The semantic-tile map</h2>
-<p>The semtile head reads each of DINOv2's 256 patch tokens and writes a 16 by 16 map of P(AI). The share of tokens above 0.5 is the semantic majority, and the map goes into the result.</p>
-<p>The map is a vote, not a verdict. A probe on it revises a shadow state, and only the production profile commits that revision.</p>
-<div class="code" data-excerpt="Sources/VeilGardeInference/Route/Mechanisms/SemanticChain.swift:SemanticChain.apply(_:_:capture:)"></div>
+<h2 id="chain">The semantic tiles member</h2>
+<p>The semtile head reads each of DINOv2's 256 patch tokens and writes a 16 by 16 map of P(AI). The share of tokens above 0.5 is the semantic majority, the member's score, and the map goes into the result.</p>
+<p>The map is a vote, not a verdict. No revision acts on it alone; the preview tail reads its majority, and only the production profile lets that revision commit.</p>
+<div class="code" data-excerpt="Sources/VeilGardeInference/Stack/Members/SemanticTiles.swift:SemanticTiles.score(_:)"></div>
 
-<h2 id="preview">The preview tail</h2>
-<p>An image under 512 pixels on its short side has no valid capture signature, and the base learned that small means generated. Quoted from the research's record, 85.5% of the invalid-capture rows it measured were generated.</p>
-<p>So a small image read as generated, with a clean semantic vote, flips to real only when two reads agree. The preview head must read it at 0.45 or under, and the fusion head, asked again with its capture flags neutralized, at 0.30 or under.</p>
-<div class="code" data-excerpt="Sources/VeilGardeInference/Route/Mechanisms/PreviewTail.swift:PreviewTail.apply(_:_:_:capture:semanticMajority:canDecide:)"></div>
-<p>Until the two lanes, the second read came from a frozen copy of the original fusion head. That copy read the warp score, so it left the bundle, and the tail now asks the live head. Its cuts were set against the old head and are kept as they were; every result reports whether the tail ran, fired and decided.</p>
+<h2 id="preview">The third revision: the preview tail</h2>
+<p>An image under 512 pixels on its short side has no valid capture signature, and the camera head learned that small means generated. Quoted from the research's record, 85.5% of the invalid-capture rows it measured were generated.</p>
+<p>So a small image read as generated, with a clean semantic vote, flips to real only when two reads agree. The preview member must read it at 0.45 or under, and the camera member's p_neutral, its score with the capture flags neutralized, at 0.30 or under.</p>
+<div class="code" data-excerpt="Sources/VeilGardeInference/Revisions/PreviewTail.swift:PreviewTail.apply(_:stack:signals:pipeline:)"></div>
+<p>Until the two lanes, the second read came from a frozen copy of the original fusion head. That copy read the warp score, so it left the bundle, and the tail now reads the live camera head. Its cuts were set against the old head and are kept as they were; every result's preview-tail record says whether it was triggered, fired and applied.</p>
 
 <h2 id="sources">Where the numbers come from</h2>
 <div class="scroll">
@@ -119,30 +121,30 @@
 <tr><td>The head's arithmetic</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Heads/LinearHead.swift">LinearHead.swift</a> PIN: the reference's pAI in Float, in index order</td><td>Every build</td></tr>
 <tr><td>The 360 by 640 force-resize</td><td class="mono"><a href="code.html#Sources/VeilGardeLens/Semantic/SemanticLens.swift">SemanticLens.swift</a>, normalizedEmbedding</td><td>Ported in phase 4, 2026-10-19</td></tr>
 <tr><td>Six heads; the cgi head out</td><td>The shipped manifest; <a href="index.html#decision-113">ledger decision-113</a></td><td>2026-10-21</td></tr>
-<tr><td>The caps, the gate, the weights</td><td class="mono">stack_combiner_v3.json, read by the build; the self-check compares the page</td><td>Refit on 2026-10-21, <a href="index.html#command-89">ledger command-89</a></td></tr>
+<tr><td>The caps, the gate, the weights</td><td class="mono">stack_combiner.json, read by the build; the self-check compares the page</td><td>Refit on 2026-10-21, <a href="index.html#command-89">ledger command-89</a></td></tr>
 <tr><td>crop_ben from 0.630 to 0.106</td><td class="mono">Tests/VeilGardeInferenceTests/Fixtures/crops/crop_ben.route.json, <a href="index.html#command-94">ledger command-94</a></td><td>2026-10-21</td></tr>
 <tr><td>The rescue's fallback; the top probe at 0.4645 for every candidate</td><td><a href="index.html#command-89">Ledger command-89</a></td><td>2026-10-21</td></tr>
-<tr><td>AUC 0.9908 and 0.9883; real false-positive rate 0.034 and 0.015</td><td><a href="index.html#command-89">Ledger command-89</a>; the base in-sample</td><td>2026-10-21</td></tr>
+<tr><td>AUC 0.9908 and 0.9883; real false-positive rate 0.034 and 0.015</td><td><a href="index.html#command-89">Ledger command-89</a>; the camera head in-sample</td><td>2026-10-21</td></tr>
 <tr><td>The art-pair broke 19 calls to fix 10</td><td><a href="index.html#command-56">Ledger command-56</a></td><td>2026-10-19</td></tr>
-<tr><td>The noiseprint's term removed</td><td><a href="index.html#decision-105">Ledger decision-105</a></td><td>2026-10-21</td></tr>
-<tr><td>8% to 50–92% under a monolithic combiner; 0% stacked</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Route/Detector.swift">Detector.swift</a> PIN, quoting the research</td><td>Not recorded</td></tr>
+<tr><td>The noiseprint's term removed; the art-pair and noiseprint code removed</td><td><a href="index.html#decision-105">Ledger decision-105</a>; <a href="index.html#decision-133">decision-133</a></td><td>2026-10-21</td></tr>
+<tr><td>The combiner as the first revision, its anchor rule</td><td><a href="index.html#decision-126">Ledger decision-126</a></td><td>2026-10-21</td></tr>
+<tr><td>8% to 50–92% under a monolithic combiner; 0% stacked</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Stack/Pipeline.swift">Pipeline.swift</a> PIN, quoting the research</td><td>Not recorded</td></tr>
 <tr><td>Denser data, not an override</td><td>The ATLAS laws, quoted</td><td>The research's parts 13 to 17b</td></tr>
 <tr><td>Admission at block@0.8 ≤ 0.10 outside Bluesky</td><td class="mono"><a href="code.html#Sources/VeilGardeFlywheel/Promote/FlywheelPolicy.swift">FlywheelPolicy.swift</a></td><td>Every build</td></tr>
 <tr><td>The admission table</td><td><a href="index.html#command-18">Ledger command-18</a></td><td>2026-10-19</td></tr>
-<tr><td>The frame seam's 0.70 and 0.20</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Route/Mechanisms/FrameSeam.swift">FrameSeam.swift</a> PIN</td><td>v3.3</td></tr>
+<tr><td>The frame seam's 0.70 and 0.20</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Revisions/FrameSeam.swift">FrameSeam.swift</a> PIN</td><td>v3.3</td></tr>
 <tr><td>The frame seam in the census</td><td><a href="index.html#command-52">Ledger command-52</a>; <a href="index.html#command-95">command-95</a></td><td>2026-10-19; 2026-10-21</td></tr>
 <tr><td>85.5% of invalid-capture rows generated</td><td>The research's record, quoted</td><td>2026-07-17</td></tr>
-<tr><td>The preview tail's 0.45 and 0.30, the live head asked</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Route/Mechanisms/PreviewTail.swift">PreviewTail.swift</a> PIN; <a href="index.html#decision-107">ledger decision-107</a></td><td>2026-10-21</td></tr>
+<tr><td>The preview tail's 0.45 and 0.30, the live head asked</td><td class="mono"><a href="code.html#Sources/VeilGardeInference/Revisions/PreviewTail.swift">PreviewTail.swift</a> PIN; <a href="index.html#decision-107">ledger decision-107</a></td><td>2026-10-21</td></tr>
 </tbody>
 </table>
 </div>
 
 <details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
 <ul class="plain">
-<li>HeadRegistry loads the heads and the combiner the manifest names; AtlasPriors evaluates art, blur and human; SemanticTiles builds the token map; ScreenshotSpecialist runs the screenshot head.</li>
-<li>CapturePriors in Route/Mechanisms decides whether the combiner runs at all: a valid, present capture suppresses every generated-side head.</li>
-<li>FrameSeam, SemanticChain and PreviewTail are the later steps; chapter 3 shows their order.</li>
-<li>HeadTrainer and CombinerTrainer in Training retrain both; chapter 5 shows how, and the ST and SI trails walk them.</li>
+<li>HeadRegistry loads the heads and the combiner the manifest names; Specialist scores art, blur, human and preview, Screenshot the screenshot head, SemanticTiles the token map, each a file in Stack/Members.</li>
+<li>Combine in Revisions chooses the anchor, applies the capture rule and runs StackCombiner.pool; FrameSeam and PreviewTail are the later revisions, and chapter 3 shows their order.</li>
+<li>HeadTrainer and CombinerTrainer in Training retrain both, SpecialistHead and Combiner are their lines in a recipe; chapter 5 shows how, and the ST trail walks them.</li>
 </ul>
 </div></details>
 </main>

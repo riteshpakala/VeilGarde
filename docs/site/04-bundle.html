@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>What does the detector ship? · VeilGarde</title>
-<meta name="description" content="The detector's shipped bundle: the fusion head, the combiner and six specialist heads under Sources/VeilGardeInference/Resources, manifest.json, the SHA-256 binding that refuses a moved file, and the frozen weights.">
+<meta name="description" content="The detector's shipped bundle: the camera head, the combiner and six linear heads under Sources/VeilGardeInference/Resources, manifest.json, the SHA-256 binding that refuses a moved file, and the frozen weights.">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/site.css">
 </head>
@@ -13,25 +13,25 @@
 <div class="shell">
 <nav class="side" aria-label="Chapters"></nav>
 <main class="page" id="main">
-<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 4 of 10</span><a href="code.html#trail-fusion-training-4">Walk a candidate bundle in the explorer</a></header>
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 4 of 10</span><a href="code.html#trail-camera-training-4">Walk a candidate bundle in the explorer</a></header>
 
 <h1 id="ch-bundle">What does the detector ship?</h1>
 <p class="lede"><em>On the files the detector reads, how each is held to its hash, and which of them may never move.</em></p>
 
 <p>The detector ships as a bundle: a folder of model files and one manifest that names them. It lives in Sources/VeilGardeInference/Resources and travels inside the package, so every build of VeilGarde carries the exact models it runs.</p>
-<p>The bundle holds <span data-fact="manifest.artifacts.length">8</span> artifacts beside its manifest. Two are the base lane's: the fusion head and the stack combiner. Six are specialist heads: screenshot, art, blur, human, semtile and preview.</p>
+<p>The bundle holds <span data-fact="manifest.artifacts.length">8</span> artifacts beside its manifest. Two were trained here: the camera head and the stack combiner. Six are linear heads: screenshot, art, blur, human, semtile and preview.</p>
 <p>The neural weights are not in it. The manifest records the <span data-fact="manifest.weights.length">3</span> DINOv2 files it expects beside the bundle, and their hashes. The detector finds them in the work area or in a folder it is told about.</p>
 
 <h2 id="binding">Every file held to its hash</h2>
 <p>Each artifact in the manifest carries its role, its file name, its SHA-256, its size and where its bytes came from. Loading a bundle re-hashes every file the manifest names and refuses a mismatch, as an error and never as a warning. A file the manifest does not name is ignored.</p>
 <div class="code" data-excerpt="Sources/VeilGardeCore/Bundle/ModelBundle.swift:ModelBundle.verify()"></div>
 <p>The shipped bundle is verified once per process, the first time anything reads it. Everything that reads a shipped model asks the bundle for it by role, so a file's name is free and its bytes are not.</p>
-<p>The six heads are the reference's bytes, ported on 2026-10-19 and unchanged since. The fusion head and the combiner were trained here, on the features-only store, and the manifest records the candidate each came from.</p>
+<p>The six heads are the reference's bytes, ported on 2026-10-19 and unchanged since. The camera head and the combiner were trained here, on the features-only store, and the manifest records the candidate each came from.</p>
 
 <h2 id="frozen">What may never move</h2>
 <p>A role is frozen when the flywheel may never promote over it. Since the warp left detection, the frozen roles are the weights alone: DINOv2's three variants and CLIP's vision tower.</p>
 <div class="code" data-excerpt="Sources/VeilGardeCore/Bundle/Artifact.swift:ArtifactRole.isFrozen"></div>
-<p>The reason is what was fitted against those bytes. Every head and the fusion head read a DINOv2 embedding, and a moved backbone would move every one of them at once. The fusion head, the combiner and the heads are the models the flywheel exists to improve, so none of them is frozen.</p>
+<p>The reason is what was fitted against those bytes. Every head and the camera head read a DINOv2 embedding, and a moved backbone would move every one of them at once. The camera head, the combiner and the heads are the models the flywheel exists to improve, so none of them is frozen.</p>
 
 <h2 id="manifest">The manifest, as the build read it</h2>
 <p>This table is read from manifest.json when the page is built, and the build re-hashes every artifact against it. The manifest's format is <span data-fact="manifest.format">veilgarde-bundle-v1</span>.</p>
@@ -39,33 +39,34 @@
 <h3 id="weights-h">The weights it expects beside it</h3>
 <div id="weights"></div>
 <h3 id="history-h">Its history</h3>
-<p>Every seed, promote and rollback adds a line here. The second seed records the day the warp left the bundle, and the two promotes after it record the fusion head and the combiner trained here.</p>
+<p>Every seed, promote and rollback adds a line here. The history started again with v1 on 2026-10-21: one seed, the stack as a list of members. The earlier history, from the port to the two lanes, stays in the git history and in chapter 10.</p>
 <div id="history"></div>
 
 <h2 id="trained-here">The two files trained here</h2>
-<p>The fusion head and the combiner were refit the day the warp left detection. The head before them also read the warp score and sharpness. A warm start cannot continue a head on columns it never saw, so the new one was grown from scratch.</p>
+<p>The camera head and the combiner were refit the day the warp left detection. The head before them also read the warp score and sharpness. A warm start cannot continue a head on columns it never saw, so the new one was grown from scratch.</p>
 <div class="scroll">
 <table class="data">
 <thead><tr><th>File</th><th>What it is</th><th>How it was trained, 2026-10-21</th></tr></thead>
 <tbody>
-<tr><td class="mono">fusion_head.xgb.json</td><td><span data-fact="boosters.fusionHead.trees">500</span> trees of depth <span data-fact="boosters.fusionHead.depth">5</span> over <span data-fact="boosters.fusionHead.features">393</span> columns: DINOv2's 384 and the nine capture values</td><td>From scratch at a learning rate of 0.04 on 113,195 store rows, with an evaluation twin held out on 11,212 rows</td></tr>
-<tr><td class="mono">stack_combiner_v3.json</td><td>Five inputs: the base, three generated-side heads and the rescue; the base enters at <span data-fact="combiner.w_base" data-round="4">1.6641</span></td><td>Refit on the new head's capture-absent store rows, reals counted three times, the rescue at the sweep's fallback of <span data-fact="combiner.w_rescue" data-round="1">1.0</span></td></tr>
+<tr><td class="mono">camera.xgb.json</td><td><span data-fact="boosters.camera.trees">500</span> trees of depth <span data-fact="boosters.camera.depth">5</span> over <span data-fact="boosters.camera.features">393</span> columns: DINOv2's 384 and the nine capture values</td><td>From scratch at a learning rate of 0.04 on 113,195 store rows, with an evaluation twin held out on 11,212 rows</td></tr>
+<tr><td class="mono">stack_combiner.json</td><td>Version 1, keyed by member: the anchor, the art, blur and human members as evidence, and the rescue; the anchor enters at <span data-fact="combiner.anchor.w" data-round="4">1.6641</span></td><td>Refit on the new head's capture-absent store rows, reals counted three times, the rescue at the sweep's fallback of <span data-fact="combiner.rescue.w" data-round="1">1.0</span></td></tr>
 </tbody>
 </table>
 </div>
 <p>Seven artifacts left the bundle the same day. They were the warp tile model and its sensor copy, the sensor calibration, the fusion reference, the cross-domain centroids, the cgi head and the noiseprint. Nothing in detection reads them any more. They stay on the 2026-rnd branch with the code that read them.</p>
-<p>The result the detector writes from these files, schema v3, is chapter 3's subject.</p>
+<p>The same day the stack became a list of members, and two files were renamed to say so. The fusion head became the camera head, camera.xgb.json, with the same bytes and hash. The combiner was rewritten in version 1 keyed by member, the same numbers digit for digit and new bytes. The result the detector writes from these files, schema v1, is chapter 3's subject.</p>
 
 <h2 id="sources">Where the numbers come from</h2>
 <div class="scroll">
 <table class="data">
 <thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
 <tbody>
-<tr><td>The artifacts, their sizes and hashes, the weights, the history; the fusion head's trees, depth and columns; the combiner's weights</td><td class="mono">Sources/VeilGardeInference/Resources/manifest.json and the files it names, read and re-hashed by docs/site/src/build.py</td><td>Each build of this page</td></tr>
+<tr><td>The artifacts, their sizes and hashes, the weights, the history; the camera head's trees, depth and columns; the combiner's weights</td><td class="mono">Sources/VeilGardeInference/Resources/manifest.json and the files it names, read and re-hashed by docs/site/src/build.py</td><td>Each build of this page</td></tr>
 <tr><td>Refused on a moved hash; verified once per process</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Bundle/ModelBundle.swift">ModelBundle.swift</a> and <a href="code.html#Sources/VeilGardeInference/Bundle/ShippedBundle.swift">ShippedBundle.swift</a> PINs; test “a file that moved under its manifest is refused”</td><td>Ledger test-3, 2026-10-19; every test run since</td></tr>
 <tr><td>The frozen roles are the weights</td><td class="mono"><a href="code.html#Sources/VeilGardeCore/Bundle/Artifact.swift">Artifact.swift</a>, ArtifactRole.isFrozen, read by the build; test “frozen roles are the weights”</td><td>Each build; the test since 2026-10-21</td></tr>
 <tr><td>8 artifacts and 3 weights; the seven artifacts that left</td><td><a href="index.html#command-90">Ledger command-90</a>, <a href="index.html#decision-104">decision-104</a>, <a href="index.html#decision-105">decision-105</a> and <a href="index.html#decision-113">decision-113</a></td><td>2026-10-21</td></tr>
 <tr><td>113,195 rows; 11,212 held out; the learning rate; the combiner's fallback rescue</td><td><a href="index.html#command-89">Ledger command-89</a> and <a href="index.html#decision-110">decision-110</a></td><td>2026-10-21</td></tr>
+<tr><td>The camera role and file; the combiner in version 1</td><td><a href="index.html#decision-129">Ledger decision-129</a> and <a href="index.html#decision-128">decision-128</a></td><td>2026-10-21</td></tr>
 <tr><td>The six heads ported unchanged</td><td>The manifest's source field; <a href="index.html#decision-13">ledger decision-13</a> for the one human head</td><td>2026-10-19</td></tr>
 </tbody>
 </table>

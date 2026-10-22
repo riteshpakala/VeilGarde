@@ -7,9 +7,9 @@
    ],
    "rows": [
     {
-     "label": "Fusion head",
+     "label": "Camera head",
      "trails": [
-      "fusion-training"
+      "camera-training"
      ]
     },
     {
@@ -36,18 +36,6 @@
      "label": "Shared Signals",
      "trails": [
       "shared-signals"
-     ]
-    },
-    {
-     "label": "Domain",
-     "trails": [
-      "domain"
-     ]
-    },
-    {
-     "label": "Base",
-     "trails": [
-      "base"
      ]
     },
     {
@@ -89,12 +77,12 @@
  ],
  "trails": [
   {
-   "id": "fusion-training",
-   "mark": "FT",
+   "id": "camera-training",
+   "mark": "CT",
    "kind": "training",
-   "title": "Fusion training",
-   "subtitle": "the store to the fusion head",
-   "say": "From the features-only store to a fusion head: the recipe names the head, every row becomes the 393 values it reads, the booster grows its trees, the candidate holds it, and promote moves it into live only behind the battery.",
+   "title": "Camera training",
+   "subtitle": "the store to the camera head",
+   "say": "From the features-only store to the camera head: the recipe names it, every row becomes the 393 values it reads, the booster grows its trees, the candidate holds it, and promote moves it into live only behind the battery.",
    "steps": [
     {
      "n": 1,
@@ -104,26 +92,29 @@
      ],
      "entries": [
       {
-       "scope": "TrainCommand.Fusion.run()",
-       "anchor": "case \"scratch\": f = f.scratch(trees: trees ?? 500, eta: eta ?? 0.04)",
-       "note": "veilgarde train fusion declares the fusion head: a warm start of 80 trees by default, the flywheel's way to move the base, or a scratch fit of 500 trees, the way the shipped head was trained on 2026-10-21.",
+       "scope": "TrainCommand.Camera.run()",
+       "anchor": "case \"scratch\": c = c.scratch(trees: trees ?? 500, eta: eta ?? 0.04)",
+       "note": "veilgarde train camera declares the camera head: a warm start of 80 trees by default, the flywheel's way to move it, or a scratch fit of 500 trees, the way the shipped head was trained on 2026-10-21.",
        "cite": "PIN"
       },
       {
        "scope": "TrainingOptions.run(_:)",
        "anchor": "let outcome = try engine.train(recipe)",
        "note": "Plans the recipe and prints the plan, then trains it into a candidate unless --plan asked only for the plan.",
+       "cite": null,
        "link": "none"
       },
       {
        "scope": "TrainingEngine.train(_:)",
-       "anchor": "metrics[model.name] = try trainFusion(f, into: &candidate)",
-       "note": "Copies the parent bundle into a candidate, then trains the fusion head, the heads and the combiner in that order and verifies the candidate."
+       "anchor": "for member in recipe.ordered { metrics[member.name] = try member.train(in: run) }",
+       "note": "Copies the parent bundle into a candidate, then asks each member of the recipe to train, in dependency order, and verifies the candidate. The engine knows no member by name.",
+       "cite": "ledger#decision-132"
       },
       {
-       "scope": "TrainingEngine.trainFusion(_:into:)",
-       "anchor": "let dataset = try FusionDataset.assemble(FeatureStore(directory: store), settings: f.settings)",
-       "note": "Assembles the store's rows, trains, and writes the head into the candidate with its parent's hash when it was warm-started."
+       "scope": "CameraHead.train(in:)",
+       "anchor": "let dataset = try CameraDataset.assemble(run.store, settings: settings)",
+       "note": "The camera head trains itself: it assembles the store's rows, fits, and writes the head into the candidate with its parent's hash when it was warm-started.",
+       "cite": null
       }
      ]
     },
@@ -136,16 +127,16 @@
      ],
      "entries": [
       {
-       "scope": "FusionDataset.assemble(_:settings:)",
-       "anchor": "for column in layout.columns { x.append(contentsOf: selection.vector(column, row: i)) }",
-       "note": "Stacks each row's columns in the recipe's layout, the plain DINOv2 embedding and the nine capture values or both DINOv2 readings and capture, in id order, with the trainer's row weights, and marks the held-out new-generator rows and the evaluation twin's rows. A refit without the warp score lost 0.0012 AUC on held-out store rows on 2026-10-19.",
+       "scope": "CameraDataset.assemble(_:settings:)",
+       "anchor": "for column in CameraRow.columns { x.append(contentsOf: selection.vector(column, row: i)) }",
+       "note": "Stacks each row's plain DINOv2 embedding and nine capture values in id order, with the trainer's row weights, and marks the held-out new-generator rows and the evaluation rows.",
        "cite": "ledger#command-53"
       },
       {
-       "scope": "FusionLayout",
-       "anchor": "case bothReadings = \"dino_fusion,dino_norm,cap\"",
-       "note": "The fusion row's two layouts: the plain DINOv2 embedding and capture, 393 columns, or both DINOv2 readings and capture, 777. A head's width names its layout, so a bundle of either kind runs.",
-       "cite": "ledger#decision-112",
+       "scope": "CameraRow",
+       "anchor": "public static let columns: [FeatureColumn] = [.dinoFusion, .cap]",
+       "note": "The camera row, 393 columns in the store's order: the trainer and the camera member both build it from this one declaration.",
+       "cite": "WHAT",
        "link": "none"
       }
      ]
@@ -158,7 +149,7 @@
      ],
      "entries": [
       {
-       "scope": "FusionTrainer.train(_:settings:parent:note:)",
+       "scope": "CameraTrainer.train(_:settings:parent:note:)",
        "anchor": "let twin = BoostTrainer.train(twinTraining, params: params, warmStart: warm, featureNames: []).model",
        "note": "Fits an evaluation twin without a tenth of the rows and scores it on them, then fits the head on every training row. On 2026-10-21 the twin's AUC was 0.9817 on 11,212 held-out rows.",
        "cite": "ledger#command-89"
@@ -218,15 +209,15 @@
       },
       {
        "scope": "Promoter.check(_:data:live:current:store:)",
-       "anchor": "guard let current else { throw VeilGardeFailure.data(\"the live bundle has no fusion head to continue\") }",
-       "note": "Refuses a base that does not keep live's trees byte for byte, a combiner with a negative weight or a noiseprint term, and an atlas head that fails admission.",
-       "cite": "test:frozen and retired slots, a cold base and a blocking head are refused before live moves"
+       "anchor": "guard let current else { throw VeilGardeFailure.data(\"the live bundle has no camera head to continue\") }",
+       "note": "Refuses a camera head that does not keep live's trees byte for byte, a combiner with a negative weight or a member live does not hold, and a category head that fails admission.",
+       "cite": "test:frozen and retired slots, a cold camera head, a blocking head and a combiner over a missing member are refused before live moves"
       },
       {
        "scope": "BatteryRunner.run(spec:specURL:gate:baselineURL:verdicts:vars:rebaseline:note:)",
        "anchor": "if r.prediction == g.want { ok += 1 }",
-       "note": "Runs the full detector on every image of every group the gate names; a hard group passes only at 100%, a ratchet only at its floor. Since 2026-10-21 two hard groups fail, so no base reaches live until one calls their four images right.",
-       "cite": "ledger#decision-111",
+       "note": "Runs the full detector on every image of every group the gate names; a hard group passes only at 100%, a ratchet only at its floor. The floors are battery_baseline.json's, recorded on 2026-10-21.",
+       "cite": "ledger#decision-131",
        "link": "none"
       }
      ]
@@ -239,7 +230,7 @@
    "kind": "training",
    "title": "Specialist training",
    "subtitle": "the store to the heads and the combiner",
-   "say": "From the store's DINOv2 rows to the specialist heads and the combiner that pools them: each head is a logistic regression split by source and admitted only if calm real photos stay real, and the combiner is a bounded fit whose rescue is swept against the protect-real probes.",
+   "say": "From the store's DINOv2 rows to the linear heads and the combiner that pools them: each head is a logistic regression split by source and admitted only if calm real photos stay real, and the combiner is a bounded fit around the camera head whose rescue is swept against the protect-real probes.",
    "steps": [
     {
      "n": 1,
@@ -250,9 +241,10 @@
      ],
      "entries": [
       {
-       "scope": "TrainingEngine.trainHead(_:into:)",
-       "anchor": "try HeadTrainer.train(h.kind, positives: h.positives",
-       "note": "Trains one head of the recipe on the store's dino_norm column and writes its head.json, recipe and metrics into the candidate.",
+       "scope": "SpecialistHead.train(in:)",
+       "anchor": "let (file, report) = try HeadTrainer.train(kind, positives: positives, negatives: negatives, settings: settings,",
+       "note": "A linear head trains itself on the store's dino_norm column and writes its head.json, recipe and metrics into the candidate.",
+       "cite": null,
        "link": "none"
       },
       {
@@ -316,26 +308,22 @@
      ],
      "entries": [
       {
-       "scope": "TrainingEngine.trainCombiner(_:into:)",
-       "anchor": "samples = try CombinerSample.captureAbsent(selection, base: base, heads: heads, pair: pair)",
-       "note": "Scores the store's capture-absent rows with the candidate's fusion head and heads, fits the combiner, and writes it in the shipped schema.",
+       "scope": "Combiner.train(in:)",
+       "anchor": "let samples = try CombinerSample.captureAbsent(selection, camera: camera, heads: heads)",
+       "note": "Scores the store's capture-absent rows with the candidate's camera head and its art, blur and human heads, fits the combiner, and writes it keyed by member.",
+       "cite": "ledger#decision-128",
        "link": "none"
       },
       {
-       "scope": "CombinerSample.captureAbsent(_:base:heads:pair:)",
-       "anchor": "let columns = try FusionLayout.of(width: base.featureCount).columns",
-       "note": "One row per capture-absent image: the base on its fusion row in the head's own layout, the three heads on its dino_norm. In-sample, the base is near-perfect for a high-capacity head; the out-of-fold form below fixes that."
+       "scope": "CombinerSample.captureAbsent(_:camera:heads:)",
+       "anchor": "slots[i] = CombinerSample(id: selection.rows[i].id, label: selection.rows[i].label, camera: Double(camera.predict(row)),",
+       "note": "One row per capture-absent image: the camera head on its camera row, the three heads on its dino_norm. The camera head reads rows it trained on, so its own test numbers are in-sample.",
+       "cite": null
       },
       {
-       "scope": "CombinerSample.captureAbsent(_:outOfFold:heads:pair:)",
-       "anchor": "captureAbsent(selection, heads: heads, pair: pair) { outOfFold[selection.rows[$0].id] }",
-       "note": "The same rows, each base read from out-of-fold predictions: a head refit without the row's fold, five folds, cached in the candidate.",
-       "link": "none"
-      },
-      {
-       "scope": "CombinerTrainer.train(_:settings:note:)",
+       "scope": "CombinerTrainer.train(_:evidence:settings:note:)",
        "anchor": "let (rescue, sweep) = chooseRescue(w0: fit.w0, w: w, settings: settings)",
-       "note": "Fits the five weights with reals counted three times, then chooses the rescue weight by the sweep. On 2026-10-21 no candidate kept the top probe under 0.42, so the rescue took the fallback, 1.0.",
+       "note": "Fits the anchor's weight and the three evidence weights with reals counted three times, then chooses the rescue weight by the sweep. On 2026-10-21 no candidate kept the top probe under 0.42, so the rescue took the fallback, 1.0.",
        "cite": "ledger#command-89"
       },
       {
@@ -377,15 +365,15 @@
       },
       {
        "scope": "Promoter.check(_:data:live:current:store:)",
-       "anchor": "guard let current else { throw VeilGardeFailure.data(\"the live bundle has no fusion head to continue\") }",
-       "note": "Refuses a base that does not keep live's trees byte for byte, a combiner with a negative weight or a noiseprint term, and an atlas head that fails admission.",
-       "cite": "test:frozen and retired slots, a cold base and a blocking head are refused before live moves"
+       "anchor": "for member in c.evidenceMembers {",
+       "note": "Refuses a combiner of another version, one with a negative weight, and one that pools a member live has no head for; a category head must pass admission first.",
+       "cite": "test:frozen and retired slots, a cold camera head, a blocking head and a combiner over a missing member are refused before live moves"
       },
       {
        "scope": "BatteryRunner.run(spec:specURL:gate:baselineURL:verdicts:vars:rebaseline:note:)",
        "anchor": "if r.prediction == g.want { ok += 1 }",
-       "note": "A head or the combiner faces the full gate: every group. Since 2026-10-21 the gate fails on two hard groups, which no rebaseline can lower.",
-       "cite": "ledger#command-93",
+       "note": "A head or the combiner faces the full gate: every group, at the floors recorded on 2026-10-21.",
+       "cite": "ledger#decision-131",
        "link": "none"
       }
      ]
@@ -451,8 +439,8 @@
    "mark": "SG",
    "kind": "inference",
    "title": "Shared Signals",
-   "subtitle": "everything later stages read, computed once",
-   "say": "The second stage: one object holds what every later stage reads, each computed once on first use: the screenshot gate, the capture signature and the two DINOv2 readings. The Domain stage reads the gate first.",
+   "subtitle": "everything the stack reads, computed once",
+   "say": "The second stage: one object holds what every member of the stack reads, each computed once on first use: the screenshot gate, the capture reading, the two DINOv2 readings and the patch tokens. The Stack stage reads them next.",
    "steps": [
     {
      "n": 1,
@@ -464,7 +452,7 @@
       {
        "scope": "DetectionSignals.init(cgImage:config:)",
        "anchor": "self.gate = ScreenshotLens.gate(cgImage)",
-       "note": "Holds the image and the config; the gate is computed now, every other signal lazily and once.",
+       "note": "Holds the image and the config; the gate is computed now, every other signal lazily and once, so no member measures a signal twice.",
        "cite": "WHAT",
        "link": "none"
       }
@@ -480,28 +468,29 @@
       {
        "scope": "ScreenshotLens.gate(_:)",
        "anchor": "guard W >= 32, H >= 32 else { return .none }",
-       "note": "A cheap measure of flat UI: few colours, hard edges and text-like rows, read on a capped copy of the image.",
+       "note": "A cheap measure of flat UI: few colours, hard edges and text-like rows, read on a capped copy of the image. The screenshot member reports it.",
        "cite": "PIN"
       }
      ]
     },
     {
      "n": 3,
-     "title": "The capture signature",
+     "title": "The capture reading",
      "chapters": [
       "01-fusion.html"
      ],
      "entries": [
       {
        "scope": "DetectionSignals.capture()",
-       "anchor": "let c = CaptureLens.signature(cgImage)",
-       "note": "The native-resolution capture signature, cached for the base and the stack.",
+       "anchor": "cached(\\.cachedCapture) { CaptureLens.reading(cgImage) }",
+       "note": "The native-resolution capture measurement, cached for the camera member and the capture member.",
+       "cite": null,
        "link": "none"
       },
       {
-       "scope": "CaptureLens.signature(_:)",
-       "anchor": "return features.signature",
-       "note": "The Nyquist peak of the native pixels: present at 30 or more on a short side of at least 512, invalid below that size.",
+       "scope": "CaptureLens.reading(_:)",
+       "anchor": "return CaptureReading(features: features, signature: features.signature)",
+       "note": "One measurement in two forms: the nine values the camera head reads, and the signature, present at a peak of 30 or more on a short side of at least 512.",
        "cite": "PIN:Sources/VeilGardeLens/Capture/CaptureLens.swift"
       }
      ]
@@ -516,8 +505,9 @@
      "entries": [
       {
        "scope": "DetectionSignals.dinoFusion()",
-       "anchor": "let e = try SemanticLens.fusionEmbedding(cgImage, variant: config.dinoVariant)",
-       "note": "The plain reading, short edge 256 and a centre crop of 224, which the fusion head reads.",
+       "anchor": "try SemanticLens.fusionEmbedding(cgImage, variant: config.dinoVariant)",
+       "note": "The plain reading, short edge 256 and a centre crop of 224, which the camera head reads.",
+       "cite": null,
        "link": "none"
       },
       {
@@ -528,164 +518,38 @@
       },
       {
        "scope": "DetectionSignals.dinoNorm()",
-       "anchor": "let e = try SemanticLens.normalizedEmbedding(cgImage, variant: config.dinoVariant)",
-       "note": "The force-resized reading, 360 by 640, which the specialist heads read and the wider fusion rows add.",
+       "anchor": "try SemanticLens.normalizedEmbedding(cgImage, variant: config.dinoVariant)",
+       "note": "The force-resized reading, 360 by 640, which every linear head reads.",
+       "cite": null,
        "link": "none"
       },
       {
        "scope": "SemanticLens.normalizedEmbedding(_:variant:normW:normH:)",
        "anchor": "Dinov2Preprocess.inputNormalized(cg, normW: normW, normH: normH)",
-       "note": "The same backbone after a forced resize, so a phone screenshot's size cannot leak into the heads' embedding."
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "id": "domain",
-   "mark": "DO",
-   "kind": "inference",
-   "title": "Domain",
-   "subtitle": "which base expert reads the image",
-   "say": "The third stage: the detector builds the signals, the domain detector picks camera or screenshot from a hint or the gate, never from size, and the domain's head becomes the Base stage.",
-   "steps": [
-    {
-     "n": 1,
-     "title": "The detector's one entry point",
-     "chapters": [
-      "03-router.html"
-     ],
-     "entries": [
-      {
-       "scope": "Detector.detect(cgImage:config:hint:)",
-       "anchor": "let domain = picker.detect(s, hint: hint)",
-       "note": "Builds the shared signals, picks the domain, then runs the base, the stack and the revisions in a fixed order.",
-       "cite": "PIN",
-       "link": "none"
+       "note": "The same backbone after a forced resize, so a phone screenshot's size cannot leak into the heads' embedding.",
+       "cite": null
       }
      ]
     },
     {
-     "n": 2,
-     "title": "A hint, else the gate",
-     "chapters": [
-      "03-router.html"
-     ],
-     "entries": [
-      {
-       "scope": "DefaultDomainDetector.detect(_:hint:)",
-       "anchor": "return s.gate.isScreenshot ? .screenshot : .camera",
-       "note": "A caller's hint wins; otherwise the screenshot gate sends flat UI to the screenshot domain and everything else to the camera domain.",
-       "cite": "PIN:Sources/VeilGardeInference/Route/Domain.swift",
-       "link": "none"
-      }
-     ]
-    },
-    {
-     "n": 3,
-     "title": "Each domain's base expert",
-     "chapters": [
-      "03-router.html",
-      "01-fusion.html"
-     ],
-     "entries": [
-      {
-       "scope": "Detector.init()",
-       "anchor": "register(CameraFusionHead())",
-       "note": "The camera domain's expert is the fusion head, the screenshot domain's the content head; a domain without its own falls back to camera.",
-       "link": "none"
-      },
-      {
-       "scope": "ScreenshotContentHead.verdict(_:)",
-       "anchor": "let emb = try s.dinoNorm()",
-       "note": "The screenshot head on the force-resized embedding, the screenshot domain's base.",
-       "link": "none"
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "id": "base",
-   "mark": "BA",
-   "kind": "inference",
-   "title": "Base",
-   "subtitle": "the fusion head's P(AI)",
-   "say": "The fourth stage: the fusion head reads a row built in the layout its width names, gives P(AI) at 0.5 with a band of 0.04, and that number starts the route the Stack stage pools onto.",
-   "steps": [
-    {
-     "n": 1,
-     "title": "The camera expert",
-     "chapters": [
-      "01-fusion.html"
-     ],
-     "entries": [
-      {
-       "scope": "CameraFusionHead.verdict(_:)",
-       "anchor": "try Fusion.verdict(s)",
-       "note": "The camera domain's base expert, and the fallback for any domain without its own.",
-       "link": "none"
-      },
-      {
-       "scope": "Fusion.verdict(_:)",
-       "anchor": "let p = head.predict(try vector(s, layout: FusionLayout.of(width: head.numFeatures)))",
-       "note": "Builds the row in the head's layout and calls its probability at 0.5 with the band.",
-       "cite": "PIN:Sources/VeilGardeInference/Fusion/FusionInference.swift"
-      },
-      {
-       "scope": "Fusion.screenshotGuard(_:)",
-       "anchor": "guard s.gate.isScreenshot, let sv = ScreenshotSpecialist.verdict(s.cgImage, config: s.config) else { return nil }",
-       "note": "A flat UI that reached the camera domain is read by the screenshot head instead."
-      }
-     ]
-    },
-    {
-     "n": 2,
-     "title": "A head's width names its row",
-     "chapters": [
-      "01-fusion.html"
-     ],
-     "entries": [
-      {
-       "scope": "FusionLayout.of(width:)",
-       "anchor": "guard let layout = FusionLayout(width: width) else {",
-       "note": "A head's width names its row; v1's head is 393 columns wide. Wider rows exist in the code for candidates and are not shipped.",
-       "cite": "WHAT:Sources/VeilGardeCore/Features/FusionVector.swift"
-      },
-      {
-       "scope": "Fusion.vector(_:layout:capture:)",
-       "anchor": "case .dinoCapture: return try s.dinoFusion() + cap",
-       "note": "v1's head reads the plain DINOv2 reading and the nine capture values, 393 columns, in the order the store keeps them."
-      }
-     ]
-    },
-    {
-     "n": 3,
-     "title": "The booster",
-     "chapters": [
-      "01-fusion.html"
-     ],
-     "entries": [
-      {
-       "scope": "TreeModelCache.model(_:)",
-       "anchor": "let m = try XGBoostTreeModel(url: url)",
-       "note": "Loads the head's XGBoost JSON once into Frigate's evaluator.",
-       "cite": "WHAT:Sources/VeilGardeLens/Scoring/TreeModelCache.swift"
-      }
-     ]
-    },
-    {
-     "n": 4,
-     "title": "The base starts the route",
+     "n": 5,
+     "title": "The patch tokens",
      "chapters": [
       "02-specialists.html"
      ],
      "entries": [
       {
-       "scope": "RouteState.init(base:)",
-       "anchor": "stack = [SpecialistContribution(name: base.scorer, pAI: base.p, verdict: base.prediction, weight: 1.0)]",
-       "note": "The route's state begins at the base's p and label, the first row of the stack; the Stack stage pools onto it.",
+       "scope": "DetectionSignals.patchTokens()",
+       "anchor": "try SemanticLens.patchTokens(cgImage, variant: config.dinoVariant)",
+       "note": "DINOv2's 256 patch tokens of the plain input, read once for the semantic tiles member.",
+       "cite": null,
        "link": "none"
+      },
+      {
+       "scope": "SemanticLens.patchTokens(_:variant:)",
+       "anchor": "let toks = try shared.vit(variant).patchTokens(Dinov2Preprocess.input(cg))",
+       "note": "The same forward pass as the plain reading, kept at the token level: a 16 by 16 grid of 384 values each.",
+       "cite": null
       }
      ]
     }
@@ -696,73 +560,119 @@
    "mark": "SK",
    "kind": "inference",
    "title": "Stack",
-   "subtitle": "capture first, then the specialist heads pooled",
-   "say": "The fifth stage: a present capture signature silences the generated-side heads; otherwise the art, blur and human heads read the force-resized embedding and a non-negative combiner pools their evidence onto the base, which the Revisions stage then reads.",
+   "subtitle": "every member speaks, each with its own score",
+   "say": "The third stage: the pipeline declares its members and runs each on the shared signals: the screenshot gate and head, the camera head, the capture signature, the art, blur, human and preview heads, and the semantic tiles. No member reads another's output; the Revisions stage does.",
    "steps": [
     {
      "n": 1,
-     "title": "Capture comes first",
+     "title": "The pipeline declaration",
      "chapters": [
-      "02-specialists.html"
+      "03-router.html",
+      "05-training.html"
      ],
      "entries": [
       {
-       "scope": "CapturePriors.apply(_:_:domain:capture:)",
-       "anchor": "let pooled = comb.pool(base: state.p, heads: hp, pairAI: pairAI)",
-       "note": "A valid, present capture signature suppresses every generated-side head. Otherwise the art, blur and human priors are pooled by the combiner onto the base.",
-       "cite": "WHAT",
+       "scope": "Pipeline.v1",
+       "anchor": "Camera()",
+       "note": "The shipped detector as one declaration: the stack's members in order, then the revisions in order. A new member is one file and one line here.",
+       "cite": "ledger#decision-124",
        "link": "none"
+      },
+      {
+       "scope": "Pipeline.run(cgImage:config:)",
+       "anchor": "let outputs = try stack.score(signals)",
+       "note": "Computes the signals once, collects every member's output, then runs the revisions in order and returns one result that lists both.",
+       "cite": "PIN",
+       "link": "none"
+      },
+      {
+       "scope": "Stack.score(_:)",
+       "anchor": "try members.compactMap { try $0.score(s) }",
+       "note": "Asks every member in turn; a member with nothing to say for this bundle or profile leaves no entry.",
+       "cite": "WHAT:Sources/VeilGardeInference/Stack/Stack.swift"
       }
      ]
     },
     {
      "n": 2,
-     "title": "The heads",
+     "title": "A member and what it reports",
      "chapters": [
-      "02-specialists.html"
+      "01-fusion.html",
+      "03-router.html"
      ],
      "entries": [
       {
-       "scope": "AtlasPriors.evaluate(_:)",
-       "anchor": "kinds.compactMap { prior($0.name, $0.kind, s) }",
-       "note": "The art, blur and human priors, skipping any head the bundle lacks."
+       "scope": "StackMember",
+       "anchor": "func score(_ s: DetectionSignals) throws -> MemberOutput?",
+       "note": "What a member is: a name and one function from the shared signals to its own output.",
+       "cite": "WHAT:Sources/VeilGardeInference/Stack/Stack.swift",
+       "link": "none"
       },
       {
-       "scope": "AtlasPriors.prior(_:_:_:)",
-       "anchor": "let p = head.pAI(emb)",
-       "note": "One head's P(AI) on the 360×640 embedding, a row in the stack whatever it reads."
+       "scope": "MemberOutput",
+       "anchor": "public let fields: [Field]",
+       "note": "A member's take: its P(AI), its verdict and the fields only it reports, written into the result as they are.",
+       "cite": "ledger#decision-125",
+       "link": "none"
       },
       {
-       "scope": "LinearHead.pAI(_:)",
-       "anchor": "z += ((embedding[i] - mean[i]) / s) * coef[i]",
-       "note": "A standardized logistic regression over the 384 values, the whole of a specialist head."
+       "scope": "Camera.score(_:)",
+       "anchor": "let p = head.predict(CameraRow(dino: dino, capture: capture).asVector)",
+       "note": "The camera head on the 393-column row, called at 0.5 with a band of 0.04, and p_neutral, the same head with the capture flags set.",
+       "cite": "PIN",
+       "link": "none"
+      },
+      {
+       "scope": "Capture.score(_:)",
+       "anchor": "Field(\"present\", .flag(c.present))",
+       "note": "The capture signature as measured: the peak, whether the image is large enough to read it, and whether it is present. It measures, so it has no P(AI).",
+       "cite": "PIN",
+       "link": "none"
       }
      ]
     },
     {
      "n": 3,
-     "title": "The combiner pools the evidence",
+     "title": "The linear-head members",
      "chapters": [
       "02-specialists.html"
      ],
      "entries": [
       {
-       "scope": "StackCombiner.pool(base:heads:pairAI:)",
-       "anchor": "if base < gateCeiling { z -= wRescue * max(0, -maxHeadLogit) }",
-       "note": "Adds each head's generated evidence to the capped base logit, and subtracts the consensus rescue only while the base sits under the gate ceiling. On 97,181 capture-absent store rows, taking the human push out moved 68 calls.",
-       "cite": "ledger#command-53"
+       "scope": "Screenshot.score(_:)",
+       "anchor": "let p = head.pAI(try s.dinoNorm())",
+       "note": "The gate's three tells and the screenshot head's P(AI) on the force-resized embedding. It reports on every image; the combiner anchors on it when the gate fires.",
+       "cite": "PIN",
+       "link": "none"
       },
       {
-       "scope": "StackCombiner.headLogits(_:pairAI:)",
-       "anchor": "ls[0] = min(ls[0], lg(pa, capHead))",
-       "note": "Caps each head's logit. The reference combiner also let an art-pair head lower the art logit; the shipped one does not ask, since taking it out moved 29 of 97,181 store calls, 19 of them to the right label.",
-       "cite": "ledger#command-56"
+       "scope": "Specialist.score(_:)",
+       "anchor": "let verdict = kind == .preview ? (p <= Self.previewCut ? \"real\" : \"generated\") : (p > head.threshold ? \"generated\" : \"real\")",
+       "note": "One file for the art, blur, human and preview heads, each its own row of the stack; a head the bundle lacks leaves no entry.",
+       "cite": "PIN",
+       "link": "none"
       },
       {
-       "scope": "StackCombiner.contribution(_:base:heads:pairAI:)",
-       "anchor": "return (base < gateCeiling && maxHeadLogit < 0) ? wRescue * (-maxHeadLogit) : 0",
-       "note": "A head's weight in the stack's rows: its generated push, or, while every head reads real under the gate, the shared rescue. Without the rescue a real wildlife photograph flipped to generated on 2026-10-19.",
-       "cite": "ledger#command-57"
+       "scope": "LinearHead.pAI(_:)",
+       "anchor": "z += ((embedding[i] - mean[i]) / s) * coef[i]",
+       "note": "A standardized logistic regression over the 384 values, the whole of a linear head.",
+       "cite": null
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The semantic tiles",
+     "chapters": [
+      "02-specialists.html"
+     ],
+     "entries": [
+      {
+       "scope": "SemanticTiles.score(_:)",
+       "anchor": "let p = head.pAI(Array(toks.values[(t * d)..<((t + 1) * d)]))",
+       "note": "The semtile head on each of DINOv2's 256 patch tokens: a 16 by 16 grid of P(AI) and the share of tokens above 0.5, its majority.",
+       "cite": "PIN",
+       "link": "none"
       }
      ]
     }
@@ -773,20 +683,54 @@
    "mark": "RV",
    "kind": "inference",
    "title": "Revisions",
-   "subtitle": "two mechanisms that act only on decisive evidence",
-   "say": "The sixth stage: the frame seam reruns the stack on a dark frame's interior, the semantic chain reads DINOv2's token map, and the preview tail flips a small image to real only when two reads agree; the Result stage writes what they leave.",
+   "subtitle": "three revisions that read the stack",
+   "say": "The fourth stage: the combiner anchors on the camera member, or the screenshot member when the gate fired, silences the generated-side evidence under a present capture and otherwise pools it; the frame seam reruns the pipeline on a dark frame's interior; the preview tail flips a small image to real only when two reads agree. The Result stage writes what they leave.",
    "steps": [
     {
      "n": 1,
+     "title": "The combiner: the anchor and the pool",
+     "chapters": [
+      "02-specialists.html"
+     ],
+     "entries": [
+      {
+       "scope": "Combine.apply(_:stack:signals:pipeline:)",
+       "anchor": "let anchorName = s.gate.isScreenshot ? \"screenshot\" : \"camera\"",
+       "note": "Takes the anchor's P(AI) and operating point; a present capture leaves the anchor standing, otherwise the combiner pools it with the evidence members its file names.",
+       "cite": "ledger#decision-126",
+       "link": "none"
+      },
+      {
+       "scope": "StackCombiner.pool(anchor:evidence:)",
+       "anchor": "if a < anchor.gateCeiling { z -= rescue.w * max(0, -maxLogit) }",
+       "note": "Adds each evidence member's generated push to the capped anchor logit, and subtracts the consensus rescue only while the anchor sits under the gate ceiling. On 97,181 capture-absent store rows, taking the human push out moved 68 calls.",
+       "cite": "ledger#command-53"
+      },
+      {
+       "scope": "StackCombiner.evidenceLogits(_:)",
+       "anchor": "evidence.map { lg($0, evidenceCap) }",
+       "note": "Caps each evidence member's logit at 2. The reference combiner also let an art-pair head lower the art logit; taking it out moved 29 of 97,181 store calls, 19 of them to the right label.",
+       "cite": "ledger#command-56"
+      },
+      {
+       "scope": "StackCombiner.contribution(_:anchor:evidence:)",
+       "anchor": "return (a < anchor.gateCeiling && maxLogit < 0) ? rescue.w * (-maxLogit) : 0",
+       "note": "An evidence member's influence, recorded in the combiner's record: its generated push, or, while every member reads real under the gate, the shared rescue. Without the rescue a real wildlife photograph flipped to generated on 2026-10-19.",
+       "cite": "ledger#command-57"
+      }
+     ]
+    },
+    {
+     "n": 2,
      "title": "A dark frame hiding the content",
      "chapters": [
       "03-router.html"
      ],
      "entries": [
       {
-       "scope": "FrameSeam.apply(_:_:capture:hint:detector:)",
-       "anchor": "let decisive = pi >= 0.70 && (pi - state.p) >= 0.20",
-       "note": "When a real verdict hides a uniform dark border, runs the whole stack again on the interior and takes that evidence only when it is decisive. In the census it ran on 3 of 300 images and decided one, IMG_0500, a hard battery anchor.",
+       "scope": "FrameSeam.apply(_:stack:signals:pipeline:)",
+       "anchor": "let decisive = pi >= 0.70 && (pi - v.p) >= 0.20",
+       "note": "When a real verdict hides a uniform dark border, runs the whole pipeline again on the interior and takes that evidence only when it is decisive. In the 2026-10-19 census it ran on 3 of 300 images and decided one, IMG_0500, a hard battery image.",
        "cite": "ledger#command-52",
        "link": "none"
       },
@@ -794,28 +738,7 @@
        "scope": "FrameSeam.detectFrame(_:)",
        "anchor": "guard [imgTop, imgBottom, left, right].filter({ $0 }).count >= 2 else { return nil }",
        "note": "Reads a 96×96 luma grid and calls a frame when at least two border bands are dark, uniform and darker than the interior.",
-       "cite": "PIN:Sources/VeilGardeInference/Route/Mechanisms/FrameSeam.swift"
-      }
-     ]
-    },
-    {
-     "n": 2,
-     "title": "The semantic-tile map",
-     "chapters": [
-      "03-router.html"
-     ],
-     "entries": [
-      {
-       "scope": "SemanticChain.apply(_:_:capture:)",
-       "anchor": "PreviewTail.apply(&probe, &state, s, capture: cap, semanticMajority: sm.majority, canDecide: canDecide)",
-       "note": "On the semantic-tile map and its majority: the preview tail, then the projection that commits a probe only under the production profile.",
-       "cite": "PIN:Sources/VeilGardeInference/Route/Mechanisms/SemanticChain.swift",
-       "link": "none"
-      },
-      {
-       "scope": "SemanticTiles.map(_:config:)",
-       "anchor": "let p = head.pAI(Array(toks.values[(t * d)..<((t + 1) * d)]))",
-       "note": "The semtile head on each of DINOv2's 256 patch tokens: a 16×16 map of P(AI) and the share of tokens above 0.5."
+       "cite": "PIN:Sources/VeilGardeInference/Revisions/FrameSeam.swift"
       }
      ]
     },
@@ -827,16 +750,24 @@
      ],
      "entries": [
       {
-       "scope": "PreviewTail.apply(_:_:_:capture:semanticMajority:canDecide:)",
-       "anchor": "let fires = phv >= 0 && phv <= 0.45 && (pn ?? 1.0) <= 0.30",
-       "note": "A small image read generated with a clean semantic vote flips to real only when the preview head and the live fusion head, its capture flags neutralized, both read it real. It fired once in the 2026-10-19 census, on a hard battery anchor's preview.",
-       "cite": "ledger#command-52"
+       "scope": "PreviewTail.apply(_:stack:signals:pipeline:)",
+       "anchor": "let fires = triggered && (pn ?? 1.0) <= 0.30",
+       "note": "A small image read generated with a clean semantic majority flips to real only when the preview member and the camera member's p_neutral both read it real. It fired once in the 2026-10-19 census.",
+       "cite": "ledger#command-52",
+       "link": "none"
       },
       {
-       "scope": "Fusion.neutralizedBaseP(_:)",
-       "anchor": "if cap.count >= 4 { cap[1] = 1.0; cap[3] = max(cap[3], 576.0) }",
-       "note": "The fusion head asked again with the capture signature's validity flags set, so a small image's missing capture cannot read as generated.",
-       "cite": "ledger#decision-107"
+       "scope": "PublicSurface.project(profile:originalP:originalVerdict:probeP:probeVerdict:probeDecisive:)",
+       "anchor": "guard profile == .control else",
+       "note": "Commits the flip only under the production profile; the diagnostic profile records that it fired and leaves the verdict.",
+       "cite": "PIN:Sources/VeilGardeCore/Result/PublicSurface.swift"
+      },
+      {
+       "scope": "Camera.score(_:)",
+       "anchor": "neutral[3] = max(neutral[3], 576.0)",
+       "note": "The camera head asked again with the capture signature's validity flags set, so a small image's missing capture cannot read as generated.",
+       "cite": "ledger#decision-107",
+       "link": "none"
       }
      ]
     }
@@ -847,42 +778,51 @@
    "mark": "RS",
    "kind": "inference",
    "title": "Result",
-   "subtitle": "one verdict, schema v3",
-   "say": "The last stage: the routed result joins the base's operating point with the router's verdict and the evidence around it, and is written as schema-v3 JSON with sorted keys.",
+   "subtitle": "one result, schema v1",
+   "say": "The last stage: the result lists every member's output and every revision's record beside the verdict, and is written as schema-v1 JSON with sorted keys.",
    "steps": [
     {
      "n": 1,
-     "title": "The routed result",
+     "title": "The result",
      "chapters": [
       "03-router.html"
      ],
      "entries": [
       {
-       "scope": "PublicSurface.routed(base:prediction:p:capture:specialists:semanticTiles:routeDiagnostics:bundle:)",
-       "anchor": "InferenceResult(scorer: base.scorer, prediction: prediction, p: p, threshold: base.threshold, band: base.band,",
-       "note": "The routed result: the base expert's scorer, operating point and image size, the router's verdict, and the stack, the map and the trace around it.",
+       "scope": "InferenceResult",
+       "anchor": "public let revisions: [RevisionRecord]",
+       "note": "The verdict and its operating point, the image's size, every member's output in the pipeline's order, every revision's record, and the bundle's hashes.",
+       "cite": "WHAT",
+       "link": "none"
+      },
+      {
+       "scope": "RevisionRecord",
+       "anchor": "public let applied: Bool",
+       "note": "What a revision did: whether it changed the verdict, the P(AI) and prediction it left, and its own fields.",
+       "cite": "WHAT",
        "link": "none"
       }
      ]
     },
     {
      "n": 2,
-     "title": "Schema v3",
+     "title": "Schema v1",
      "chapters": [
       "03-router.html"
      ],
      "entries": [
       {
-       "scope": "ResultJSON.encode(_:times:device:route:)",
+       "scope": "ResultJSON.encode(_:times:device:)",
        "anchor": "options: [.sortedKeys]",
-       "note": "Serializes the result as schema-v3 JSON with JSONSerialization and sorted keys, the bytes the goldens and the battery read.",
-       "cite": "ledger#decision-103",
+       "note": "Serializes the result as schema-v1 JSON with JSONSerialization and sorted keys, the bytes the goldens and the battery read.",
+       "cite": "ledger#decision-127",
        "link": "none"
       },
       {
-       "scope": "ResultJSON.object(_:times:device:route:)",
+       "scope": "ResultJSON.object(_:times:device:)",
        "anchor": "\"schema_version\": schemaVersion,",
-       "note": "Writes exactly the keys of schema v3, each block only when the result holds it."
+       "note": "Writes exactly the keys of schema v1: schema_version, device, image, verdict, stack, revisions, bundle and times_sec.",
+       "cite": null
       }
      ]
     },
@@ -895,9 +835,16 @@
      "entries": [
       {
        "scope": "RouteCommand.run()",
-       "anchor": "try emitJSON(try ResultJSON.encode(r, times: [], device: \"route\", route: routed.domain.rawValue), to: \"-\")",
-       "note": "veilgarde route prints the verdict, the base and the stack, or the JSON with --json.",
+       "anchor": "try emitJSON(try ResultJSON.encode(r, times: [], device: \"route\"), to: \"-\")",
+       "note": "veilgarde route prints the verdict, every member and every revision, or the JSON with --json.",
+       "cite": null,
        "link": "none"
+      },
+      {
+       "scope": "RouteCommand.text(_:)",
+       "anchor": "lines.append(\"revisions\")",
+       "note": "The text form: one line for the verdict, one for each member with its own P(AI) and fields, one for each revision.",
+       "cite": null
       }
      ]
     }

@@ -43,14 +43,15 @@
 <p>The rates are pinned. For the two parity crops, the tests hold every tile's rate and the signature's id exactly. A separate gate signs the battery's 105 images again and compares each signature with the recorded one.</p>
 
 <h2 id="detection">What detection may read</h2>
-<p>The same residual also yields 19 features a tile at a 512-pixel cap, the warp19 the research's tile model read. Detection may take each feature's mean and spread over the image, 38 numbers, as fusion columns. The code that measures them lives here, beside the signature's, and detection reads only the numbers.</p>
+<p>The same residual also yields 19 features a tile at a 512-pixel cap, the warp19 the research's tile model read, and each feature's mean and spread over the image, 38 numbers. The code that measures them lives here, beside the signature's.</p>
+<p>No member of the detector's stack reads them today. A head over them was trained and measured on 2026-10-21 as columns of a wider camera row; it did not ship, and the store's column and the row left the code with the restructure the same day. A member that reads them again would take them as a shared signal from this code, and detection would read only the numbers.</p>
 <p>The signature never reads them. It reads FR alone at native size, and its pinned fragility rates and the invariance run did not move when warp19 came back.</p>
 <div class="code" data-excerpt="Sources/VeilWatermark/Residual/ResidualStatistics.swift:ResidualStatistics"></div>
 
 <h2 id="history">Where the residual came from</h2>
 <p>Until 2026-10-21 the same residual fed the detector, and the branch 2026-rnd keeps that code.</p>
 <p>Each tile became a row of 19 features. A tree model scored each tile, and the tiles gave a weighted verdict and a camera-sensor call. The record chapter keeps that model's numbers.</p>
-<p>The research measured that the detector no longer needed it. Refit without the warp score, the fusion head lost 0.0012 AUC on held-out store rows, at the noise floor of a re-seed. The owner then gave the warp to the watermark alone.</p>
+<p>The research measured that the detector no longer needed it. Refit without the warp score, the fusion head, now the camera head, lost 0.0012 AUC on held-out store rows, at the noise floor of a re-seed. The owner then gave the warp to the watermark alone.</p>
 <p>The move changed no operation and no order. The residual's five files moved from the lens into the watermark. The tests held the pinned rates and ids bit for bit before the change, after detection lost the warp, and after the move.</p>
 
 <h2 id="sources">Where the numbers come from</h2>

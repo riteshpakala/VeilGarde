@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>What did the research find? · VeilGarde</title>
-<meta name="description" content="The record: the pruning study, the core, redundancy and condensed studies, the full-detector matrix, the trainers that left, what the owner took, and the cut to two lanes on 2026-10-21, every number dated, the code on the 2026-rnd branch.">
+<meta name="description" content="The record: the pruning study, the core, redundancy and condensed studies, the full-detector matrix, the trainers that left, what the owner took, the cut to two lanes on 2026-10-21 and the restructure into a stack of members the same day, every number dated, the code on the 2026-rnd branch.">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/site.css">
 </head>
@@ -369,11 +369,40 @@ git checkout main</code></pre>
 </div>
 <p>The owner stopped the run after two of seven candidates, and nothing shipped. The residual helped every gated number, and one generated battery image still stands between the wider head and the bar.</p>
 
+<h2 id="v1-stack">v1: the stack as a list</h2>
+<p>On 2026-10-21 the owner asked for the detector as a stack. The fusion head detects cameras, so it is one member among others, not a stage; every member's score is shown; inference and training are declared the same way; every schema is v1; and the code the shipped detector does not run leaves. <a href="index.html#amendment-27">Amendment-27</a> holds the request, and answers 32 to 35 the owner's choices.</p>
+<p>Detection became five stages, Decode, Shared Signals, Stack, Revisions and Result. What changed:</p>
+<ul class="plain">
+<li>The stack is a flat list of members, each reading only the shared signals and reporting its own output: screenshot, camera, capture, art, blur, human, preview and semantic-tiles.</li>
+<li>The combiner is the first revision. It anchors on the screenshot member when the gate fires and on the camera member otherwise, the old domain rule; the frame seam and the preview tail follow it.</li>
+<li>The result is schema v1, the combiner file stack_combiner.json version 1 keyed by member, the bundle's role camera with the head's same bytes, the store's shards format v1 after a migration, and the battery's files version 1.</li>
+<li>The training recipe lists trainable members as the pipeline lists members, so a new specialist is one file and one line on each side.</li>
+<li>Removed: the 777 and 815 rows, the residual column, the out-of-fold combiner, domains and hints, the art-pair and cgi heads, the no-combiner fallback and the noiseprint refusals.</li>
+</ul>
+<p>The rule fixed before the work was that no number may move. Every check held:</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Check, 2026-10-21</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>The two goldens against schema v3's: the verdict, every member, the combiner, the semantic grid</td><td>max |Δ| 0 on both, then re-recorded in schema v1</td></tr>
+<tr><td>The battery on the same floors</td><td>PASS on 96 images</td></tr>
+<tr><td>The census of 296 images, call by call against the v1.0.0 binary</td><td>296 of 296 identical; generated 76 of 135 and real 154 of 161 right</td></tr>
+<tr><td>The iPhone originals, call by call</td><td>438 of 438 identical; 435 real</td></tr>
+<tr><td>The store's migration</td><td>60 shards, 138,267 rows in and out, every column's bytes equal</td></tr>
+<tr><td>The watermark's invariance</td><td>105 of 105 signatures equal</td></tr>
+<tr><td>Every test target, the GPU suites included</td><td>135 passed, 0 failed</td></tr>
+<tr><td>The playground</td><td>12 of 12 checkpoints</td></tr>
+</tbody>
+</table>
+</div>
+<p>Showing every score shows one thing the old result hid: the screenshot head reads generated on 186 of the 296 census images, most of them not screenshots. It has always done so; its score counts only when the gate fires and the combiner anchors on it.</p>
+
 <h2 id="sources">Where the numbers come from</h2>
 <div class="scroll">
 <table class="data">
 <thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
 <tbody>
+<tr><td>The stack as a list: the reference runs, the migration, the goldens, the battery, the censuses, the playground, the invariance</td><td><a href="index.html#command-115">Ledger command-115</a> to <a href="index.html#command-121">command-121</a>; <a href="index.html#test-30">test-30</a>; decisions 124 to 135</td><td>2026-10-21</td></tr>
 <tr><td>The branch at 6ed634d</td><td><a href="index.html#command-87">Ledger command-87</a></td><td>2026-10-21</td></tr>
 <tr><td>The pruning rules: 0.005 AUC, 0.5% of calls, 1,000 resamples; the seed control</td><td><a href="index.html#decision-68">Ledger decision-68</a> and <a href="index.html#decision-70">decision-70</a></td><td>2026-10-19</td></tr>
 <tr><td>Every warp, scoring, calibration, fusion and stack row of the pruning study</td><td><a href="index.html#command-56">Ledger command-56</a>, reproducing command-53 and command-55 row for row</td><td>2026-10-19</td></tr>

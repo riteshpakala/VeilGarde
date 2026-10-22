@@ -15,7 +15,7 @@
 
   V.pages = [
     { file: "index.html", short: "The change at a glance", start: true },
-    { file: "01-fusion.html", n: 1, short: "How does the fusion head read an image?" },
+    { file: "01-fusion.html", n: 1, short: "How does the camera head read an image?" },
     { file: "02-specialists.html", n: 2, short: "What do the specialist heads add?" },
     { file: "03-router.html", n: 3, short: "How does the detector reach one verdict?" },
     { file: "04-bundle.html", n: 4, short: "What does the detector ship?" },
