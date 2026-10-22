@@ -262,7 +262,7 @@ struct PackageLayeringTests {
             #expect(lines.count > 1 && lines[1] == "// \(license)", "\(manifest) names its license on its second line")
         }
         var scripts: [String] = ["build-metallib.sh", "Examples/run.sh"]
-        for folder in ["scripts", "docs/site/src", "docs/site/js"] {
+        for folder in ["Scripts", "Docs/site/src", "Docs/site/js"] {
             let names = (try? FileManager.default.contentsOfDirectory(atPath: repoRoot.appendingPathComponent(folder).path)) ?? []
             scripts += names.filter { !$0.hasPrefix(".") && ["sh", "py", "js", "command"].contains(URL(fileURLWithPath: $0).pathExtension) }.map { "\(folder)/\($0)" }
         }

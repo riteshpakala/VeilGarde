@@ -14,8 +14,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Frigate, the vendored MLX stack, is taken by path: VEILGARDE_FRIGATE_DIR, else a checkout beside this repo
-# (https://github.com/rao-studios/Frigate). A machine's own settings, kept in a gitignored scripts/lib.sh, come first.
-[ -f "$REPO_ROOT/scripts/lib.sh" ] && source "$REPO_ROOT/scripts/lib.sh"
+# (https://github.com/rao-studios/Frigate). A machine's own settings, kept in a gitignored Scripts/lib.sh, come first.
+[ -f "$REPO_ROOT/Scripts/lib.sh" ] && source "$REPO_ROOT/Scripts/lib.sh"
 VEILGARDE_FRIGATE_DIR="${VEILGARDE_FRIGATE_DIR:-$REPO_ROOT/../Frigate}"
 if [ ! -f "$VEILGARDE_FRIGATE_DIR/Package.swift" ]; then
     echo "veilgarde: no Frigate at $VEILGARDE_FRIGATE_DIR: check it out beside this repo, or set VEILGARDE_FRIGATE_DIR" >&2

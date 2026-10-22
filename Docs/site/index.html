@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The change at a glance · VeilGarde</title>
+<meta name="description" content="What this run built: VeilGarde, a detector for AI-generated images and a crop-robust watermark in one Swift and MLX package, in two lanes, told in the order the code runs, with what was checked and why each piece is the way it is.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the overview</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · the change at a glance</span><a href="code.html">The change explorer</a></header>
+
+<h1 id="ch-overview">VeilGarde: an AI-image detector as one Swift package</h1>
+<p class="lede"><em>On what this run built, in the order the code runs, and what was checked.</em></p>
+<p>VeilGarde is a detector for AI-generated images and a crop-robust watermark, in one Swift and MLX package, in two lanes. The detector is a stack of independent members, each with its own score: the camera head over what an image depicts and how it was captured, the screenshot head, the capture signature, the specialist heads and the semantic tiles. Three revisions read them, and one verdict comes out. The watermark reads the warp residual off an image's own pixels and matches a crop or a re-encode against it.</p>
+<p>Nine trails walk the code in the order it runs. Two train the camera head and the specialist stack. Five follow detection stage by stage, each handing off to the next: Decode, Shared Signals, Stack, Revisions and Result. Two follow the watermark, signing an image and matching a crop of it.</p>
+<p><a href="ml.html">The ML explorer</a> tells the same flows as machine learning: what each model learns from and why its algorithm was chosen. It also follows how the stack's members and three revisions reach one verdict. Its steps link back to these trails. The research that led here, the warp model, the noiseprint and the studies, is in <a href="10-record.html">the record</a> and on the 2026-rnd branch.</p>
+
+<div id="request"></div>
+
+<h2 id="system-picture">The package, one layer at a time</h2>
+<p>Eight targets sit in layers, each built on the ones above it in the picture. Pick a trail from the grid, a row for each flow and a column for each kind, then a step, to light the layers it runs through. Then walk it in the explorer.</p>
+<div class="system" id="system">
+<figure>
+<svg viewBox="0 0 360 490" role="img" aria-labelledby="sys-title sys-desc">
+<title id="sys-title">VeilGarde's eight targets, in layers</title>
+<desc id="sys-desc">Core feeds the Lens. The Lens feeds Inference, Training and the Watermark. Inference and Training feed the Flywheel. The umbrella re-exports them all, and the command line sits on the umbrella.</desc>
+<defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrowhead" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+<path class="edge" d="M180,62 V90"/>
+<path class="edge" d="M140,144 L74,172"/>
+<path class="edge" d="M180,144 V172"/>
+<path class="edge" d="M220,144 L286,172"/>
+<path class="edge" d="M70,234 L128,262"/>
+<path class="edge" d="M180,234 V262"/>
+<path class="edge" d="M290,234 V344"/>
+<path class="edge" d="M180,316 V344"/>
+<path class="edge" d="M180,398 V426"/>
+<g class="layer" data-layer="VeilGardeCore"><a href="code.html"><title>VeilGardeCore</title><rect x="20" y="10" width="320" height="52" rx="8"/><text class="name" x="34" y="30">VeilGardeCore</text><text class="count" x="326" y="30" text-anchor="end"></text><text class="what" x="34" y="48">the domain: features, boosters, heads, the store, results</text></a></g>
+<g class="layer" data-layer="VeilGardeLens"><a href="code.html"><title>VeilGardeLens</title><rect x="20" y="92" width="320" height="52" rx="8"/><text class="name" x="34" y="112">VeilGardeLens</text><text class="count" x="326" y="112" text-anchor="end"></text><text class="what" x="34" y="130">the extractors: capture, DINOv2, CLIP</text></a></g>
+<g class="layer" data-layer="VeilGardeInference"><a href="code.html"><title>VeilGardeInference</title><rect x="20" y="174" width="100" height="60" rx="8"/><text class="name" x="30" y="194">Inference</text><text class="what" x="30" y="210">the detector</text><text class="count" x="30" y="225"></text></a></g>
+<g class="layer" data-layer="VeilGardeTraining"><a href="code.html"><title>VeilGardeTraining</title><rect x="130" y="174" width="100" height="60" rx="8"/><text class="name" x="140" y="194">Training</text><text class="what" x="140" y="210">the trainers</text><text class="count" x="140" y="225"></text></a></g>
+<g class="layer" data-layer="VeilWatermark"><a href="code.html"><title>VeilWatermark</title><rect x="240" y="174" width="100" height="60" rx="8"/><text class="name" x="250" y="194">Watermark</text><text class="what" x="250" y="210">residual, signature</text><text class="count" x="250" y="225"></text></a></g>
+<g class="layer" data-layer="VeilGardeFlywheel"><a href="code.html"><title>VeilGardeFlywheel</title><rect x="75" y="264" width="200" height="52" rx="8"/><text class="name" x="89" y="284">Flywheel</text><text class="count" x="261" y="284" text-anchor="end"></text><text class="what" x="89" y="302">acquire, stage, gate, promote</text></a></g>
+<g class="layer" data-layer="VeilGarde"><a href="code.html"><title>VeilGarde</title><rect x="20" y="346" width="320" height="52" rx="8"/><text class="name" x="34" y="366">VeilGarde</text><text class="count" x="326" y="366" text-anchor="end"></text><text class="what" x="34" y="384">the umbrella, and the doctor that checks every layer</text></a></g>
+<g class="layer" data-layer="VeilGardeCLI"><a href="code.html"><title>VeilGardeCLI</title><rect x="20" y="428" width="320" height="52" rx="8"/><text class="name" x="34" y="448">VeilGardeCLI</text><text class="count" x="326" y="448" text-anchor="end"></text><text class="what" x="34" y="466">veilgarde, the command line over all of it</text></a></g>
+</svg>
+<figcaption>The layer table PackageLayeringTests holds, from Package.swift. A lit box is a layer the selected step runs through; each box opens its first file in the explorer.</figcaption>
+</figure>
+<div class="stepper" id="stepper"></div>
+</div>
+
+<h2 id="what-changed">What changed</h2>
+<p>Every count below is read from the data the page was built from, and each card names where its number comes from.</p>
+<div class="counts" id="counts"></div>
+
+<h2 id="checked">What was checked</h2>
+<p>These are the commands the run's ledger recorded, with their exit codes and dates. A failed command shows as failed, with the lines that explain it and the fix that followed.</p>
+<div id="checks"></div>
+<h3 id="tests-h">Tests</h3>
+<p>Each row is one test run the ledger recorded. The counts above take the latest run of each suite.</p>
+<div id="tests"></div>
+<p class="note">Not checked here: this page reruns no command and no test. The site's own checks are Docs/site/src/build.py and Docs/site/src/check.py, and the self-check page runs the rest in the browser.</p>
+
+<h2 id="decisions-h">Decisions</h2>
+<p>One line per decision, from the ledger, with the file it shaped.</p>
+<div id="decisions"></div>
+
+<h2 id="open">Open questions and assumptions</h2>
+<div id="questions"></div>
+
+<h2 id="also-changed">Also changed</h2>
+<p>The change explorer starts from an empty repository, so every declaration is added and few are on a trail. The table counts them by folder, and each folder opens in the explorer.</p>
+<div id="also"></div>
+
+<h2 id="excluded">Left out of the explorer</h2>
+<p>These files are in the change but not embedded: the shipped model files, test fixtures, a lock file, the licence, and anything that would carry a secret. Each is listed by name and size.</p>
+<div id="excluded-list"></div>
+
+<h2 id="commits-h">The run's commits</h2>
+<div id="commits"></div>
+
+<p class="close">Two lanes: one verdict, and one signature read off the residual.</p>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/run.js"></script>
+<script src="data/index.js"></script>
+<script src="js/overview.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount(function () { VeilGarde.overview.mount(); });</script>
+</body>
+</html>

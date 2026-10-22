@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How do I run each stage myself? · VeilGarde</title>
+<meta name="description" content="On the examples: one program that runs both lanes on this Mac, the camera head and every member of the stack, a candidate trained in miniature, a promote and its rollback, and a watermark read off the warp residual.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-groups="Examples">
+<a class="skip" href="#main">Skip to the chapter</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 9 of 10</span><a href="code.html#Examples/Sources/VeilGardeExamples/main.swift">Open the examples in the explorer</a></header>
+
+<h1 id="ch-examples">How do I run each stage myself?</h1>
+<p class="lede"><em>On the examples that walk both lanes stage by stage, from the capture signature to a signature read off the warp residual.</em></p>
+
+<p>Each chapter before this one explains a part. The examples run them, one after another, on this Mac, and checks every step against something it must equal. It is one program, read top to bottom, and it exits with 0 only when every checkpoint holds.</p>
+<pre class="cmd">Examples/run.sh</pre>
+<p>The program writes nothing outside its own scratch folder, <code>Examples/.work</code>, and only from the training step on.</p>
+
+<h2 id="inference">The detector, one part at a time</h2>
+<p>Steps 0 and 1 load the Metal library, verify the shipped bundle against its manifest, and pick the images. They are the two parity crops with VeilGarde's own goldens, and a dozen final_mixed images when the T9 is mounted.</p>
+<p>Step 2 measures whether a sensor made the first crop: its capture signature at native resolution, and the screenshot gate. Step 3 reads what it depicts, through DINOv2's two views of one image, the camera head's plain crop and the heads' forced resize.</p>
+<p>Step 4 builds the camera head's 393 columns by hand, the embedding and then the capture values, and asks the head for P(AI). A checkpoint holds that number to the camera member's score in the full detector's stack.</p>
+<p>Step 5 runs the full detector and prints every member of its stack and every revision. When the capture signature is absent and the gate is quiet, the combiner revision's sum is worked out term by term around the camera member, and a checkpoint holds it to the revision's own score. Both crops' results are then held to VeilGarde's goldens, every label exact and every number within 1e-4.</p>
+
+<h2 id="training">Training, in miniature</h2>
+<p>Step 6 writes a recipe in Swift: a two-tree warm start on the shipped camera head, the human head, and the combiner, three trainable members. It prints the plan before anything trains, then runs the engine into a candidate bundle.</p>
+<p>The rows come from a seeded sample of the work area's feature store, copied and never written back. Without that store, seeded synthetic rows stand in, and the step says so.</p>
+<div class="code" data-excerpt="Examples/Sources/VeilGardeExamples/Toy.swift:Toy.writeStore()"></div>
+<p>A toy fit on a few hundred rows means little, so the step proves the machinery instead. The warm start keeps the shipped head's trees byte for byte and adds two. Frigate's evaluator reads the candidate's head with predictions identical to VeilGarde's own. The candidate verifies, every hash against its manifest.</p>
+
+<h2 id="flywheel">The flywheel, and the watermark</h2>
+<p>Step 7 copies the shipped bundle as a live bundle and builds a small battery: every image must keep the call the shipped detector gives it today. Promote refuses a frozen weight and a slot that no longer exists. The human head from step 6 goes through admission and the battery, and is rolled back. The checkpoints say the weights never moved and live is byte for byte what it was.</p>
+<p>Step 8 is the other lane. It signs the first crop with its own fragility pattern, read off the warp residual, and matches it against itself. It then reports a half-area crop and a JPEG re-encode; whether the signature holds on real crops is the acceptance run's question, chapter 8's.</p>
+
+<h2 id="showed">What it showed on 2026-10-21</h2>
+<p>The run after the stack became a list of members held all 12 checkpoints, with the same numbers as the run after the warp left. Its numbers, by step:</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Step</th><th>What the run printed</th></tr></thead>
+<tbody>
+<tr><td>4, the camera head</td><td>crop_ben's P(AI) 0.6304, a generated call on its own, equal to the camera member's score in the stack</td></tr>
+<tr><td>5, the stack</td><td>no capture signature and a quiet gate, so the combiner pooled around the camera member; its rescue pulled the P(AI) to 0.1059, real, equal to the revision's; both crops equal their goldens, max |Δ| 0</td></tr>
+<tr><td>6, training</td><td>the shipped head's 500 trees kept byte for byte, 2 added; Frigate equal on 830 store rows; the candidate's 8 artifacts verified</td></tr>
+<tr><td>7, the flywheel</td><td>a battery of 13 images that must stay real and 1 that must stay generated; dinov2-small and fusion-head refused; the human head promoted, the battery passed, then rolled back; the 3 weights unmoved</td></tr>
+<tr><td>8, the watermark</td><td>16×16 tiles and 930 measured bits; a self-match of 1.000; a half-area crop matched at 0.789 over 379 bits, found 0.12 tiles off; a JPEG at quality 0.75 matched at 0.894</td></tr>
+<tr><td>9, verify</td><td>12 of 12 checkpoints</td></tr>
+</tbody>
+</table>
+</div>
+<p>Crop_ben shows the stack at work. The camera member alone calls the crop generated, and the art, blur and human members, all reading it real, rescue it to real.</p>
+
+<h2 id="sources">Where the numbers come from</h2>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>The steps and their checkpoints</td><td class="mono"><a href="code.html#Examples/Sources/VeilGardeExamples/main.swift">main.swift</a> and Examples/README.md</td><td>Rewritten for the two lanes and then for the stack, 2026-10-21</td></tr>
+<tr><td>12 of 12 checkpoints; 500 trees kept; the battery's 13 and 1; the refusals; the 3 weights</td><td><a href="index.html#command-102">Ledger command-102</a>; the run after the restructure, <a href="index.html#command-120">command-120</a></td><td>2026-10-21</td></tr>
+<tr><td>crop_ben's camera member 0.6304 and pooled 0.1059</td><td><a href="index.html#command-94">Ledger command-94</a>, the goldens the examples hold themselves to</td><td>2026-10-21</td></tr>
+<tr><td>930 bits; 0.789 over 379 bits; 0.894</td><td>The run's output, step 8; the same numbers as the run of 2026-10-19, since the residual is unchanged</td><td>2026-10-21</td></tr>
+</tbody>
+</table>
+</div>
+
+<details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
+<ul class="plain">
+<li>The examples are a package of their own, <code>Examples/Package.swift</code>, called the playground until 2026-10-21, so building them never touches VeilGarde's targets; run.sh builds them in release and installs the Metal library.</li>
+<li><code>Scripts/cli.sh route &lt;image&gt; --bundle Examples/.work/candidates/examples</code> runs the candidate it trains; <code>Scripts/cli.sh flywheel status --work-area Examples/.work</code> shows its live bundle.</li>
+<li><code>Examples/README.md</code> lists every checkpoint and what it compares.</li>
+</ul>
+</div></details>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/index.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount();</script>
+</body>
+</html>

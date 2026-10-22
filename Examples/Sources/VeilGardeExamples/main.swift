@@ -161,7 +161,7 @@ func run() throws {
     var verified = true
     do { try candidate.verify() } catch { verified = false }
     checks.record("the candidate bundle verifies (\(candidate.manifest.artifacts.count) artifacts, every hash): \(candidate.root.path)", verified)
-    Show.line("run it:  scripts/cli.sh route Tests/VeilGardeInferenceTests/Fixtures/crops/crop_ben.png --bundle Examples/.work/candidates/examples")
+    Show.line("run it:  Scripts/cli.sh route Tests/VeilGardeInferenceTests/Fixtures/crops/crop_ben.png --bundle Examples/.work/candidates/examples")
 
     // 7. The flywheel, on Examples/.work.
     Show.step(7, "flywheel", "the flywheel alone: a live bundle, a battery, a promote and its rollback, all in Examples/.work")
@@ -215,7 +215,7 @@ func run() throws {
     }
     checks.record("the frozen weights never moved (\(weightsBefore.count) of them)", try fly.liveBundle().manifest.weights == weightsBefore)
     checks.record("live is byte for byte what it was before the promote", try fly.liveHashes() == liveBefore)
-    Show.line("look at it:  scripts/cli.sh flywheel status --work-area Examples/.work")
+    Show.line("look at it:  Scripts/cli.sh flywheel status --work-area Examples/.work")
 
     // 8. The other lane: the watermark, read off the warp residual.
     let markImage = try ImageDecoding.cgImage(contentsOf: crops[0].url)

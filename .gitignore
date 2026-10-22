@@ -27,19 +27,19 @@ __pycache__/
 /Examples/.build/
 /Examples/.swiftpm/
 
-# Local only: everything in docs/ but the site (docs/site is the documentation), and the maintainer's own scripts,
+# Local only: everything in Docs/ but the site (Docs/site is the documentation), and the maintainer's own scripts,
 # which need the research environment, Garde or this Mac's layout
-/docs/*
-!/docs/site/
-/scripts/fixtures/
-/scripts/lib.sh
-/scripts/parity-garde.sh
-/scripts/test.sh
-/scripts/weights.sh
+/Docs/*
+!/Docs/site/
+/Scripts/fixtures/
+/Scripts/lib.sh
+/Scripts/parity-garde.sh
+/Scripts/test.sh
+/Scripts/weights.sh
 
 # The site regenerates these: exports and check screenshots
-/docs/site/export/
-/docs/site/.check/
-# The ask orb's key, copied from this Mac's ~/.rao by docs/site/src/askkey.py: never committed
-/docs/site/local/
+/Docs/site/export/
+/Docs/site/.check/
+# The ask orb's key, copied from this Mac's ~/.rao by Docs/site/src/askkey.py: never committed
 /Docs/site/local/
+/docs/site/local/

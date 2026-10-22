@@ -16,7 +16,7 @@ One program, read top to bottom, that runs VeilGarde's two lanes on this Mac and
 ## Run
 
 ```sh
-scripts/cli.sh weights import-dinov2   # once: DINOv2's weights into the work area
+Scripts/cli.sh weights import-dinov2   # once: DINOv2's weights into the work area
 Examples/run.sh                      # builds release, installs mlx.metallib, runs
 ```
 
@@ -35,5 +35,5 @@ The first build compiles Frigate's MLX and takes minutes. From Xcode, open `Exam
 - The watermarked image matches its own signature at offset (0, 0) with score 1.
 
 On 2026-10-21 every one of the 12 checkpoints held. It writes nothing outside `Examples/.work` (gitignored), and only from step 6 on. Run the candidate it trains with
-`scripts/cli.sh route <image> --bundle Examples/.work/candidates/examples`, and look at its flywheel with
-`scripts/cli.sh flywheel status --work-area Examples/.work`.
+`Scripts/cli.sh route <image> --bundle Examples/.work/candidates/examples`, and look at its flywheel with
+`Scripts/cli.sh flywheel status --work-area Examples/.work`.

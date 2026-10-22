@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How is each shipped model trained? · VeilGarde</title>
+<meta name="description" content="On the training regime: one declaration per run, a native trainer for the camera head's trees, the shipped recipes for the linear heads and the combiner, and the backbones imported byte for byte.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-groups="Sources-VeilGardeTraining,Sources-VeilGardeInference">
+<a class="skip" href="#main">Skip to the chapter</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 5 of 10</span><a href="code.html#trail-camera-training-3">Walk the training in the explorer</a></header>
+
+<h1 id="ch-training">How is each shipped model trained?</h1>
+<p class="lede"><em>On the training regime: every model the detector trains, trained from stored features in Swift, and measured on rows it did not see.</em></p>
+
+<p>The detector trains three kinds of model: the camera head, the linear heads and the combiner that pools them. VeilGarde trains each in Swift, from the features-only store, and writes a bundle the detector runs as it is.</p>
+<p>The backbones are the exception. DINOv2 is imported from its published checkpoint, never trained here, and its bytes are pinned.</p>
+
+<h2 id="recipe">A run is one declaration</h2>
+<p>A training run is one recipe, written the way the detector's pipeline is: one trainable member per line, with an <code>if</code> or a <code>for</code> where the set depends on something. Each member is a value with copy modifiers, so nothing is built until the engine runs it.</p>
+<div class="code" data-excerpt="Sources/VeilGardeTraining/Recipe/TrainingRecipe.swift:TrainingRecipe.shipped(id:)"></div>
+<p>The detector is declared the same way, its stack's members and its revisions in order:</p>
+<div class="code" data-excerpt="Sources/VeilGardeInference/Stack/Pipeline.swift:Pipeline.v1"></div>
+<p>The two declarations match on purpose. A new specialist is one file and one line on each side: a member that scores the image in the pipeline, and a trainable member that fits it in the recipe.</p>
+<p>The shipped recipe grows the camera head from scratch, trains the art, blur, human and preview heads, and fits the combiner over them. The screenshot and semtile heads are not in it: the store keeps no screenshot rows and no patch tokens to train them on.</p>
+<p>The engine has two calls, and knows no member by name. The plan asks each member what it would do: its stages, whether each runs and why, and any refusal, reading files and touching no GPU. Training plans first, so a refusal stops the run before a candidate exists, then asks each member to train itself.</p>
+<div class="code" data-excerpt="Sources/VeilGardeTraining/Engine/TrainingEngine.swift:TrainingEngine.train(_:)"></div>
+<p>A candidate starts as a copy of its parent bundle. Each trained model replaces its parent's file, every write re-hashes the manifest, and the whole candidate is verified at the end. <code>veilgarde route --bundle</code> runs it.</p>
+
+<h2 id="trees">The camera head is a tree ensemble</h2>
+<p>The camera head is a gradient-boosted ensemble, and there is no XGBoost in Swift. VeilGarde's trainer reproduces XGBoost 3.2's histogram method decision for decision. Gradients and gains are single precision and histograms double, each sibling's histogram is built by subtraction, and ties break toward the lower feature, then the lower bin.</p>
+<div class="code" data-excerpt="Sources/VeilGardeTraining/Boost/BoostTrainer.swift:BoostTrainer.train(_:validation:params:warmStart:featureNames:progress:)"></div>
+<p>On integer features its trees equal XGBoost's node for node, in three configurations. On continuous features the bins differ slightly, and the AUC stays within 0.005. A warm start copies the parent's trees into the new file verbatim, so they stay byte-identical.</p>
+
+<h2 id="fusion">The camera head</h2>
+<p>The shipped head was grown from scratch on the day the warp left detection. The head before it also read the warp score and sharpness, and a warm start cannot continue a head on columns its parent never read. The trainer refuses that, and the plan says so before anything trains.</p>
+<p>Each row is the store's DINOv2 embedding and its nine capture values, in the head's own order. Rows from the newest generators carry their own weight, and 30% of them stay out of training, so the recall reported on them is held out.</p>
+<div class="code" data-excerpt="Sources/VeilGardeTraining/Camera/CameraTrainer.swift:CameraTrainer.train(_:settings:parent:note:)"></div>
+<p>A head trained on every row has no held-out AUC of its own. So the trainer first fits a twin the same way without a tenth of the rows, chosen by a hash of the row's id, and scores the twin on them. The written head still trains on every training row; the twin is measurement only.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>The scratch fit of 2026-10-21</th><th class="n">Value</th></tr></thead>
+<tbody>
+<tr><td>Store rows, not golden or NSFW</td><td class="n">113,195</td></tr>
+<tr><td>Trained on, new-generator rows held out</td><td class="n">111,626 and 1,569</td></tr>
+<tr><td>Trees, depth, learning rate</td><td class="n">500, 5, 0.04</td></tr>
+<tr><td>Recall on the held-out new-generator rows</td><td class="n">0.978</td></tr>
+<tr><td>The twin's held-out rows</td><td class="n">11,212</td></tr>
+<tr><td>The twin's AUC</td><td class="n">0.9817</td></tr>
+<tr><td>The twin's real false-positive rate and generated recall at 0.5</td><td class="n">0.052 and 0.918</td></tr>
+<tr><td>Seconds for the head, in release</td><td class="n">19.9</td></tr>
+</tbody>
+</table>
+</div>
+<p>From here the camera head moves the flywheel's way, by warm start. Each weekly candidate adds 80 trees at a learning rate of 0.03 and keeps every parent tree byte for byte.</p>
+
+<h2 id="heads">The heads</h2>
+<p>Each head is a standardized logistic regression, fitted by Newton's method to sklearn's own objective. It reaches sklearn's optimum within 1e-5. Each kind keeps its shipped recipe: which rows are positive, which negative, the regularization, the class weights, and a test split by source.</p>
+<div class="code" data-excerpt="Sources/VeilGardeTraining/Heads/HeadTrainer.swift:HeadTrainer.train(_:positives:negatives:settings:store:parent:note:)"></div>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Head, retrained on the seed store on 2026-10-19</th><th class="n">Test AUC, trained here</th><th class="n">The shipped head, same rows</th></tr></thead>
+<tbody>
+<tr><td class="mono">art</td><td class="n">0.9774</td><td class="n">0.9439</td></tr>
+<tr><td class="mono">blur</td><td class="n">0.9629</td><td class="n">0.9177</td></tr>
+<tr><td class="mono">human</td><td class="n">0.6713</td><td class="n">0.6955</td></tr>
+<tr><td class="mono">preview</td><td class="n">0.9535</td><td class="n">0.9719</td></tr>
+<tr><td class="mono">cgi, not shipped since 2026-10-21, its code removed</td><td class="n">0.9847</td><td class="n">0.9668</td></tr>
+<tr><td class="mono">art-pair, not shipped since 2026-10-19, its code removed</td><td class="n">0.9638</td><td class="n">0.9498</td></tr>
+</tbody>
+</table>
+</div>
+<p>The shipped preview head was trained on these rows, so its number is not held out. The human head's test is split by source, the hardest split, and both heads find it hard. The cgi head left the bundle with the render arbiter, its only reader; its numbers here are the record.</p>
+
+<h2 id="combiner">The combiner</h2>
+<p>The combiner pools the camera head, its anchor, with the art, blur and human heads on images with no capture signature. It is fitted with every weight held at zero or above, so no evidence can be counted backwards. Each real row counts three times, so a false alarm on a real photograph costs more.</p>
+<div class="code" data-excerpt="Sources/VeilGardeTraining/Combiner/CombinerTrainer.swift:CombinerTrainer.train(_:evidence:settings:note:)"></div>
+<p>It writes the combiner keyed by member: the anchor's weight, each evidence member by name with its weight, and the rescue.</p>
+<p>Its rescue weight is chosen by a sweep that must keep every protect-real probe real and none above 0.42. On this refit every candidate weight kept the probes real, but the highest stayed at 0.4645, so the sweep chose none and the combiner took the fallback.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>The refit of 2026-10-21</th><th class="n">Value</th></tr></thead>
+<tbody>
+<tr><td>Capture-absent store rows, train and test</td><td class="n">77,879 and 19,302</td></tr>
+<tr><td>Inputs</td><td class="n">5</td></tr>
+<tr><td>w0 and the anchor's weight</td><td class="n">−1.022 and 1.664</td></tr>
+<tr><td>The evidence weights for art, blur and human</td><td class="n">0.153, 0.220, 0.300</td></tr>
+<tr><td>The rescue weight, the fallback</td><td class="n">1.0</td></tr>
+<tr><td>Test AUC, the camera head and then pooled</td><td class="n">0.9908 → 0.9883</td></tr>
+<tr><td>Real false-positive rate, the camera head and then pooled</td><td class="n">0.034 → 0.015</td></tr>
+<tr><td>The fit of 2026-10-19, warp-era head and noiseprint: test AUC</td><td class="n">0.9896 → 0.9901</td></tr>
+<tr><td>The fit of 2026-10-19: real false-positive rate</td><td class="n">0.031 → 0.012</td></tr>
+</tbody>
+</table>
+</div>
+<p>The camera head's numbers here are in-sample: it was trained on these rows. Pooling costs a little AUC and cuts the false alarms on real photographs by more than half, the trade the combiner is built to make. The last two rows are the fit before it, under the warp-era head and with the noiseprint.</p>
+
+<h2 id="backbones">The backbones</h2>
+<p>DINOv2 is not trained here; it is imported. The import starts from Hugging Face's checkpoint, renames each tensor, moves the patch convolution's axes, and resizes the 37×37 position grid to 16×16 for a 224-pixel input.</p>
+<p>That resize has to be PyTorch's, bit for bit, or the file would differ from the shipped export. Plain single-precision arithmetic matched 44% of the values. Fusing the multiply-adds the compiler fused in PyTorch's kernel, in the source position, the weights and the sums, matches every value at every scale tried.</p>
+<div class="code" data-excerpt="Sources/VeilGardeTraining/Backbone/TorchBicubic.swift:TorchBicubic.resize(_:planes:input:output:)"></div>
+<p>The imported small file is byte-identical to the shipped one, so its hash is the manifest's pin. The F16 and 8-bit variants match the reference export tensor for tensor.</p>
+
+<h2 id="sources">Where the numbers come from</h2>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>Node for node on integer features; AUC within 0.005; byte-preserving warm start</td><td><a href="index.html#test-7">Ledger test-7</a>, the training tests against xgboost 3.2 fixtures</td><td>2026-10-19</td></tr>
+<tr><td>The scratch fit: rows, held-out rows, trees, recall, the twin's AUC, false-positive rate and recall, seconds</td><td><a href="index.html#command-89">Ledger command-89</a> and <a href="index.html#decision-110">decision-110</a>; candidates/fusion-20261021/fusion/metrics.json</td><td>2026-10-21</td></tr>
+<tr><td>The combiner's rows, weights, sweep and test</td><td><a href="index.html#command-89">Ledger command-89</a>; candidates/fusion-20261021/combiner/metrics.json</td><td>2026-10-21</td></tr>
+<tr><td>The combiner of 2026-10-19: 0.9896 to 0.9901, 3.1% to 1.2%</td><td><a href="index.html#command-20">Ledger command-20</a>, under the warp-era head</td><td>2026-10-19</td></tr>
+<tr><td>The heads' table; within 1e-5 of sklearn</td><td><a href="index.html#command-18">Ledger command-18</a> and <a href="index.html#test-7">test-7</a></td><td>2026-10-19</td></tr>
+<tr><td>The cgi head out of the bundle and the recipe; its code and the art-pair's removed</td><td><a href="index.html#decision-113">Ledger decision-113</a>; <a href="index.html#decision-133">decision-133</a></td><td>2026-10-21</td></tr>
+<tr><td>The recipe as a list of trainable members, the DSL on both sides</td><td><a href="index.html#decision-132">Ledger decision-132</a></td><td>2026-10-21</td></tr>
+<tr><td>44% with plain arithmetic, every value fused</td><td>Test “the bicubic resize is PyTorch's, bit for bit”</td><td>2026-10-19, against torch 2.11</td></tr>
+<tr><td>Byte-identical small; tensor-identical xsmall and xxsmall</td><td><a href="index.html#command-40">Ledger command-40</a> and <a href="index.html#command-41">command-41</a></td><td>2026-10-19</td></tr>
+</tbody>
+</table>
+</div>
+
+<details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
+<ul class="plain">
+<li>Training's folders run in order: Data, Extract, Boost and Linear, then Camera, Heads and Combiner, then Recipe with its Members, Engine and Artifacts, and Backbone for the imports.</li>
+<li>A trainable member conforms to TrainableMember: its name, its rank, its plan and its training. CameraHead, SpecialistHead and Combiner are the three; TrainingRecipe.kinds lists the types a recipe file may name.</li>
+<li><code>veilgarde train plan --preset</code> prints the shipped recipe's plan without training; <code>train all</code> trains it; <code>train camera</code>, <code>train heads</code> and <code>train combiner</code> train one member; <code>train run &lt;recipe.toml&gt;</code> trains a recipe file with <code>[camera]</code>, <code>[heads]</code> and <code>[combiner]</code> tables.</li>
+<li>Train in release: <code>VEILGARDE_CONFIG=release Scripts/cli.sh train …</code>. The store defaults to the work area's <code>store/shards</code>.</li>
+<li>The tests hold the trainers to references written once in Python: XGBoost's trees, scikit-learn's logistic fits and scipy's bounded optimum.</li>
+</ul>
+</div></details>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/index.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount();</script>
+</body>
+</html>

@@ -10,7 +10,7 @@
 //  PIN:  The parent bundle is the shipped one unless --parent names another (a candidate, or
 //        <work area>/live). The store defaults to <work area>/store/shards; --store names
 //        another (any store in the same shard format reads as is). Train in release:
-//        VEILGARDE_CONFIG=release scripts/cli.sh train …
+//        VEILGARDE_CONFIG=release Scripts/cli.sh train …
 //
 
 import ArgumentParser
@@ -75,7 +75,7 @@ func datasetURL(_ path: String) -> URL { URL(fileURLWithPath: (path as NSString)
 struct TrainCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "train", abstract: "Train the stack's trainable members into a candidate bundle: the camera head, the heads, the combiner.",
-        discussion: "Train in release (VEILGARDE_CONFIG=release scripts/cli.sh train …). A candidate is a full bundle: run it with `veilgarde route <image> --bundle <candidate>`.",
+        discussion: "Train in release (VEILGARDE_CONFIG=release Scripts/cli.sh train …). A candidate is a full bundle: run it with `veilgarde route <image> --bundle <candidate>`.",
         subcommands: [Plan.self, Camera.self, Heads.self, CombinerFit.self, All.self, Run.self])
 
     struct Plan: ParsableCommand {

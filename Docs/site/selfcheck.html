@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The self-check · VeilGarde</title>
+<meta name="description" content="Every consistency check the site can make in a browser, run when the page opens: the data against itself, the declarations, the ids, the calls, both explorers' trails, find, the deep links and the ask orb.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-groups="all">
+<a class="skip" href="#main">Skip to the results</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · appendix</span><a href="code.html">The change explorer</a></header>
+<h1 id="ch-selfcheck">The self-check</h1>
+<p class="lede"><em>On every check the site can make in the browser, run when this page opened.</em></p>
+<p>The checks below hold the data to itself and to the code it embeds. Every declaration's lines lie inside its file, every signature line holds its keyword, and the ids this page derives equal the build's. Every call edge joins two declarations with a tier, and every trail entry on both explorers resolves and still holds its anchor.</p>
+<p>A page opened from disk cannot read the repository, so the comparison with the working tree runs in Docs/site/src/check.py, which fails when a file changed after the build. That script opens this page in Chrome and fails if any check below fails.</p>
+<div id="summary"></div>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/run.js"></script>
+<script src="data/index.js"></script>
+<script src="js/explorer.js"></script>
+<script src="js/ask.js"></script>
+<script>
+VeilGarde.mount(null, function () {
+  var V = window.VeilGarde, h = V.h, results = V.selfCheck(), failed = results.filter(function (r) { return !r.ok; });
+  var summary = document.getElementById("summary"), idx = V.data().index || {};
+  summary.appendChild(h("p", { class: "close" }, [failed.length ? failed.length + " of " + results.length + " checks failed" : "All " + results.length + " checks passed",
+    idx.head ? " · data built from " + idx.base.short + " to " + idx.head.short + (idx.head.dirty ? " and the working tree" : "") : ""]));
+  summary.appendChild(h("div", { class: "scroll" }, h("table", { class: "data" }, [
+    h("thead", null, h("tr", null, [h("th", null, "Part"), h("th", null, "Check"), h("th", null, "Result")])),
+    h("tbody", null, results.map(function (r) {
+      return h("tr", null, [h("td", { class: "mono nowrap" }, r.part || ""), h("td", null, r.name), h("td", null, [h("span", { class: "status " + (r.ok ? "ok" : "bad") }, r.ok ? "✓ passed" : "✗ failed"), r.detail ? " · " + r.detail : ""])]);
+    }))])));
+});
+</script>
+</body>
+</html>

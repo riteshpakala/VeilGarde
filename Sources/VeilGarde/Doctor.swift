@@ -81,7 +81,7 @@ public enum Doctor {
         if FileManager.default.fileExists(atPath: library.path) {
             return DoctorCheck("metal", ok: true, library.path)
         }
-        return DoctorCheck("metal", ok: false, "no mlx.metallib beside \(directory.path)\n        run scripts/cli.sh (it installs one) or ./build-metallib.sh")
+        return DoctorCheck("metal", ok: false, "no mlx.metallib beside \(directory.path)\n        run Scripts/cli.sh (it installs one) or ./build-metallib.sh")
     }
 
     static func workArea(_ area: WorkArea) -> DoctorCheck {

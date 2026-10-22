@@ -7,7 +7,7 @@
 //        signature (its codes at every grid phase, slid over the signature's). Nothing is added
 //        to the pixels: the mark is what the warp residual already reads off them.
 //  PIN:  v1 is a design under measurement, not a claim: `veilgarde watermark accept` runs the
-//        acceptance and its kill criterion (docs/site/08-watermark.html). Signing reads the grid at phase
+//        acceptance and its kill criterion (Docs/site/08-watermark.html). Signing reads the grid at phase
 //        (0, 0); a self-match therefore lands at offset 0, phase 0, score 1. Resizing is out of
 //        scope for v1: a resized image changes its tiles and is measured only to show where it
 //        breaks.

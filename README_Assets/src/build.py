@@ -34,6 +34,7 @@ LANES = (436, 502)   # the verdict's lane above, the signature's below
 TILE = 7.5           # one 32-pixel tile of the image, drawn
 GRID_X = 68          # the mosaic's left edge
 LENS = (556, 618)    # the sixteen warps, on the signature's lane
+REACH = 40           # the warps' half-height about the signature's lane, short of the verdict's
 WORDS_END = 1040     # the stage words stop here; a short line runs on to each lane's mark at 1102
 
 
@@ -112,7 +113,7 @@ def lens():
         x = x0 + (x1 - x0) * i / 15
         points = []
         for step in range(0, 61):
-            y = Y - 62 + 124 * step / 60
+            y = Y - REACH + 2 * REACH * step / 60
             fold = 2.0 * math.sin(2 * math.pi * (y - Y) / 64 + i * 0.85)
             points.append(f"{x + fold:.1f},{y:.1f}")
         opacity = 0.14 + 0.24 * math.sin(math.pi * (i + 0.5) / 16)
@@ -121,13 +122,15 @@ def lens():
 
 
 def hero(browser, golden, signature):
-    scores = golden["semantic_tiles"]
+    member = {m["name"]: m for m in golden["stack"]}
+    combiner = next(r for r in golden["revisions"] if r["name"] == "combiner")
+    scores = member["semantic-tiles"]["grid"]
     cols = signature["cols"]
     fragility = [signature["fr"][r * cols:(r + 1) * cols] for r in range(signature["rows"])]
     tiles = sum(len(r) for r in scores)
     above = sum(1 for r in scores for p in r if p > 0.5)
     verdict = golden["verdict"]
-    stages = [("base", f"{golden['route_diagnostics']['base_p']:.2f}"), ("stack", f"{golden['route_diagnostics']['pre_semantic_p']:.4f}"),
+    stages = [("base", f"{member['camera']['p']:.2f}"), ("stack", f"{combiner['p']:.4f}"),
               ("verdict", verdict["prediction"])]
     marks = [("fr", f"{tiles} tiles"), ("bits", "4 a tile"), ("vw1", signature["cid"][:8])]
     words = "".join(f'<span class="stage"><small>{name}</small> {value}</span>' for name, value in stages)
@@ -167,14 +170,14 @@ svg {{ position: absolute; left: 0; top: 0; }}
     <linearGradient id="fade-y" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.3" stop-color="#fff"/>
       <stop offset="0.7" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-    <mask id="fade" maskUnits="userSpaceOnUse" x="0" y="{Y - 70}" width="1200" height="140">
-      <rect x="0" y="{Y - 62}" width="1200" height="124" fill="url(#fade-y)"/></mask>
+    <mask id="fade" maskUnits="userSpaceOnUse" x="0" y="{LANES[1] - REACH - 8}" width="1200" height="{2 * REACH + 16}">
+      <rect x="0" y="{LANES[1] - REACH}" width="1200" height="{2 * REACH}" fill="url(#fade-y)"/></mask>
     <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
       <stop offset="0" stop-color="{LINE}" stop-opacity="0.10"/><stop offset="1" stop-color="{LINE}" stop-opacity="0"/></radialGradient>
   </defs>
   {mosaic(scores, fragility)}
   {rows(scores)}
-  <ellipse cx="{sum(LENS) / 2}" cy="{LANES[1]}" rx="58" ry="70" fill="url(#glow)"/>
+  <ellipse cx="{sum(LENS) / 2}" cy="{LANES[1]}" rx="58" ry="{REACH + 8}" fill="url(#glow)"/>
   {lens()}
   <line id="tail1" x1="{WORDS_END}" y1="{LANES[0]}" x2="1092" y2="{LANES[0]}" stroke="{LINE}" stroke-width="3" stroke-linecap="round"/>
   <circle cx="1102" cy="{LANES[0]}" r="9.5" fill="none" stroke="{GOLD}" stroke-width="2.4"/>

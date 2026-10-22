@@ -103,21 +103,21 @@ DINOv2 and the capture measurement run on the GPU through MLX, by way of [Frigat
 ## The CLI at a glance
 
 ```sh
-scripts/cli.sh doctor                                   # builds veilgarde, installs MLX's Metal library, checks the setup
-scripts/cli.sh route photo.jpg                          # the full detector: the verdict, every member's score, every revision
-scripts/cli.sh route photo.jpg --json                   # the same, as the schema-v1 result
-scripts/cli.sh train plan --preset                      # what the shipped recipe would train, without training
-VEILGARDE_CONFIG=release scripts/cli.sh train heads     # a candidate bundle under <work area>/candidates/
-scripts/cli.sh flywheel init && scripts/cli.sh flywheel battery --gate full
-VEILGARDE_CONFIG=release scripts/cli.sh research census  # every call of a bundle on the battery and 200 labelled images
-scripts/cli.sh watermark sign photo.jpg > photo.vw1 && scripts/cli.sh watermark match crop.jpg photo.vw1
+Scripts/cli.sh doctor                                   # builds veilgarde, installs MLX's Metal library, checks the setup
+Scripts/cli.sh route photo.jpg                          # the full detector: the verdict, every member's score, every revision
+Scripts/cli.sh route photo.jpg --json                   # the same, as the schema-v1 result
+Scripts/cli.sh train plan --preset                      # what the shipped recipe would train, without training
+VEILGARDE_CONFIG=release Scripts/cli.sh train heads     # a candidate bundle under <work area>/candidates/
+Scripts/cli.sh flywheel init && Scripts/cli.sh flywheel battery --gate full
+VEILGARDE_CONFIG=release Scripts/cli.sh research census  # every call of a bundle on the battery and 200 labelled images
+Scripts/cli.sh watermark sign photo.jpg > photo.vw1 && Scripts/cli.sh watermark match crop.jpg photo.vw1
 ```
 
-`scripts/cli.sh` builds `veilgarde`, installs `mlx.metallib` beside it, and finds Frigate. `scripts/cli.sh <command> --help` lists a command's flags.
+`Scripts/cli.sh` builds `veilgarde`, installs `mlx.metallib` beside it, and finds Frigate. `Scripts/cli.sh <command> --help` lists a command's flags.
 
 ## Examples
 
-[Examples/](Examples/README.md) runs both regimes on this Mac in one program and exits 0 only when every checkpoint holds: one image's capture signature and DINOv2 embeddings, the camera head's row built by hand, every member of the stack and the combiner revision's arithmetic term by term, then each trainer in miniature, the flywheel's promote and rollback, and the watermark. [The site's chapter 9](docs/site/09-examples.html) walks through it.
+[Examples/](Examples/README.md) runs both regimes on this Mac in one program and exits 0 only when every checkpoint holds: one image's capture signature and DINOv2 embeddings, the camera head's row built by hand, every member of the stack and the combiner revision's arithmetic term by term, then each trainer in miniature, the flywheel's promote and rollback, and the watermark. [The site's chapter 9](Docs/site/09-examples.html) walks through it.
 
 ```sh
 Examples/run.sh
@@ -125,9 +125,9 @@ Examples/run.sh
 
 ## VeilGarde docsite
 
-A site that explains each layer and shows every file this build changed, verbatim, with each Swift declaration's calls and callers, and the run's ledger of commands, tests and decisions. Nine trails walk the code in the order it runs: how the camera head and the specialist stack are trained, detection stage by stage from Decode through Shared Signals, Stack and Revisions to Result, and how the watermark signs an image and matches a crop of it. A grid picks them, a row for each flow and a column for each kind. Double-click scripts/site.command, or open [docs/site/index.html](docs/site/index.html); it is plain HTML with no build step. [docs/site/README.md](docs/site/README.md) says how it is rebuilt and checked.
+A site that explains each layer and shows every file this build changed, verbatim, with each Swift declaration's calls and callers, and the run's ledger of commands, tests and decisions. Nine trails walk the code in the order it runs: how the camera head and the specialist stack are trained, detection stage by stage from Decode through Shared Signals, Stack and Revisions to Result, and how the watermark signs an image and matches a crop of it. A grid picks them, a row for each flow and a column for each kind. Double-click Scripts/site.command, or open [Docs/site/index.html](Docs/site/index.html); it is plain HTML with no build step. [Docs/site/README.md](Docs/site/README.md) says how it is rebuilt and checked.
 
-The site's chat asks Mistral about what you are reading. On a Mac that holds a Mistral key in its key store, `scripts/site.command` hands the site that key; anyone else is asked for their own key in a dialog when the chat opens, and it stays in their browser.
+The site's chat asks Mistral about what you are reading. On a Mac that holds a Mistral key in its key store, `Scripts/site.command` hands the site that key; anyone else is asked for their own key in a dialog when the chat opens, and it stays in their browser.
 
 ## Requirements and tests
 
