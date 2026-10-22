@@ -115,12 +115,12 @@ scripts/cli.sh watermark sign photo.jpg > photo.vw1 && scripts/cli.sh watermark 
 
 `scripts/cli.sh` builds `veilgarde`, installs `mlx.metallib` beside it, and finds Frigate. `scripts/cli.sh <command> --help` lists a command's flags.
 
-## The playground
+## Examples
 
-[Playground/](Playground/README.md) runs both regimes on this Mac in one program and exits 0 only when every checkpoint holds: one image's capture signature and DINOv2 embeddings, the camera head's row built by hand, every member of the stack and the combiner revision's arithmetic term by term, then each trainer in miniature, the flywheel's promote and rollback, and the watermark. [The site's chapter 9](docs/site/09-playground.html) walks through it.
+[Examples/](Examples/README.md) runs both regimes on this Mac in one program and exits 0 only when every checkpoint holds: one image's capture signature and DINOv2 embeddings, the camera head's row built by hand, every member of the stack and the combiner revision's arithmetic term by term, then each trainer in miniature, the flywheel's promote and rollback, and the watermark. [The site's chapter 9](docs/site/09-examples.html) walks through it.
 
 ```sh
-Playground/run.sh
+Examples/run.sh
 ```
 
 ## VeilGarde docsite

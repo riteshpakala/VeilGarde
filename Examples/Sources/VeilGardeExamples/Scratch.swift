@@ -1,9 +1,9 @@
 //
 //  Scratch.swift
-//  VeilGardePlayground
+//  VeilGardeExamples
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The playground's own work area (Playground/.work, gitignored) and MLX's Metal library
+//  WHAT: The examples' own work area (Examples/.work, gitignored) and MLX's Metal library
 //        beside whichever binary runs: run.sh installs it, and a run from Xcode copies the one
 //        Frigate's build-metallib.sh staged.
 //
@@ -12,7 +12,7 @@ import Foundation
 import VeilGarde
 
 enum Scratch {
-    static let work = Images.repoRoot.appendingPathComponent("Playground/.work", isDirectory: true)
+    static let work = Images.repoRoot.appendingPathComponent("Examples/.work", isDirectory: true)
 
     static var workArea: WorkArea { WorkArea(root: work) }
 
@@ -26,7 +26,7 @@ enum Scratch {
             Images.repoRoot.appendingPathComponent(".build/out/Products/Debug/mlx.metallib"),
         ]
         guard let source = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
-            throw VeilGardeFailure.missing("no mlx.metallib beside \(binary.path)", hint: "run Playground/run.sh, which installs it")
+            throw VeilGardeFailure.missing("no mlx.metallib beside \(binary.path)", hint: "run Examples/run.sh, which installs it")
         }
         try FileManager.default.copyItem(at: source, to: target)
         return source.path

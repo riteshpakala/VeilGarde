@@ -138,6 +138,11 @@
       "id": "amendment-27",
       "date": "2026-10-21",
       "text": "The way we should be designing this is that the fusion head is meant for detecting cameras and that should be apart of the stack as its own lane rather than treated as a stage. Our entire detection stage pipeline can be even more simplified. Decode -> Shared Signals -> Stack -> Revisions -> Result. Screenshot and Fusion Head (Camera) should be apart of the stack with its own score. The only goal is to show all scores all specialists providing an unbiased overall mapped take on where this image came from and whether it could have been generated in that sector of visuals. Do you understand what I am getting at? And then over time the main goal is to simply add to the shared signals and stack to improve our detection mechanism a flywheel that increases in accuracy indefinitely no matter how robust image generation gets. Creating very easy pipelines to add to a modular stack. Where the inference and training even match this DSL like syntax where the code itself stylizes the modularity as written. After adjusting this once more let's update this schema to just be v1, remove legacy code and let's start fresh with this as the baseline."
+    },
+    {
+      "id": "amendment-28",
+      "date": "2026-10-21",
+      "text": "1) Can we update \"Playground\" To be \"Examples\" and then update the README accordingly as well 2) Update The detection accuracy sections with a disclaimer saying things are in progress of updating, the dataset, the training regime, the golden anchors, to optimize towards a push in increasing generation accuracy up to 80% in the coming weeks. 3) Create the commits in git and I'll push"
     }
   ],
   "answers": [
@@ -531,7 +536,7 @@
       "chose": "The Playground reads the parity crops and Garde's goldens from Tests/VeilGardeInferenceTests/Fixtures",
       "rejected": "copying them into Playground/Images",
       "reason": "one copy of each golden; the playground checks itself against the same bytes the tests do",
-      "file": "Playground/Sources/VeilGardePlayground/Images.swift"
+      "file": "Examples/Sources/VeilGardeExamples/Images.swift"
     },
     {
       "id": "decision-23",
@@ -1358,6 +1363,13 @@
       "rejected": "a new version number for a change that moved no number",
       "reason": "amendment-27 asks to start fresh with this as the baseline; the goldens, the battery and the census calls equal v1.0.0's",
       "file": "Sources/VeilGardeCore/Support/Version.swift"
+    },
+    {
+      "id": "decision-136",
+      "chose": "The playground is Examples: the folder Examples/, the package and executable VeilGardeExamples, Examples/run.sh, the scratch area Examples/.work and the site's chapter 09-examples.html; the toy store's split salt keeps its name so the sample does not move",
+      "rejected": "keeping the name Playground",
+      "reason": "amendment-28",
+      "file": "Examples/Package.swift"
     }
   ],
   "commands": [

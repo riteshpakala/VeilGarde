@@ -1,6 +1,6 @@
 //
 //  Golden.swift
-//  VeilGardePlayground
+//  VeilGardeExamples
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: Comparing a result JSON with VeilGarde's own golden: every label exact and every number

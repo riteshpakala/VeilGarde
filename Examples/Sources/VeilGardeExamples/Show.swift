@@ -1,9 +1,9 @@
 //
 //  Show.swift
-//  VeilGardePlayground
+//  VeilGardeExamples
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: How the playground prints: numbered step headers, and the checkpoints it collects for the
+//  WHAT: How the examples print: numbered step headers, and the checkpoints it collects for the
 //        last step.
 //
 
@@ -20,7 +20,7 @@ enum Show {
     static func f(_ x: Float, _ digits: Int = 4) -> String { String(format: "%.\(digits)f", x) }
 }
 
-/// Every checkpoint the playground makes, for the verify step and the exit code.
+/// Every checkpoint the examples make, for the verify step and the exit code.
 final class Checkpoints {
     private(set) var all: [(String, Bool)] = []
 

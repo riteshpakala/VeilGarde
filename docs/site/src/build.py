@@ -1149,7 +1149,7 @@ def group_key(group):
     if group.startswith("Tests-"):
         t = group[6:]
         return (1, layer(t[:-5] if t.endswith("Tests") else t), group)
-    return ({"Playground": 2, "scripts": 3, "docs": 4, "root": 5}.get(group, 6), 0, group)
+    return ({"Examples": 2, "scripts": 3, "docs": 4, "root": 5}.get(group, 6), 0, group)
 
 
 def layer_of(group):
@@ -1833,7 +1833,7 @@ def build(stats=False):
         c.first = c.swift.first if c.swift else total
         total += len(c.swift.scopes) if c.swift else 0
         c.classify()
-        if (c.lang == "swift" and c.path.startswith(("Sources/", "Tests/", "Playground/")) and Path(c.path).name != "Package.swift"
+        if (c.lang == "swift" and c.path.startswith(("Sources/", "Tests/", "Examples/")) and Path(c.path).name != "Package.swift"
                 and c.swift and not (c.swift.header and c.swift.header.get("what"))):
             warnings.append(f"{c.path}: no //  WHAT: header")
     facts = bundle_facts()

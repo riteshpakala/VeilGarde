@@ -4,7 +4,7 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The manifest and the sources to the package's rules, as text over Package.swift,
-//        Sources/, Tests/ and Playground/: exactly four products; the layer table (which target
+//        Sources/, Tests/ and Examples/: exactly four products; the layer table (which target
 //        may depend on which); MLX only through Frigate, each Frigate module imported only by a
 //        target that lists its product; Core on Foundation and Crypto alone; nothing imports
 //        MLXLLM, MLXLMCommon, AppKit or UIKit; nothing re-declares a Frigate function; no type is
@@ -187,7 +187,7 @@ struct PackageLayeringTests {
 
     @Test("nothing imports MLXLLM, MLXLMCommon, UIKit or SwiftUI, and AppKit only to decode images")
     func noForbiddenImports() throws {
-        for file in swiftFiles(under: "Sources") + swiftFiles(under: "Playground/Sources") {
+        for file in swiftFiles(under: "Sources") + swiftFiles(under: "Examples/Sources") {
             let names = Set(imports(in: try String(contentsOf: file, encoding: .utf8)))
             for forbidden in ["MLXLLM", "MLXLMCommon", "UIKit", "SwiftUI"] {
                 #expect(!names.contains(forbidden), "\(file.lastPathComponent) imports \(forbidden)")
@@ -244,11 +244,11 @@ struct PackageLayeringTests {
 
     @Test("every Swift file opens with its name, its target, its license and a WHAT")
     func headers() throws {
-        for root in ["Sources", "Tests", "Playground/Sources"] {
+        for root in ["Sources", "Tests", "Examples/Sources"] {
             for file in swiftFiles(under: root) {
                 let body = try String(contentsOf: file, encoding: .utf8)
                 let target = file.deletingLastPathComponent().pathComponents
-                    .drop { $0 != (root == "Playground/Sources" ? "Sources" : root) }.dropFirst().first ?? ""
+                    .drop { $0 != (root == "Examples/Sources" ? "Sources" : root) }.dropFirst().first ?? ""
                 let header = "//\n//  \(file.lastPathComponent)\n//  \(target)\n//  \(license)\n//\n//  WHAT:"
                 #expect(body.hasPrefix(header), "\(file.path.replacingOccurrences(of: repoRoot.path + "/", with: "")) does not open with its WHAT header")
             }
@@ -257,11 +257,11 @@ struct PackageLayeringTests {
 
     @Test("the manifests, every script and the site's code name the GPL-3.0 at the top")
     func licenses() throws {
-        for manifest in ["Package.swift", "Playground/Package.swift"] {
+        for manifest in ["Package.swift", "Examples/Package.swift"] {
             let lines = try text(manifest).split(separator: "\n", omittingEmptySubsequences: false)
             #expect(lines.count > 1 && lines[1] == "// \(license)", "\(manifest) names its license on its second line")
         }
-        var scripts: [String] = ["build-metallib.sh", "Playground/run.sh"]
+        var scripts: [String] = ["build-metallib.sh", "Examples/run.sh"]
         for folder in ["scripts", "docs/site/src", "docs/site/js"] {
             let names = (try? FileManager.default.contentsOfDirectory(atPath: repoRoot.appendingPathComponent(folder).path)) ?? []
             scripts += names.filter { !$0.hasPrefix(".") && ["sh", "py", "js", "command"].contains(URL(fileURLWithPath: $0).pathExtension) }.map { "\(folder)/\($0)" }

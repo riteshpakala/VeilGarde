@@ -1,4 +1,4 @@
-# The VeilGarde playground
+# The VeilGarde examples
 
 One program, read top to bottom, that runs VeilGarde's two lanes on this Mac and checks itself against VeilGarde's own goldens:
 
@@ -8,8 +8,8 @@ One program, read top to bottom, that runs VeilGarde's two lanes on this Mac and
 3. **Semantics.** DINOv2-small's two readings of the same image, 384 numbers each: the plain one the camera head reads and the force-resized one the linear heads read.
 4. **Camera.** The 393-column camera row built by hand, DINOv2's 384 then the nine capture values, and the camera head's P(AI).
 5. **The stack.** Every member of the stack with its own P(AI) and verdict, every revision and what it did, the combiner revision's arithmetic term by term, and the result against VeilGarde's goldens.
-6. **Training, in miniature.** A `TrainingRecipe` written in Swift (a warm start on the shipped camera head, the human head, the combiner), its plan, and the engine's run into a candidate bundle in `Playground/.work/candidates/playground`, on a seeded sample of the work area's feature store, three columns a row. Without the store, seeded synthetic rows stand in, and the step says so.
-7. **The flywheel.** The regime alone, in `Playground/.work`: the shipped bundle copied as the live bundle, a regression battery (every image keeps the call the shipped detector gives it, as HARD groups), a frozen weight and a retired slot refused, the human head from step 6 promoted behind its admission gate and the battery, the promote log, and a rollback.
+6. **Training, in miniature.** A `TrainingRecipe` written in Swift (a warm start on the shipped camera head, the human head, the combiner), its plan, and the engine's run into a candidate bundle in `Examples/.work/candidates/examples`, on a seeded sample of the work area's feature store, three columns a row. Without the store, seeded synthetic rows stand in, and the step says so.
+7. **The flywheel.** The regime alone, in `Examples/.work`: the shipped bundle copied as the live bundle, a regression battery (every image keeps the call the shipped detector gives it, as HARD groups), a frozen weight and a retired slot refused, the human head from step 6 promoted behind its admission gate and the battery, the promote log, and a rollback.
 8. **The watermark.** The first parity crop signed by its own fragility pattern (four ordinal bits a tile, sectioned 4×4), matched against itself, then a half-area crop at a seeded random offset found by the phase search, and a JPEG q75 re-encode; the crop and the re-encode are reported, not asserted.
 9. **Verify.** Every checkpoint; the exit code is 0 only when all hold.
 
@@ -17,10 +17,10 @@ One program, read top to bottom, that runs VeilGarde's two lanes on this Mac and
 
 ```sh
 scripts/cli.sh weights import-dinov2   # once: DINOv2's weights into the work area
-Playground/run.sh                      # builds release, installs mlx.metallib, runs
+Examples/run.sh                      # builds release, installs mlx.metallib, runs
 ```
 
-The first build compiles Frigate's MLX and takes minutes. From Xcode, open `Playground/Package.swift` and Run; step 0 copies a staged `mlx.metallib` beside Xcode's binary.
+The first build compiles Frigate's MLX and takes minutes. From Xcode, open `Examples/Package.swift` and Run; step 0 copies a staged `mlx.metallib` beside Xcode's binary.
 
 ## What the checkpoints compare
 
@@ -34,6 +34,6 @@ The first build compiles Frigate's MLX and takes minutes. From Xcode, open `Play
 - The frozen weights never move, and after the promote and its rollback the live bundle is byte for byte what it was.
 - The watermarked image matches its own signature at offset (0, 0) with score 1.
 
-On 2026-10-21 every one of the 12 checkpoints held. It writes nothing outside `Playground/.work` (gitignored), and only from step 6 on. Run the candidate it trains with
-`scripts/cli.sh route <image> --bundle Playground/.work/candidates/playground`, and look at its flywheel with
-`scripts/cli.sh flywheel status --work-area Playground/.work`.
+On 2026-10-21 every one of the 12 checkpoints held. It writes nothing outside `Examples/.work` (gitignored), and only from step 6 on. Run the candidate it trains with
+`scripts/cli.sh route <image> --bundle Examples/.work/candidates/examples`, and look at its flywheel with
+`scripts/cli.sh flywheel status --work-area Examples/.work`.

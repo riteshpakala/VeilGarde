@@ -1,6 +1,6 @@
 //
 //  main.swift
-//  VeilGardePlayground
+//  VeilGardeExamples
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: VeilGarde end to end, top to bottom, in its two lanes. The detector first, one part at a
@@ -12,8 +12,8 @@
 //        watermark (step 8: a signature read off the warp residual, matched by a crop and a
 //        re-encode). Every step that has a golden checks itself against it.
 //  IN:   The DINOv2 weights in the work area or VEILGARDE_WEIGHTS; final_mixed under
-//        VEILGARDE_DATASETS for the iPhone sample (optional). Run by Playground/run.sh.
-//  OUT:  One numbered block per step; Playground/.work for the training steps. Exit 0 only when
+//        VEILGARDE_DATASETS for the iPhone sample (optional). Run by Examples/run.sh.
+//  OUT:  One numbered block per step; Examples/.work for the training steps. Exit 0 only when
 //        every checkpoint holds.
 //  PIN:  One MLX workload at a time; everything runs on this thread. The result is held to
 //        VeilGarde's own goldens with labels exact and numbers within 1e-4 (Frigate's Metal kernels
@@ -119,7 +119,7 @@ func run() throws {
     Show.step(6, "train", "the training regime in miniature, on the code paths `veilgarde train` runs")
     let rows = try Toy.writeStore()
     Show.line("store: \(rows)")
-    let recipe = TrainingRecipe(id: "playground") {
+    let recipe = TrainingRecipe(id: "examples") {
         CameraHead().warmStart(add: 2, eta: 0.03)                    // the flywheel's only camera move
         SpecialistHead(.human)                                       // one category head, the shipped recipe
         Combiner()                                                   // pooled over the candidate's heads
@@ -161,10 +161,10 @@ func run() throws {
     var verified = true
     do { try candidate.verify() } catch { verified = false }
     checks.record("the candidate bundle verifies (\(candidate.manifest.artifacts.count) artifacts, every hash): \(candidate.root.path)", verified)
-    Show.line("run it:  scripts/cli.sh route Tests/VeilGardeInferenceTests/Fixtures/crops/crop_ben.png --bundle Playground/.work/candidates/playground")
+    Show.line("run it:  scripts/cli.sh route Tests/VeilGardeInferenceTests/Fixtures/crops/crop_ben.png --bundle Examples/.work/candidates/examples")
 
-    // 7. The flywheel, on Playground/.work.
-    Show.step(7, "flywheel", "the flywheel alone: a live bundle, a battery, a promote and its rollback, all in Playground/.work")
+    // 7. The flywheel, on Examples/.work.
+    Show.step(7, "flywheel", "the flywheel alone: a live bundle, a battery, a promote and its rollback, all in Examples/.work")
     let fly = FlywheelArea(Scratch.workArea)
     try? FileManager.default.removeItem(at: fly.live)
     try? FileManager.default.removeItem(at: fly.battery)
@@ -182,7 +182,7 @@ func run() throws {
         floors["keeps_generated"] = BatteryGroupResult(acc: 1, n: keepsGenerated.count, expectedN: nil, inputComplete: nil, semAcc: nil, mode: .hard, want: "generated")
     }
     try fly.initialize(from: try ShippedBundle.verified(), spec: try JSONEncoder().encode(BatterySpec(groups: groups)), baseline: try JSONEncoder().encode(floors),
-                       note: "the playground's live bundle")
+                       note: "the examples' live bundle")
     Show.line("live: the shipped bundle copied to \(fly.live.path)")
     Show.line("battery: \(keepsReal.count) images that must stay real and \(keepsGenerated.count) that must stay generated (HARD groups)")
     let liveBefore = try fly.liveHashes()
@@ -215,7 +215,7 @@ func run() throws {
     }
     checks.record("the frozen weights never moved (\(weightsBefore.count) of them)", try fly.liveBundle().manifest.weights == weightsBefore)
     checks.record("live is byte for byte what it was before the promote", try fly.liveHashes() == liveBefore)
-    Show.line("look at it:  scripts/cli.sh flywheel status --work-area Playground/.work")
+    Show.line("look at it:  scripts/cli.sh flywheel status --work-area Examples/.work")
 
     // 8. The other lane: the watermark, read off the warp residual.
     let markImage = try ImageDecoding.cgImage(contentsOf: crops[0].url)
@@ -246,7 +246,7 @@ func run() throws {
 do {
     try run()
 } catch {
-    print("playground: \(error)")
+    print("examples: \(error)")
     exit(1)
 }
 exit(checks.passed ? 0 : 1)

@@ -8,7 +8,7 @@ The site is VeilGarde's docs and its two explorers in one folder of plain HTML. 
 | `code.html` | the change explorer: the tree, the source with old, new and diff, the declaration's card, the trails, find |
 | `ml.html` | the ML explorer: the same engine walked by the ML trails, each step's primer, deeper line, live facts and code-trail twins, a depth control, and the orb reading the ML side |
 | `selfcheck.html` | every check the browser can make, run when the page opens |
-| `01-fusion.html` … `10-record.html` | the chapters: the two lanes and then the machinery, the camera head, the specialists, the stages and the result, the bundle, training, the flywheel, the warp residual, the watermark, the playground, and the record of the research |
+| `01-fusion.html` … `10-record.html` | the chapters: the two lanes and then the machinery, the camera head, the specialists, the stages and the result, the bundle, training, the flywheel, the warp residual, the watermark, the examples, and the record of the research |
 
 ## Rebuilding and checking
 

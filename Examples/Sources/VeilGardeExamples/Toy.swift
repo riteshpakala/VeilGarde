@@ -1,12 +1,12 @@
 //
 //  Toy.swift
-//  VeilGardePlayground
+//  VeilGardeExamples
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The training regime in miniature, on real code paths: a small store, a seeded sample of the
 //        work area's feature store when this Mac has it. Without that store, seeded synthetic rows
 //        take its place, and the output says so.
-//  PIN:  Writes only Playground/.work; reads final_mixed and the work area's store, never writes them.
+//  PIN:  Writes only Examples/.work; reads final_mixed and the work area's store, never writes them.
 //
 
 import Foundation
