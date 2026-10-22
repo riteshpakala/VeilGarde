@@ -9,8 +9,9 @@
 //        against rules fixed before any comparison runs (DetectorComparisonRules).
 //  PIN:  Reads only the JSONs `research census` and `flywheel battery` wrote, joined by image path.
 //        The labelled images R2 counts are the census rows under a final_mixed folder (200 in the
-//        default census); the iPhone originals are the second census of each side. A census written
-//        before 2026-10-21 reads as is. Writes <work area>/research/compare-<name>-<stamp>.json.
+//        default census); the iPhone originals are the second census of each side. Rows are joined
+//        on path, label and call, which every census row keeps. Writes
+//        <work area>/research/compare-<name>-<stamp>.json.
 //
 
 import ArgumentParser

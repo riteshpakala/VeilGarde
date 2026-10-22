@@ -89,7 +89,7 @@ public final class Promoter {
         }
         let file = targetFile(slot, current: current, candidateID: candidateID)
         let recorded = Artifact(role: slot.role, head: slot.head, file: file, sha256: incoming.sha256, bytes: data.count,
-                                source: "candidates/\(candidateID)", parent: slot == .base ? current?.sha256 : incoming.parent)
+                                source: "candidates/\(candidateID)", parent: slot == .camera ? current?.sha256 : incoming.parent)
         return Preview(slot: slot, candidate: candidateID, current: current, incoming: recorded, gate: FlywheelPolicy.gate(for: slot), data: data)
     }
 
@@ -147,21 +147,26 @@ public final class Promoter {
     /// Everything that must hold before live/ is touched.
     func check(_ slot: FlywheelSlot, data: Data, live: ModelBundle, current: Artifact?, store: FeatureStore?) throws {
         switch slot {
-        case .base:
-            guard let current else { throw VeilGardeFailure.data("the live bundle has no fusion head to continue") }
+        case .camera:
+            guard let current else { throw VeilGardeFailure.data("the live bundle has no camera head to continue") }
             let previous = try GBDTModel.load(live.root.appendingPathComponent(current.file))
             let next = try GBDTModel.decode(xgboostJSON: data)
             guard next.trees.count > previous.trees.count,
                   zip(previous.trees, next.trees).allSatisfy({ $0.raw != nil && $0.raw == $1.raw }) else {
-                throw VeilGardeFailure.usage("the base moves only by a warm start of the live head: the candidate does not keep the live head's \(previous.trees.count) trees byte for byte")
+                throw VeilGardeFailure.usage("the camera head moves only by a warm start of the live head: the candidate does not keep the live head's \(previous.trees.count) trees byte for byte")
             }
         case .combiner:
             let c = try JSONDecoder().decode(StackCombiner.self, from: data)
-            guard c.wBase >= 0, c.wRescue >= 0, c.wGen.allSatisfy({ $0 >= 0 }) else {
-                throw VeilGardeFailure.usage("a combiner's evidence weights must all be ≥ 0")
+            guard c.model == StackCombiner.modelName, c.version == StackCombiner.currentVersion else {
+                throw VeilGardeFailure.usage("the combiner is \(c.model) version \(c.version), not \(StackCombiner.modelName) version \(StackCombiner.currentVersion)")
             }
-            if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], object["w_np"] != nil {
-                throw VeilGardeFailure.usage("the combiner carries a noiseprint term (w_np), which the detector no longer reads")
+            guard c.anchor.w >= 0, c.rescue.w >= 0, c.evidence.allSatisfy({ $0.w >= 0 }) else {
+                throw VeilGardeFailure.usage("a combiner's weights must all be ≥ 0")
+            }
+            for member in c.evidenceMembers {
+                guard let kind = HeadKind(rawValue: member), live.manifest.artifact(.head, head: kind) != nil else {
+                    throw VeilGardeFailure.usage("the combiner pools the \(member) member, which has no head in the live bundle")
+                }
             }
         case .head(let kind):
             let head = try LinearHead(data: data)
@@ -178,8 +183,8 @@ public final class Promoter {
 
     func targetFile(_ slot: FlywheelSlot, current: Artifact?, candidateID: String) -> String {
         switch slot {
-        case .base, .combiner:
-            return current?.file ?? (slot == .base ? "fusion_head.xgb.json" : "stack_combiner_v3.json")
+        case .camera, .combiner:
+            return current?.file ?? (slot == .camera ? "camera.xgb.json" : "stack_combiner.json")
         case .head(let kind):
             let tag = candidateID.replacingOccurrences(of: "/", with: "-")
             return HeadTrainer.fileName(kind, version: tag)

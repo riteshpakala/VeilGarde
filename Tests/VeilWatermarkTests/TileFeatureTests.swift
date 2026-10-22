@@ -23,7 +23,7 @@ extension WatermarkMLXSuites {
             #expect(plane.paddedWidth == 512 && plane.paddedHeight == 512)
             let rows = TileFeatures.measure(plane)
             let dump = try Fixture.tileDump(name)
-            #expect(rows.tileRows == 16 && rows.tileCols == 16 && dump.feature_order == FeatureColumn.residualFeatures)
+            #expect(rows.tileRows == 16 && rows.tileCols == 16 && dump.feature_order == ResidualStatistics.features)
             let want = dump.features.flatMap { $0.map(Float.init) }
             let worst = zip(rows.values, want).map { abs($0 - $1) }.max() ?? .infinity
             #expect(rows.values == want, "\(name): max |Δ| \(worst)")
@@ -39,8 +39,8 @@ extension WatermarkMLXSuites {
                 let v = dump.features.map { Double(Float($0[k])) }
                 let mean = v.reduce(0, +) / Double(v.count)
                 let spread = (v.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / Double(v.count)).squareRoot()
-                #expect(abs(Double(stats[k]) - mean) <= 1e-6 * max(1, abs(mean)), "\(FeatureColumn.residualFeatures[k]) mean")
-                #expect(abs(Double(stats[19 + k]) - spread) <= 1e-5 * max(1, spread), "\(FeatureColumn.residualFeatures[k]) spread")
+                #expect(abs(Double(stats[k]) - mean) <= 1e-6 * max(1, abs(mean)), "\(ResidualStatistics.features[k]) mean")
+                #expect(abs(Double(stats[19 + k]) - spread) <= 1e-5 * max(1, spread), "\(ResidualStatistics.features[k]) spread")
             }
         }
 

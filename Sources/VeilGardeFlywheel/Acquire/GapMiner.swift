@@ -4,7 +4,7 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: Where the next acquisition should look: the store's rows bucketed by (domain, category,
-//        label), each bucket's base error (the fusion head's call against the truth) plus its
+//        label), each bucket's camera error (the camera head's call against the truth) plus its
 //        disagreement with the pooled verdict, ranked, and the worst buckets mapped to the
 //        collector jobs that fill them.
 //  PIN:  flywheel_gap.py on the store: domains by v198_probe.domain_of (acquired rows count as
@@ -22,7 +22,7 @@ public struct GapBucket: Codable, Sendable, Equatable {
     public var category: String
     public var label: Int
     public var n: Int
-    public var baseError: Double
+    public var cameraError: Double
     public var disagreement: Double
     public var gap: Double
 
@@ -36,9 +36,9 @@ public struct GapReport: Codable, Sendable {
 
     public var table: String {
         func pad(_ s: String, _ n: Int, right: Bool = true) -> String { s.count >= n ? s : (right ? String(repeating: " ", count: n - s.count) + s : s + String(repeating: " ", count: n - s.count)) }
-        var lines = [pad("bucket", 26, right: false) + pad("n", 6) + pad("base_err", 10) + pad("disagree", 10) + pad("gap", 8)]
+        var lines = [pad("bucket", 26, right: false) + pad("n", 6) + pad("cam_err", 10) + pad("disagree", 10) + pad("gap", 8)]
         for b in buckets {
-            lines.append(pad(b.name, 26, right: false) + pad(String(b.n), 6) + pad(String(format: "%.1f%%", b.baseError * 100), 10)
+            lines.append(pad(b.name, 26, right: false) + pad(String(b.n), 6) + pad(String(format: "%.1f%%", b.cameraError * 100), 10)
                          + pad(String(format: "%.1f%%", b.disagreement * 100), 10) + pad(String(format: "%.2f", b.gap), 8))
         }
         return lines.joined(separator: "\n")
@@ -60,32 +60,9 @@ public enum GapMiner {
     }
 
     public static func mine(_ bundle: ModelBundle, store: FeatureStore, shards: [String]? = nil, targets: AcquireTargets) throws -> GapReport {
-        guard let fusionURL = bundle.url(.fusionHead), let combinerURL = bundle.url(.combiner) else { throw VeilGardeFailure.missing("the bundle needs a fusion head and a combiner") }
-        let fusion = try GBDTModel.load(fusionURL), combiner = try StackCombiner.load(combinerURL)
-        let columns = try FusionLayout.of(width: fusion.featureCount).columns
-        let heads = try [HeadKind.art, .blur, .human].map { kind -> LinearHead in
-            guard let url = bundle.url(.head, head: kind) else { throw VeilGardeFailure.missing("the bundle has no \(kind.rawValue) head") }
-            return try LinearHead.load(url)
-        }
-        let pair = try bundle.url(.head, head: .artPair).map { try LinearHead.load($0) }
         let s = try store.select(columns: Set(FeatureColumn.allCases), shards: shards) { !$0.golden && !$0.nsfw }
         let keep = (0..<s.count).filter { s.vector(.dinoNorm, row: $0).first?.isFinite == true && s.vector(.dinoFusion, row: $0).first?.isFinite == true }
-        var base = [Float](repeating: 0, count: keep.count), pooled = [Float](repeating: 0, count: keep.count)
-        base.withUnsafeMutableBufferPointer { b in
-            pooled.withUnsafeMutableBufferPointer { w in
-                DispatchQueue.concurrentPerform(iterations: (keep.count + 1023) / 1024) { c in
-                    for k in (c * 1024)..<min(keep.count, (c + 1) * 1024) {
-                        let i = keep[k]
-                        var row = [Float]()
-                        for column in columns { row.append(contentsOf: s.vector(column, row: i)) }
-                        let norm = Array(s.vector(.dinoNorm, row: i))
-                        let p = fusion.predict(row)
-                        b[k] = p
-                        w[k] = combiner.pool(base: p, heads: heads.map { $0.pAI(norm) }, pairAI: pair?.pAI(norm))
-                    }
-                }
-            }
-        }
+        let (camera, pooled) = try StoreScoring.scores(bundle, s, rows: keep)
         var buckets: [GapBucket] = []
         for d in ["camera", "processed"] {
             for c in categories {
@@ -95,9 +72,9 @@ public enum GapMiner {
                         return r.label == l && domain(r) == d && category(r) == c
                     }
                     guard idx.count >= 20 else { continue }
-                    let err = Double(idx.filter { (base[$0] > 0.5 ? 1 : 0) != l }.count) / Double(idx.count)
-                    let dis = Double(idx.filter { (base[$0] > 0.5) != (pooled[$0] > 0.5) }.count) / Double(idx.count)
-                    buckets.append(GapBucket(domain: d, category: c, label: l, n: idx.count, baseError: err, disagreement: dis, gap: err + dis))
+                    let err = Double(idx.filter { (camera[$0] > 0.5 ? 1 : 0) != l }.count) / Double(idx.count)
+                    let dis = Double(idx.filter { (camera[$0] > 0.5) != (pooled[$0] > 0.5) }.count) / Double(idx.count)
+                    buckets.append(GapBucket(domain: d, category: c, label: l, n: idx.count, cameraError: err, disagreement: dis, gap: err + dis))
                 }
             }
         }

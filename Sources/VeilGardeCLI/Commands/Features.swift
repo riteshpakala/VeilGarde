@@ -5,9 +5,8 @@
 //
 //  WHAT: `veilgarde features`: what the lens measures, without a verdict. `capture` prints the
 //        capture signature as a TSV line (peak, valid, native px, present); `extract` measures
-//        labeled images into a new store shard (the columns every head and the fusion head train
-//        on) and keeps nothing of the images; `residual` measures the warp residual's statistics
-//        for shards written before that column existed, from images still on disk.
+//        labeled images into a new store shard (the columns every head and the camera head train
+//        on) and keeps nothing of the images.
 //
 
 import ArgumentParser
@@ -17,7 +16,7 @@ import VeilGarde
 struct FeaturesCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "features", abstract: "Measure images: the capture signature, and labeled images into the features-only store.",
-        subcommands: [Capture.self, Extract.self, Residual.self])
+        subcommands: [Capture.self, Extract.self])
 
     struct Capture: ParsableCommand {
         static let configuration = CommandConfiguration(commandName: "capture", abstract: "Print the native capture signature as a TSV line: peak, valid, native px, present.")
@@ -42,7 +41,7 @@ struct FeaturesCommand: ParsableCommand {
         @Option(help: "The feature store directory (default: <work area>/store/shards).") var store: String?
         @Option(help: "Read at most this many images.") var limit: Int?
         @Option(help: "small, xsmall or xxsmall.") var dino: String = DinoVariant.small.rawValue
-        @Option(help: "Measure only these columns, comma separated (dino_norm, dino_fusion, cap, residual); the rest are NaN.") var columns: String?
+        @Option(help: "Measure only these columns, comma separated (dino_norm, dino_fusion, cap); the rest are NaN.") var columns: String?
         @OptionGroup var workArea: WorkAreaOptions
 
         func run() throws {
@@ -77,30 +76,6 @@ struct FeaturesCommand: ParsableCommand {
                 let report = try ShardExtractor.extract(items, shard: shard, store: FeatureStore(directory: storeURL), extractor: extractor, note: note)
                 print(String(format: "%@: %d rows written, %d already in the store, %d skipped, %.1fs", report.shard, report.rows, report.skippedKnown,
                              report.failed.count, report.seconds))
-            }
-        }
-    }
-
-    struct Residual: ParsableCommand {
-        static let configuration = CommandConfiguration(
-            commandName: "residual", abstract: "Measure the store's residual column for shards written before it, from images still at their recorded paths.",
-            discussion: "Each row's file is read, checked against the row's SHA-1 and dropped; a side file per shard holds the 38 values. One MLX workload: run it alone.")
-        @Option(help: "The feature store directory (default: <work area>/store/shards).") var store: String?
-        @Option(help: "Only these shards, comma separated.") var shards: String?
-        @Flag(help: "Measure a shard again even when its side file exists.") var replace = false
-        @Option(help: "Write the per-shard report here too (`-` for stdout).") var json: String?
-        @OptionGroup var workArea: WorkAreaOptions
-
-        func run() throws {
-            guarded {
-                let storeURL = try store.map(datasetURL) ?? workArea.resolve().root.appendingPathComponent("store/shards", isDirectory: true)
-                let names = shards.map { $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } }
-                let reports = try ResidualBackfill.run(store: storeURL, shards: names, replacing: replace, note: note)
-                if let json { try emitJSON(try JSONCoding.prettyEncoder().encode(reports), to: json) }
-                let done = reports.filter { !$0.skipped }
-                print("residual: \(done.count) shards measured, \(reports.count - done.count) already had the column; "
-                      + "\(done.map(\.measured).reduce(0, +)) of \(done.map(\.rows).reduce(0, +)) rows measured, "
-                      + "\(done.map(\.missing).reduce(0, +)) images gone, \(done.map(\.mismatched).reduce(0, +)) changed, \(done.map(\.failed).reduce(0, +)) failed")
             }
         }
     }

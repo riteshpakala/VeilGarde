@@ -3,73 +3,79 @@
 //  VeilGardeCoreTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The routed result and the schema-v3 JSON: a routed result keeps the base expert's scorer,
-//        operating point and size around the router's verdict and evidence; the JSON writes exactly
-//        the v3 keys, omits the blocks a result lacks, and writes the same bytes for the same
-//        result; only `.control` commits a semantic probe; the strict batch manifest.
+//  WHAT: The result and its schema-v1 JSON: the JSON writes exactly the v1 keys, a member as its
+//        name, p and verdict beside its own fields, a revision as its name, applied, p and
+//        prediction beside its own, and the same result as the same bytes; only `.control`
+//        commits a semantic probe; the strict batch manifest.
 //
 
 import Foundation
 import Testing
 @testable import VeilGardeCore
 
-private func baseResult(capture: CaptureSignature? = CaptureSignature(peak: 42, valid: true, nativePixels: 1_024, present: true)) -> InferenceResult {
-    InferenceResult(scorer: "fusion", prediction: "real", p: 0.10, threshold: 0.5, band: 0.04, imageWidth: 640, imageHeight: 480, captureSignature: capture)
-}
-
 private func object(_ data: Data) throws -> [String: Any] {
     try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 }
 
-private let diagnostics = RouteDiagnostics(route: "camera", requestedHint: nil, semanticProfile: "control", screenshotGate: false, baseP: 0.42,
-                                           preSemanticP: 0.61, preSemanticPrediction: "generated", semanticMajority: 0.99, semanticEvaluated: true,
-                                           semanticTriggered: true)
-private let hashes = BundleHashes(fusionHeadSHA256: "aa", combinerSHA256: "bb", manifestSHA256: "cc")
+private let stack = [
+    MemberOutput(name: "camera", p: 0.42, verdict: "real", fields: [Field("p_neutral", .number(0.2))]),
+    MemberOutput(name: "capture", p: nil, verdict: "absent", fields: [Field("peak", .number(7)), Field("valid", .flag(true)), Field("present", .flag(false))]),
+    MemberOutput(name: "semantic-tiles", p: 0.5, verdict: "real", fields: [Field("majority", .number(0.5)), Field("grid", .grid([[0.99, 0.0]]))]),
+]
+private let revisions = [
+    RevisionRecord(name: "combiner", applied: true, p: 0.91, prediction: "generated",
+                   fields: [Field("anchor", .text("camera")), Field("pooled", .number(0.91)), Field("influence", .map(["art": 1.5]))]),
+    RevisionRecord(name: "frame-seam", applied: false, p: 0.91, prediction: "generated", fields: [Field("interior_p", .absent)]),
+]
+private let hashes = BundleHashes(manifestSHA256: "cc", artifacts: ["camera": "aa", "combiner": "bb"])
+
+private func result(bundle: BundleHashes? = hashes) -> InferenceResult {
+    InferenceResult(prediction: "generated", p: 0.91, threshold: 0.5, band: 0.04, imageWidth: 640, imageHeight: 480,
+                    stack: stack, revisions: revisions, bundle: bundle)
+}
 
 @Suite("Result JSON")
 struct ResultJSONTests {
-    @Test("a routed result keeps the base's scorer, operating point and size around the router's verdict")
-    func routedKeepsBaseAndTrace() {
-        let base = baseResult()
-        let specialists = [SpecialistContribution(name: "fusion", pAI: 0.42, verdict: "real", weight: 1)]
-        let r = PublicSurface.routed(base: base, prediction: "generated", p: 0.91, capture: base.captureSignature!, specialists: specialists,
-                                     semanticTiles: [[0.99, 0.98]], routeDiagnostics: diagnostics, bundle: hashes)
-        #expect(r.scorer == "fusion" && r.threshold == 0.5 && r.band == 0.04 && r.imageWidth == 640 && r.imageHeight == 480)
-        #expect(r.prediction == "generated" && r.p == 0.91)
-        #expect(r.specialists == specialists && r.semanticTiles == [[0.99, 0.98]] && r.routeDiagnostics == diagnostics && r.bundle == hashes)
-    }
-
-    @Test("the JSON writes exactly the schema-v3 keys")
-    func jsonV3() throws {
-        let base = baseResult()
-        let r = PublicSurface.routed(base: base, prediction: "generated", p: 0.91, capture: base.captureSignature!,
-                                     specialists: [SpecialistContribution(name: "art", pAI: 0.7, verdict: "generated", weight: 0.25)],
-                                     semanticTiles: [[0.99, 0.0]], routeDiagnostics: diagnostics, bundle: hashes)
-        let json = try object(ResultJSON.encode(r, times: [], device: "route", route: "camera"))
-        #expect(Set(json.keys) == ["bundle", "capture", "device", "image", "route", "route_diagnostics", "schema_version", "scorer", "semantic_tiles",
-                                   "specialists", "times_sec", "verdict"])
-        #expect(json["schema_version"] as? Int == 3 && json["route"] as? String == "camera" && json["scorer"] as? String == "fusion")
+    @Test("the JSON writes exactly the schema-v1 keys")
+    func jsonV1() throws {
+        let json = try object(ResultJSON.encode(result(), times: [], device: "route"))
+        #expect(Set(json.keys) == ["bundle", "device", "image", "revisions", "schema_version", "stack", "times_sec", "verdict"])
+        #expect(json["schema_version"] as? Int == 1 && json["device"] as? String == "route")
         let verdict = try #require(json["verdict"] as? [String: Any])
         #expect(Set(verdict.keys) == ["band", "p", "prediction", "threshold"])
         #expect(verdict["prediction"] as? String == "generated" && abs((verdict["p"] as? Double ?? 0) - 0.91) < 1e-6)
-        let d = try #require(json["route_diagnostics"] as? [String: Any])
-        #expect(Set(d.keys) == ["route", "requested_hint", "semantic_profile", "screenshot_gate", "base_p", "pre_semantic_p", "pre_semantic_prediction",
-                                "semantic_majority", "semantic_evaluated", "semantic_triggered", "semantic_decisive", "preview_evaluated",
-                                "preview_triggered", "preview_decisive"])
-        #expect(abs((d["base_p"] as? Double ?? 0) - 0.42) < 1e-6 && d["screenshot_gate"] as? Bool == false && d["requested_hint"] is NSNull)
-        #expect((json["bundle"] as? [String: Any])?["fusion_head_sha256"] as? String == "aa")
-        #expect((json["capture"] as? [String: Any])?["present"] as? Bool == true)
         #expect((json["image"] as? [String: Any])?["width"] as? Int == 640)
-        #expect(((json["specialists"] as? [[String: Any]])?.first)?["name"] as? String == "art")
+        let bundle = try #require(json["bundle"] as? [String: Any])
+        #expect(Set(bundle.keys) == ["artifacts", "manifest_sha256"] && (bundle["artifacts"] as? [String: String])?["camera"] == "aa")
     }
 
-    @Test("a result without capture, tiles, specialists, diagnostics or bundle omits those blocks, and the same result writes the same bytes")
-    func jsonOmitsAbsentBlocks() throws {
-        let bare = baseResult(capture: nil)
+    @Test("a member is its name, p and verdict beside its own fields; a revision its name, applied, p and prediction beside its own")
+    func membersAndRevisions() throws {
+        let json = try object(ResultJSON.encode(result(), times: [], device: "route"))
+        let members = try #require(json["stack"] as? [[String: Any]])
+        #expect(members.map { $0["name"] as? String } == ["camera", "capture", "semantic-tiles"])
+        #expect(Set(members[0].keys) == ["name", "p", "verdict", "p_neutral"] && abs((members[0]["p_neutral"] as? Double ?? 0) - 0.2) < 1e-6)
+        #expect(members[1]["p"] is NSNull && members[1]["present"] as? Bool == false)
+        #expect((members[2]["grid"] as? [[Double]])?.first?.first.map { abs($0 - 0.99) < 1e-6 } == true)
+        let records = try #require(json["revisions"] as? [[String: Any]])
+        #expect(Set(records[0].keys) == ["name", "applied", "p", "prediction", "anchor", "pooled", "influence"])
+        #expect(records[0]["anchor"] as? String == "camera" && (records[0]["influence"] as? [String: Double])?["art"] == 1.5)
+        #expect(records[1]["applied"] as? Bool == false && records[1]["interior_p"] is NSNull)
+    }
+
+    @Test("a result without a bundle omits that block, and the same result writes the same bytes")
+    func jsonOmitsBundle() throws {
+        let bare = result(bundle: nil)
         let json = try object(ResultJSON.encode(bare, times: [0.5], device: "gpu"))
-        #expect(Set(json.keys) == ["device", "image", "route", "schema_version", "scorer", "times_sec", "verdict"])
-        #expect(json["route"] is NSNull)
+        #expect(Set(json.keys) == ["device", "image", "revisions", "schema_version", "stack", "times_sec", "verdict"])
         #expect(try ResultJSON.encode(bare, times: [0.5], device: "gpu") == ResultJSON.encode(bare, times: [0.5], device: "gpu"))
+    }
+
+    @Test("a member reads its fields back by key, and the stack finds a member by name")
+    func accessors() {
+        #expect(stack.member("capture")?.flag("valid") == true && stack.member("camera")?.number("p_neutral") == 0.2)
+        #expect(stack.member("semantic-tiles")?.grid("grid") == [[0.99, 0.0]] && stack.member("art") == nil)
+        #expect(revisions.revision("combiner")?.text("anchor") == "camera")
     }
 
     @Test("only the control profile commits a semantic probe")
@@ -92,29 +98,29 @@ struct ResultJSONTests {
 
 @Suite("Route batch manifest")
 struct RouteBatchTests {
-    @Test("parses order and hints exactly")
+    @Test("parses order exactly")
     func parses() throws {
         let items = try RouteBatch.parse(Data("""
-        {"id":"first","path":"/a.jpg","hint":"camera"}
-        {"id":"second","path":"/b.png","hint":"screenshot"}
+        {"id":"first","path":"/a.jpg"}
+        {"id":"second","path":"/b.png"}
         """.utf8))
-        #expect(items.map(\.id) == ["first", "second"] && items.map(\.hint) == [.camera, .screenshot])
+        #expect(items.map(\.id) == ["first", "second"] && items.map(\.path) == ["/a.jpg", "/b.png"])
     }
 
     @Test("rejects a duplicate id before inference")
     func duplicate() {
         #expect(throws: RouteBatchError.duplicateID(line: 2, id: "same")) {
             try RouteBatch.parse(Data("""
-            {"id":"same","path":"/a.jpg","hint":"camera"}
-            {"id":"same","path":"/b.jpg","hint":"camera"}
+            {"id":"same","path":"/a.jpg"}
+            {"id":"same","path":"/b.jpg"}
             """.utf8))
         }
     }
 
-    @Test("rejects a bad id, hint or shape")
+    @Test("rejects a bad id or shape, a hint among them")
     func rejects() {
-        #expect(throws: RouteBatchError.self) { try RouteBatch.parse(Data(#"{"id":"bad id ","path":"/a","hint":"camera"}"#.utf8)) }
-        #expect(throws: RouteBatchError.self) { try RouteBatch.parse(Data(#"{"id":"a","path":"/a","hint":"auto"}"#.utf8)) }
-        #expect(throws: RouteBatchError.self) { try RouteBatch.parse(Data(#"{"id":"a","path":"/a","hint":"camera","extra":1}"#.utf8)) }
+        #expect(throws: RouteBatchError.self) { try RouteBatch.parse(Data(#"{"id":"bad id ","path":"/a"}"#.utf8)) }
+        #expect(throws: RouteBatchError.self) { try RouteBatch.parse(Data(#"{"id":"a","path":"/a","hint":"camera"}"#.utf8)) }
+        #expect(throws: RouteBatchError.self) { try RouteBatch.parse(Data(#"{"id":"a"}"#.utf8)) }
     }
 }

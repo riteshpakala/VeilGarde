@@ -6,9 +6,9 @@
 //  WHAT: What the battery reads off one image: the verdict and its P(AI), the semantic tile
 //        majority, and whether a capture signature is present. The production source runs the full
 //        detector on a bundle in process; tests hand the runner canned verdicts.
-//  PIN:  The values are read from the result JSON the detector writes (schema v3):
-//        verdict.prediction and .p, the share of semantic_tiles cells above 0.5 (nil without
-//        tiles), capture.present.
+//  PIN:  The values are read from the result JSON the detector writes (schema v1):
+//        verdict.prediction and .p, the share of the semantic-tiles member's grid cells above 0.5
+//        (nil without that member), the capture member's present.
 //
 
 import CoreGraphics
@@ -29,7 +29,7 @@ public struct BatteryVerdict: Codable, Sendable, Equatable {
         self.capturePresent = capturePresent
     }
 
-    /// Reads a schema-v3 result JSON.
+    /// Reads a schema-v1 result JSON.
     public init(resultJSON data: Data) throws {
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let verdict = object["verdict"] as? [String: Any], let prediction = verdict["prediction"] as? String else {
@@ -37,9 +37,11 @@ public struct BatteryVerdict: Codable, Sendable, Equatable {
         }
         self.prediction = prediction
         self.p = (verdict["p"] as? NSNumber)?.doubleValue ?? .nan
-        let cells = ((object["semantic_tiles"] as? [[NSNumber]]) ?? []).flatMap { $0 }.map(\.doubleValue)
+        let stack = object["stack"] as? [[String: Any]] ?? []
+        func member(_ name: String) -> [String: Any]? { stack.first { $0["name"] as? String == name } }
+        let cells = ((member("semantic-tiles")?["grid"] as? [[NSNumber]]) ?? []).flatMap { $0 }.map(\.doubleValue)
         self.semanticScore = cells.isEmpty ? nil : Double(cells.filter { $0 > 0.5 }.count) / Double(cells.count)
-        self.capturePresent = ((object["capture"] as? [String: Any])?["present"] as? Bool) ?? false
+        self.capturePresent = (member("capture")?["present"] as? Bool) ?? false
     }
 }
 
@@ -66,8 +68,8 @@ public final class DetectorVerdicts: BatteryVerdictSource {
     public func verdict(for url: URL) throws -> BatteryVerdict {
         defer { LensRuntime.releaseMemory() }
         let cg = try ImageDecoding.cgImage(contentsOf: url)
-        let routed = try Detector.shared.detect(cgImage: cg, config: config)
-        return try BatteryVerdict(resultJSON: try ResultJSON.encode(routed.result, times: [], device: "route", route: routed.domain.rawValue))
+        let result = try Detector.detect(cgImage: cg, config: config)
+        return try BatteryVerdict(resultJSON: try ResultJSON.encode(result, times: [], device: "route"))
     }
 }
 

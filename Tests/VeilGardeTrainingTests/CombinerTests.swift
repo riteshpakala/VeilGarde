@@ -4,9 +4,11 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The combiner's five columns equal the reference's first five (atlas_combiner.features;
-//        the sixth, the noiseprint's, left on 2026-10-21), the bounded solver reaches scipy's
-//        optimum on the reference fit, the rescue sweep follows its rule, and on the shipped
-//        combiner's own weights no candidate passes, so the sweep falls back to the shipped 1.0.
+//        the sixth, the noiseprint's, left on 2026-10-21) wherever the art-pair head did not move
+//        the art logit, the bounded solver reaches scipy's optimum on the reference fit, the
+//        rescue sweep follows its rule, on the shipped combiner's own weights no candidate passes,
+//        so the sweep falls back to the shipped 1.0, and a fit writes the version-1 file keyed by
+//        member.
 //
 
 import Foundation
@@ -20,34 +22,34 @@ struct CombinerTests {
 
     static func optional(_ any: Any?) -> Double? { (any as? NSNumber)?.doubleValue }
 
-    @Test("the five feature columns equal the reference's first five")
+    @Test("the five feature columns equal the reference's first five where no art-pair moved the art logit")
     func features() throws {
         let f = try Self.fixture()
         let base = doubles(f["base"]), heads = (f["heads"] as! [[NSNumber]]).map { $0.map(\.doubleValue) }
         let pair = (f["pair"] as! [Any]).map(Self.optional)
         let expected = (f["features"] as! [[NSNumber]]).map { $0.map(\.doubleValue) }
+        var checked = 0
         for i in base.indices {
-            let row = CombinerFeatures.row(base: base[i], heads: heads[i], pair: pair[i])
+            if let p = pair[i], CombinerFeatures.logit(p, cap: CombinerFeatures.capHead) < CombinerFeatures.logit(heads[i][0], cap: CombinerFeatures.capHead) { continue }
+            checked += 1
+            let row = CombinerFeatures.row(camera: base[i], heads: heads[i])
             #expect(row.count == CombinerFeatures.count && CombinerFeatures.count == 5)
             #expect(maxAbs(row, Array(expected[i].prefix(5))) < 1e-12, "row \(i)")
         }
+        #expect(checked > 500)
     }
 
-    @Test("a combiner fitted with no art-pair head does not adjudicate, and one fitted beside it does")
-    func adjudication() throws {
+    @Test("a fit writes the version-1 file: the camera anchor, the evidence keyed by member")
+    func file() throws {
         let f = try Self.fixture()
         let base = doubles(f["base"]), heads = (f["heads"] as! [[NSNumber]]).map { $0.map(\.doubleValue) }, y = ints(f["y"])
-        let pair = (f["pair"] as! [Any]).map(Self.optional)
-        func samples(_ withPair: Bool) -> [CombinerSample] {
-            base.indices.map { CombinerSample(id: "row\($0)", label: y[$0], base: base[$0], heads: heads[$0], pair: withPair ? pair[$0] : nil) }
-        }
-        let (alone, report) = try CombinerTrainer.train(samples(false))
-        #expect(alone.pairAdjudicates == false && !alone.note.contains("art-pair"))
-        #expect(try alone.combiner().pairAdjudicates == false)
-        #expect(alone.inputs == ["base", "art_gen", "blur_gen", "human_gen", "rescue"])
-        #expect(report.fitted.count == 1 + CombinerFeatures.count)
-        let (beside, _) = try CombinerTrainer.train(samples(true))
-        #expect(beside.pairAdjudicates == true && beside.note.contains("art-pair"))
+        let samples = base.indices.map { CombinerSample(id: "row\($0)", label: y[$0], camera: base[$0], heads: heads[$0]) }
+        let (file, report) = try CombinerTrainer.train(samples)
+        #expect(file.version == 1 && file.evidence.map(\.member) == ["art", "blur", "human"] && file.anchor.cap == 4 && file.evidenceCap == 2)
+        #expect(file.anchor.w >= 0 && file.evidence.allSatisfy { $0.w >= 0 } && file.rescue.w == report.rescue)
+        #expect(report.fitted.count == 1 + CombinerFeatures.count && report.testAUCCamera != nil)
+        let c = try file.combiner()
+        #expect(c.evidenceMembers == ["art", "blur", "human"])
     }
 
     @Test("the bounded solver reaches scipy's optimum on the reference's six-column fit")
@@ -94,11 +96,11 @@ struct CombinerTests {
 
     @Test("on the shipped combiner's own weights no sweep candidate passes, and the fallback is the shipped rescue")
     func sweepShipped() throws {
-        let c = try StackCombiner.load(Fixture.resource("stack_combiner_v3.json"))
-        let w = [Double(c.wBase)] + c.wGen.map(Double.init) + [0]
+        let c = try StackCombiner.load(Fixture.resource("stack_combiner.json"))
+        let w = [Double(c.anchor.w)] + c.evidence.map { Double($0.w) } + [0]
         let settings = CombinerSettings()
         let (rescue, sweep) = CombinerTrainer.chooseRescue(w0: Double(c.w0), w: w, settings: settings)
         #expect(!sweep.contains { $0.probesReal == settings.probes.count && $0.maxProbe <= settings.maxProbe })
-        #expect(rescue == settings.rescueFallback && rescue == Double(c.wRescue))
+        #expect(rescue == settings.rescueFallback && rescue == Double(c.rescue.w))
     }
 }

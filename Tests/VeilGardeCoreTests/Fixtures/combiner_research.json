@@ -1,0 +1,30 @@
+{
+  "anchor" : {
+    "cap" : 4,
+    "gate_ceiling" : 0.75,
+    "w" : 3.8205217946638634
+  },
+  "evidence" : [
+    {
+      "member" : "art",
+      "w" : 0.0
+    },
+    {
+      "member" : "blur",
+      "w" : 0.0
+    },
+    {
+      "member" : "human",
+      "w" : 0.1966929563436263
+    }
+  ],
+  "evidence_cap" : 2,
+  "model" : "stack_combiner",
+  "note" : "The research's v1.9.7 fit, real:gen 3:1, in the version-1 schema: the weights the float32 replica in combiner_reference.json was computed with.",
+  "rescue" : {
+    "w" : 0.5
+  },
+  "threshold" : 0.5,
+  "version" : 1,
+  "w0" : -0.6754975033517225
+}

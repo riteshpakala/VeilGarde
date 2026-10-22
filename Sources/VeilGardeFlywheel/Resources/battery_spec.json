@@ -1,8 +1,8 @@
 {
-  "version": 3,
-  "doc": "The battery spec, v3 (2026-10-21), the v1 detector's baseline: the gate every promote is judged by. v3 sets four images the two-lane detector misses aside for research, in staged[], measured but not gated. v2 (2026-10-19) v2 retires v1's twelve atlas anchor groups (their images are gone; a new atlas comes later) and reads every image from {IMAGES}: the folder VEILGARDE_BATTERY_IMAGES names, else the work area's battery/images. The eight groups it keeps are v1's: the same images, modes and floors. Modes: HARD (any weighted miss = FAIL) · HARD_SEM (HARD + semantic must agree) · RATCHET (per-group weighted accuracy >= recorded baseline - tolerance) · RATCHET_SEM (RATCHET + semantic floor) · TAXONOMY (tracked, never gates) · REPORT (printed only). The floors live in battery_v2_baseline.json; never rebaseline during a migration, --rebaseline is an explicit, reviewed act. staged[] holds probes that do not gate yet.",
+  "version": 1,
+  "doc": "The battery spec, version 1 (2026-10-21), the gate every promote is judged by: eight groups of images read from {IMAGES}, the folder VEILGARDE_BATTERY_IMAGES names, else the work area's battery/images. Four images the shipped detector misses (IMG_0291, IMG_0345, IMG_0354, HNUFoy2bcAA0vDW) are set aside for research in staged[], measured but not gated. Modes: HARD (any weighted miss = FAIL) · HARD_SEM (HARD + semantic must agree) · RATCHET (per-group weighted accuracy >= recorded baseline - tolerance) · RATCHET_SEM (RATCHET + semantic floor) · TAXONOMY (tracked, never gates) · REPORT (printed only). The floors live in battery_baseline.json; --rebaseline is an explicit, reviewed act. staged[] holds probes that do not gate yet.",
   "tolerance": 0.001,
-  "baseline": "battery_v2_baseline.json",
+  "baseline": "battery_baseline.json",
   "vars": {
     "IMAGES": "battery/images"
   },
@@ -178,24 +178,5 @@
       "want": "generated",
       "note": "Set aside for research by the owner on 2026-10-21: the two-lane detector, v1, misses it; measured, not gated. Every candidate of the 2026-10-21 studies called it real, too."
     }
-  ],
-  "retired": {
-    "date": "2026-10-19",
-    "from_version": 1,
-    "groups": [
-      "atlas_art_real",
-      "atlas_art_generated",
-      "atlas_art_shotgen",
-      "atlas_blur_real",
-      "atlas_blur_generated",
-      "atlas_blur_shotgen",
-      "atlas_cgi_real",
-      "atlas_cgi_generated",
-      "atlas_cgi_shotgen",
-      "atlas_human_real",
-      "atlas_human_generated",
-      "atlas_human_shotgen"
-    ],
-    "note": "The atlas anchors behind these groups were deleted; a new atlas will be built and gated in a later version."
-  }
+  ]
 }

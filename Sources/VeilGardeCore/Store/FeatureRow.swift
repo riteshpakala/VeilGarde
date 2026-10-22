@@ -6,12 +6,10 @@
 //  WHAT: One image in the features-only store, as metadata: its id (the SHA-1 of its bytes), where
 //        it came from, its label and category, and what the flywheel needs to train and audit a
 //        head. The image itself is never kept; its features sit in the shard's columns.
-//  PIN:  The <shard>_meta.json row (store_ingest.py) read and written as is, so a shard written
-//        here opens in the Python feature store and the seed store's 138,247 rows open here. Schema v2 adds
-//        optional provenance (source id and URL, licence, native size, dHash, the CLIP route
-//        scores); a seed row simply lacks them. A row written before 2026-10-21 may also name the
-//        warp model that measured its old `warp` column (`warp_model`): that key is ignored now.
-//        label: 1 generated, 0 real.
+//  PIN:  The <shard>_meta.json row, read and written as is. The seed store's rows carry the first
+//        keys; a row the flywheel writes adds its provenance (source id and URL, licence, native
+//        size, dHash, the CLIP route scores). A key not listed here is ignored on read and not
+//        written back. label: 1 generated, 0 real.
 //
 
 public struct FeatureRow: Codable, Sendable, Equatable {
@@ -74,31 +72,17 @@ public struct FeatureRow: Codable, Sendable, Equatable {
 
 /// The store's columns, by name and width, in the order a shard lists them.
 public enum FeatureColumn: String, Codable, Sendable, CaseIterable {
-    /// DINOv2 CLS after the 360×640 force-resize: what the specialist heads read.
+    /// DINOv2 CLS after the 360×640 force-resize: what the linear heads read.
     case dinoNorm = "dino_norm"
-    /// DINOv2 CLS after the plain preprocessing: what the fusion head reads.
+    /// DINOv2 CLS after the plain preprocessing: what the camera head reads.
     case dinoFusion = "dino_fusion"
     /// The nine capture values.
     case cap
-    /// The warp residual's 19 tile features at the 512-px cap, their mean then their spread over
-    /// the image's tiles (VeilWatermark's ResidualStatistics). Older shards carry it in a side file.
-    case residual
 
     public var width: Int {
         switch self {
         case .dinoNorm, .dinoFusion: return 384
         case .cap: return CaptureFeatures.count
-        case .residual: return 2 * Self.residualFeatures.count
         }
     }
-
-    /// The warp residual's 19 tile features, in the tile extractor's order.
-    public static let residualFeatures = ["FR", "LV", "CV", "CM", "CC", "CR", "SH", "SV", "SH_S", "SV_S", "xcorr_RG", "cfa_G",
-                                          "xcorr_BG", "xcorr_RB", "cfa_R", "cfa_B", "noise_ratio", "diag_axial", "nyq_R"]
-
-    /// The residual column's names: each feature's mean, then each feature's spread.
-    public static var residualNames: [String] { residualFeatures.map { "\($0)_mean" } + residualFeatures.map { "\($0)_std" } }
-
-    /// The fusion head's columns for a layout, in its order: FusionLayout's columns.
-    public static func fusion(_ layout: FusionLayout) -> [FeatureColumn] { layout.columns }
 }

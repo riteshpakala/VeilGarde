@@ -3,8 +3,8 @@
 //  VeilGardeFlywheelTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The battery's spec and rules: the shipped spec and floors are the pinned v2 bytes and
-//        decode (the atlas groups retired, the floors re-recorded on 2026-10-21); `{IMAGES}` resolves from the
+//  WHAT: The battery's spec and rules: the shipped spec and floors are the pinned version-1 bytes
+//        and decode (the floors recorded on 2026-10-21, four images staged); `{IMAGES}` resolves from the
 //        environment, then the work area; a newer pair replaces an older one without losing it; a
 //        group's files resolve as the Python battery's glob, filters and order resolve them; every
 //        mode gates the way run_full gates; the input-set hash equals Python's.
@@ -23,16 +23,15 @@ struct BatteryTests {
         #expect(ContentHash.sha256Hex(spec) == FlywheelResources.batterySpecSHA256)
         #expect(ContentHash.sha256Hex(floors) == FlywheelResources.batteryBaselineSHA256)
         let s = try JSONDecoder().decode(BatterySpec.self, from: spec)
-        #expect(s.version == 3 && s.groups.count == 8 && s.tolerance == 0.001)
+        #expect(s.version == 1 && s.groups.count == 8 && s.tolerance == 0.001)
         #expect(s.groups.filter { $0.mode.isHard }.map(\.name) == ["user_real", "native_12yrs", "flux_anchor", "user_gen", "native_cam", "lion_hard"])
         #expect(s.groups.filter { !$0.mode.isHard }.map(\.name) == ["gen_semantic", "wildlife_real"])
         let everyPattern = s.groups.flatMap { ($0.paths ?? []) + ($0.globs ?? []) }
         #expect(everyPattern.allSatisfy { $0.hasPrefix("{IMAGES}/") }, "every image is under {IMAGES}")
         let raw = try JSONSerialization.jsonObject(with: spec) as! [String: Any]
-        let retired = (raw["retired"] as? [String: Any])?["groups"] as? [String] ?? []
-        #expect(retired.count == 12 && retired.allSatisfy { $0.hasPrefix("atlas_") })
+        #expect(raw["retired"] == nil && raw["baseline"] as? String == "battery_baseline.json")
         let b = try JSONDecoder().decode([String: BatteryGroupResult].self, from: floors)
-        // The v1 detector's floors, recorded on 2026-10-21 by `flywheel battery --rebaseline` on spec v3.
+        // The floors recorded on 2026-10-21 by `flywheel battery --rebaseline`, unchanged by the rename to version 1.
         let staged = (raw["staged"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
         #expect(["IMG_0291", "IMG_0345", "IMG_0354", "HNUFoy2bcAA0vDW"].allSatisfy(staged.contains), "the four images set aside for research")
         #expect(b["user_real"]?.acc == 1.0 && b["user_real"]?.mode == .hard)
@@ -185,9 +184,9 @@ struct BatteryTests {
         #expect(BatteryRunner.inputSetHash(rows) == "80fdc1ebfcdb179465b8f2ee9eaf993ff62681761b416a64cba7b77b88f1d2b9")   // Python 3: json.dumps(…, sort_keys=True, separators=(",", ":"))
     }
 
-    @Test("a schema-v3 result JSON reads as the battery reads it")
+    @Test("a schema-v1 result JSON reads as the battery reads it")
     func verdictFromJSON() throws {
-        let json = #"{"verdict":{"prediction":"generated","p":0.7,"threshold":0.5,"band":0.04},"semantic_tiles":[[0.9,0.2],[0.8,0.7]],"capture":{"present":true}}"#
+        let json = #"{"verdict":{"prediction":"generated","p":0.7,"threshold":0.5,"band":0.04},"stack":[{"name":"capture","p":null,"verdict":"real","present":true},{"name":"semantic-tiles","p":0.75,"verdict":"generated","grid":[[0.9,0.2],[0.8,0.7]]}]}"#
         let v = try BatteryVerdict(resultJSON: Data(json.utf8))
         #expect(v.prediction == "generated" && v.p == 0.7 && v.semanticScore == 0.75 && v.capturePresent)
         let none = try BatteryVerdict(resultJSON: Data(#"{"verdict":{"prediction":"real","p":0.2}}"#.utf8))
@@ -202,7 +201,7 @@ struct BatteryDetectorTests {
     func runtime() {
         let detector = DetectorVerdicts(bundle: .shipped)
         #expect(detector.runtime["bundle"] == DetectorBundle.shipped.directory.path && detector.runtime["backend"] == "veilgarde-detector")
-        #expect(detector.runtime["fusion_head_sha256"] == DetectorBundle.shipped.manifest.artifact(.fusionHead)?.sha256)
+        #expect(detector.runtime["camera_sha256"] == DetectorBundle.shipped.manifest.artifact(.camera)?.sha256)
         #expect(detector.runtime["combiner_sha256"] == DetectorBundle.shipped.manifest.artifact(.combiner)?.sha256)
         #expect(detector.runtime["manifest_sha256"] != nil && detector.runtime["base_expert"] == nil)
     }

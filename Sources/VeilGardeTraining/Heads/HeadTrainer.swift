@@ -3,7 +3,7 @@
 //  VeilGardeTraining
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The specialist heads: one logistic regression per head on the store's dino_norm column
+//  WHAT: The linear heads: one logistic regression per head on the store's dino_norm column
 //        (DINOv2 CLS after the 360×640 resize), standardized, fitted to that head's positives
 //        against its negatives, measured on held-out sources, and admitted only when it leaves
 //        calm real photos alone.
@@ -97,16 +97,9 @@ public enum HeadTrainer {
     }
 
     /// The file name a trained head ships as (the shipped spellings).
-    public static func fileName(_ kind: HeadKind, version: String) -> String {
-        switch kind {
-        case .artPair: return "art_pair_\(version).json"
-        default: return "\(kind.rawValue)_dinov2_\(version).json"
-        }
-    }
+    public static func fileName(_ kind: HeadKind, version: String) -> String { "\(kind.rawValue)_dinov2_\(version).json" }
 
-    public static func modelName(_ kind: HeadKind) -> String {
-        kind == .artPair ? "art_pair" : "\(kind.rawValue)_dinov2"
-    }
+    public static func modelName(_ kind: HeadKind) -> String { "\(kind.rawValue)_dinov2" }
 
     public static func train(_ kind: HeadKind, positives: RowFilter, negatives: RowFilter, settings: HeadSettings,
                              store: StoreSelection, parent: LinearHead? = nil, note: (String) -> Void = { _ in }) throws -> (file: HeadFile, report: HeadReport) {
@@ -146,7 +139,7 @@ public enum HeadTrainer {
         let admitted: Bool? = settings.admission ? (admissionBlock.map { $0 <= 0.10 } ?? false) : nil
 
         let file = HeadFile(model: modelName(kind), normalizeSize: [360, 640], threshold: settings.threshold,
-                            fireThreshold: kind == .artPair ? nil : settings.fireThreshold, scalerMean: scaler.mean, scalerScale: scaler.scale,
+                            fireThreshold: settings.fireThreshold, scalerMean: scaler.mean, scalerScale: scaler.scale,
                             coef: fit.coef, intercept: fit.intercept,
                             note: "VeilGarde \(kind.rawValue) head, trained from the features-only store: \(positives.summary) against \(negatives.summary), "
                                 + "split \(split.basis.rawValue)-disjoint, C \(settings.C), class weight \(settings.classWeight.rawValue), golden anchors held out.")

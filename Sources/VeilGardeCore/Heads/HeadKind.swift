@@ -3,10 +3,10 @@
 //  VeilGardeCore
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The specialist heads VeilGarde ships, by role: the screenshot domain's base expert, the three
-//        atlas priors the combiner pools (art, blur, human), the pairwise real-art adjudicator,
-//        and the arbiters the semantic chain consults (semantic tiles, cgi, preview).
-//  PIN:  `combinerOrder` is the order StackCombiner.w_gen weighs: art, blur, human.
+//  WHAT: The linear heads VeilGarde ships, by kind: the screenshot member's content head, the three
+//        category heads the combiner pools (art, blur, human), the preview head the preview tail
+//        reads, and the semantic-tile head on DINOv2's patch tokens.
+//  PIN:  `combinerOrder` is the shipped combiner's evidence order: art, blur, human.
 //
 
 public enum HeadKind: String, Codable, Sendable, CaseIterable {
@@ -14,18 +14,12 @@ public enum HeadKind: String, Codable, Sendable, CaseIterable {
     case art
     case blur
     case human
-    case artPair = "art-pair"
     case semtile
-    case cgi
     case preview
 
-    /// The heads the stack combiner pools, in w_gen's order.
+    /// The heads the shipped combiner pools as evidence, in its order.
     public static let combinerOrder: [HeadKind] = [.art, .blur, .human]
 
-    /// The heads the flywheel retrains every cycle: the three the combiner pools. The cgi head left
-    /// the shipped bundle on 2026-10-21 with the render arbiter, its only reader.
+    /// The heads the flywheel retrains every cycle: the three the combiner pools.
     public static let flywheelCategories: [HeadKind] = [.art, .blur, .human]
-
-    /// The name a head row carries in `specialists[]`.
-    public var specialistName: String { self == .artPair ? "art-pair" : rawValue }
 }

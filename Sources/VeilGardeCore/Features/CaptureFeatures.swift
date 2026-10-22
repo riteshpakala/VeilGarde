@@ -5,16 +5,16 @@
 //
 //  WHAT: The camera-capture signature: a real sensor's Bayer mosaic and demosaicing leave a
 //        high-frequency peak near Nyquist in the residual power spectrum that no generator
-//        reproduces. Nine values feed the fusion head; four of them (peak, valid, native size,
-//        present) are what the verdict and the trust law read.
+//        reproduces. Nine values feed the camera head; four of them (peak, valid, native size,
+//        present) are what the capture member reports and the combiner reads.
 //  PIN:  Computed at NATIVE resolution on a centre crop (Lens/Capture): a single 2× downsample
 //        destroys it, so `valid` requires a native short side of 512. `present` needs peak ≥ 30,
 //        Swift's threshold since 2026-07-11 (the Python reference used 20; the [20, 30) band held only
 //        AI-video re-encodes). The order of the nine is capture_signature.py's
-//        CAPTURE_FEATURE_NAMES and the fusion head's columns 384–392.
+//        CAPTURE_FEATURE_NAMES and the camera head's columns 384–392.
 //
 
-/// What the verdict and the trust law read from the capture signature.
+/// What the capture member reports and the combiner reads.
 public struct CaptureSignature: Sendable, Equatable, Codable {
     /// Radial high-frequency spectral peakiness: max over median of the outer radial profile.
     public let peak: Float
@@ -33,7 +33,7 @@ public struct CaptureSignature: Sendable, Equatable, Codable {
     }
 }
 
-/// The capture law's constants, read by the extractor (Lens) and the router (Inference) alike.
+/// The capture law's constants, read by the extractor (Lens) and the detector (Inference) alike.
 public enum CaptureLaw {
     /// The centre crop's side cap, in native pixels.
     public static let analysisSide = 1024
@@ -44,13 +44,13 @@ public enum CaptureLaw {
     /// The high-pass the residual is taken with: gray − GaussianBlur(7×7, σ = 1).
     public static let highPassKernel = 7
     public static let highPassSigma: Float = 1
-    /// The ceiling on P(AI) when a valid signature is present on the screenshot surfaces (the
-    /// router's screenshot domain and the screenshot head). Never applied to the camera verdict,
-    /// where capture-present only suppresses the specialists' gen-side evidence.
+    /// The ceiling the combiner puts on P(AI) when the screenshot gate fired and a valid signature
+    /// is present. Never applied when the camera member anchors the verdict, where capture-present
+    /// only silences the generated-side evidence.
     public static let realCeiling: Float = 0.10
 }
 
-/// The nine values the fusion head reads, in its column order.
+/// The nine values the camera head reads, in its column order.
 public struct CaptureFeatures: Sendable, Equatable, Codable {
     public var peak: Float
     public var valid: Float
@@ -70,7 +70,7 @@ public struct CaptureFeatures: Sendable, Equatable, Codable {
     public static let count = 9
     public static let names = ["peak", "valid", "present", "native_px", "res_std", "hf_ratio", "spec_flat", "cfa_trace", "ac_lag1"]
 
-    /// What an undecodable or too-small image yields: zeros, so a fusion row stays aligned.
+    /// What an undecodable or too-small image yields: zeros, so a camera row stays aligned.
     public static let zero = CaptureFeatures(vector: [Float](repeating: 0, count: count))
 
     public var asVector: [Float] { [peak, valid, present, nativePixels, residualStd, highFrequencyRatio, spectralFlatness, cfaTrace, lag1] }
@@ -84,5 +84,17 @@ public struct CaptureFeatures: Sendable, Equatable, Codable {
     /// The signature the verdict reads, derived from the same nine values.
     public var signature: CaptureSignature {
         CaptureSignature(peak: peak, valid: valid > 0.5, nativePixels: Int(nativePixels), present: present > 0.5)
+    }
+}
+
+/// One measurement of the image in both forms: the nine values the camera head reads and the
+/// signature the capture member reports. The Lens fills it once per image.
+public struct CaptureReading: Sendable, Equatable {
+    public let features: CaptureFeatures
+    public let signature: CaptureSignature
+
+    public init(features: CaptureFeatures, signature: CaptureSignature) {
+        self.features = features
+        self.signature = signature
     }
 }

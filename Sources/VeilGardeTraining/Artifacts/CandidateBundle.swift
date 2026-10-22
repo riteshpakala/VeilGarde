@@ -14,7 +14,7 @@
 //
 //            candidates/<id>/
 //              manifest.json  recipe.json  runs.jsonl  *.json (inherited)
-//              fusion/ combiner/                           the model and its metrics.json
+//              camera/ combiner/                           the model and its metrics.json
 //              heads/<kind>/{head.json, recipe.json, metrics.json}
 //
 

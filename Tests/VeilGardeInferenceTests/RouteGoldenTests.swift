@@ -3,11 +3,13 @@
 //  VeilGardeInferenceTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The full detector against VeilGarde's own route goldens (`veilgarde route --json` on the
-//        two parity crops with the shipped bundle of 2026-10-21): every label, route and structural
-//        field equal, every number within 1e-4 (DINOv2's matrix kernels move with Frigate's MLX
-//        revision by about 1e-5). The schema-v3 keys; the screenshot hint; the semantic chain
-//        removed; DINOv2 against the HF reference embeddings.
+//  WHAT: The full detector against VeilGarde's own goldens (`veilgarde route --json` on the two
+//        parity crops with the shipped bundle): every label and structural field equal, every
+//        number within 1e-4 (DINOv2's matrix kernels move with Frigate's MLX revision by about
+//        1e-5). The goldens were re-recorded in schema v1 on 2026-10-21 after the stack's numbers
+//        were checked equal to the schema-v3 goldens', and the verdicts stay pinned here by value.
+//        The members and revisions in order; the schema-v1 keys; the semantic tiles removed;
+//        DINOv2 against the HF reference embeddings.
 //
 
 import Foundation
@@ -44,46 +46,72 @@ func compare(_ a: Data, _ b: Data, tolerance: Double) throws -> (worst: Double, 
 extension InferenceMLXSuites {
     @Suite("Full detector goldens", .serialized, .enabled(if: Fixture.weightsPresent))
     struct RouteGoldenTests {
-        @Test("the routed result matches the golden: labels exact, numbers within 1e-4", arguments: ["crop_ben", "crop_fox"])
+        /// The verdicts of 2026-10-21, as the schema-v3 goldens held them before the stack was a list.
+        static let verdicts: [String: (p: Float, prediction: String)] = ["crop_ben": (0.1059354618191719, "real"), "crop_fox": (0.018225347623229027, "real")]
+
+        @Test("the result matches the golden: labels exact, numbers within 1e-4", arguments: ["crop_ben", "crop_fox"])
         func routeJSON(name: String) throws {
             let cg = try ImageDecoding.cgImage(contentsOf: Fixture.crop("\(name).png"))
-            let routed = try Detector.shared.detect(cgImage: cg, config: InferenceConfig())
-            #expect(routed.domain == .camera)
-            let ours = try ResultJSON.encode(routed.result, times: [], device: "route", route: routed.domain.rawValue)
+            let result = try Detector.detect(cgImage: cg, config: InferenceConfig())
+            let ours = try ResultJSON.encode(result, times: [], device: "route")
             let (worst, mismatches) = try compare(ours, Data(contentsOf: Fixture.crop("\(name).route.json")), tolerance: 1e-4)
             #expect(mismatches.isEmpty, "\(mismatches.prefix(5))")
             #expect(worst < 1e-4, "max |Δ| \(worst)")
-            #expect(routed.result.specialists?.map(\.name) == ["fusion", "art", "blur", "human", "capture", "semantic-tiles"])
+            let pinned = try #require(Self.verdicts[name])
+            #expect(abs(result.p - pinned.p) < 1e-4 && result.prediction == pinned.prediction)
+            #expect(result.stack.map(\.name) == ["screenshot", "camera", "capture", "art", "blur", "human", "preview", "semantic-tiles"])
+            #expect(result.revisions.map(\.name) == ["combiner", "frame-seam", "preview-tail"])
+            #expect(result.revisions.revision("combiner")?.text("anchor") == "camera")
         }
 
-        @Test("the result JSON is schema v3")
-        func schemaV3() throws {
+        @Test("the result JSON is schema v1")
+        func schemaV1() throws {
             let cg = try ImageDecoding.cgImage(contentsOf: Fixture.crop("crop_fox.png"))
-            let routed = try Detector.shared.detect(cgImage: cg, config: InferenceConfig())
-            let json = try #require(JSONSerialization.jsonObject(with: ResultJSON.encode(routed.result, times: [], device: "route", route: "camera")) as? [String: Any])
-            #expect(Set(json.keys) == ["bundle", "capture", "device", "image", "route", "route_diagnostics", "schema_version", "scorer", "semantic_tiles",
-                                       "specialists", "times_sec", "verdict"])
-            #expect(json["schema_version"] as? Int == 3 && json["scorer"] as? String == "fusion")
-            #expect(routed.result.imageWidth == cg.width && routed.result.imageHeight == cg.height)
+            let result = try Detector.detect(cgImage: cg, config: InferenceConfig())
+            let json = try #require(JSONSerialization.jsonObject(with: ResultJSON.encode(result, times: [], device: "route")) as? [String: Any])
+            #expect(Set(json.keys) == ["bundle", "device", "image", "revisions", "schema_version", "stack", "times_sec", "verdict"])
+            #expect(json["schema_version"] as? Int == 1)
+            #expect(result.imageWidth == cg.width && result.imageHeight == cg.height)
         }
 
-        @Test("a screenshot hint routes to the content head")
-        func screenshotHint() throws {
-            let cg = try ImageDecoding.cgImage(contentsOf: Fixture.crop("crop_ben.png"))
-            let routed = try Detector.shared.detect(cgImage: cg, config: InferenceConfig(), hint: .screenshot)
-            #expect(routed.domain == .screenshot)
-            #expect(routed.result.scorer == "screenshot")
-            #expect(routed.result.routeDiagnostics?.requestedHint == "screenshot" && routed.result.routeDiagnostics?.route == "screenshot")
-        }
-
-        @Test("removing the semantic chain runs no semantic probe")
+        @Test("removing the semantic tiles runs no token head and the preview tail never arms")
         func semanticRemoved() throws {
             let cg = try ImageDecoding.cgImage(contentsOf: Fixture.crop("crop_fox.png"))
             var config = InferenceConfig()
             config.semanticResponsibility = .semanticRemoved
-            let r = try Detector.shared.detect(cgImage: cg, config: config).result
-            #expect(r.semanticTiles == nil && r.routeDiagnostics?.semanticEvaluated == false)
-            #expect(!(r.specialists ?? []).contains { $0.name == "semantic-tiles" })
+            let r = try Detector.detect(cgImage: cg, config: config)
+            #expect(r.stack.member("semantic-tiles") == nil)
+            #expect(r.revisions.revision("preview-tail")?.applied == false && r.revisions.revision("preview-tail")?.flag("triggered") == false)
+        }
+
+        @Test("a pipeline declared in place runs only its members and revisions")
+        func customPipeline() throws {
+            let cg = try ImageDecoding.cgImage(contentsOf: Fixture.crop("crop_ben.png"))
+            let pipeline = Pipeline {
+                Stack {
+                    Screenshot()
+                    Camera()
+                    Capture()
+                    for kind in HeadKind.combinerOrder { Specialist(kind) }
+                }
+                Revisions {
+                    Combine()
+                }
+            }
+            let r = try Detector.detect(cgImage: cg, config: InferenceConfig(), pipeline: pipeline)
+            let shipped = try Detector.detect(cgImage: cg, config: InferenceConfig())
+            #expect(r.stack.map(\.name) == ["screenshot", "camera", "capture", "art", "blur", "human"] && r.revisions.map(\.name) == ["combiner"])
+            #expect(r.p == shipped.revisions.revision("combiner")?.p, "the combiner reads the same members either way")
+            let missing = Pipeline {
+                Stack {
+                    Camera()
+                    Capture()
+                }
+                Revisions {
+                    Combine()
+                }
+            }
+            #expect(throws: VeilGardeFailure.self, "the combiner needs its evidence members") { try Detector.detect(cgImage: cg, config: InferenceConfig(), pipeline: missing) }
         }
 
         @Test("DINOv2 reproduces the HF reference embeddings (cosine ≥ 0.999)",

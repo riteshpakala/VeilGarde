@@ -41,7 +41,7 @@ enum Toy {
         var rng = SplitMix64(seed: 9)
         func gauss() -> Float { Float((-2 * log(max(1e-12, rng.unit()))).squareRoot() * cos(2 * .pi * rng.unit())) }
         var rows: [FeatureRow] = []
-        var columns: [FeatureColumn: [Float]] = Dictionary(uniqueKeysWithValues: FeatureColumn.allCases.filter { $0 != .residual }.map { ($0, [Float]()) })   // no residual: these rows have no image
+        var columns: [FeatureColumn: [Float]] = Dictionary(uniqueKeysWithValues: FeatureColumn.allCases.map { ($0, [Float]()) })
         let sources = ["civitai", "commons_native", "inat", "hf_faces", "wikimedia"]
         for (key, n) in quota.sorted(by: { $0.key < $1.key }) {
             let parts = key.split(separator: "/"), category = String(parts[0]), label = Int(parts[1])!

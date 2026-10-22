@@ -31,7 +31,7 @@ public final class SemanticLens: @unchecked Sendable {
         return m
     }
 
-    /// The fusion head's embedding: CLS after the plain 256/224 preprocessing.
+    /// The camera head's embedding: CLS after the plain 256/224 preprocessing.
     public static func fusionEmbedding(_ cg: CGImage, variant: DinoVariant = .small) throws -> [Float] {
         try shared.vit(variant)(Dinov2Preprocess.input(cg)).reshaped(-1).asArray(Float.self)
     }

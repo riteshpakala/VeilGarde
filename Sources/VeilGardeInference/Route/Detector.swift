@@ -3,64 +3,17 @@
 //  VeilGardeInference
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The router, the one entry point of the full detector. It picks the image's domain, runs
-//        that domain's base expert (camera: the fusion head; screenshot: the content head), then
-//        compounds the high-precision priors on it in a fixed order: capture and the pooled
-//        specialists, the frame seam, the semantic chain. One verdict comes out.
-//  PIN:  The reference router's order and arithmetic, split one mechanism per file. Stacking, not
-//        blending: a monolithic combiner regressed real false positives 8% → 50–92% in the
-//        research's measurement, the stack holds them at 0%. Routing is never by image size. The
-//        state is frozen before the semantic chain (preSemantic) for replay.
+//  WHAT: The detector's one entry point: a decoded image through a pipeline, the shipped one
+//        unless told otherwise, into one result.
+//  PIN:  The command line, the battery, the census and the goldens all call this; none builds the
+//        stack itself.
 //
 
 import CoreGraphics
-import Foundation
 
-public final class Detector: @unchecked Sendable {
-    public static let shared = Detector()
-    private let lock = NSLock()
-    private var heads: [DetectionDomain: DomainHead] = [:]
-    private var overrides: [DomainOverride] = []
-    private var domainDetector: DomainDetector = DefaultDomainDetector()
-
-    public init() {
-        register(CameraFusionHead())
-        register(ScreenshotContentHead())
-    }
-
-    public func register(_ head: DomainHead) { lock.lock(); heads[head.domain] = head; lock.unlock() }
-    public func register(override o: DomainOverride) { lock.lock(); overrides.append(o); lock.unlock() }
-    public func setDomainDetector(_ d: DomainDetector) { lock.lock(); domainDetector = d; lock.unlock() }
-
-    private func snapshot() -> (DomainDetector, [DetectionDomain: DomainHead], [DomainOverride]) {
-        lock.lock()
-        defer { lock.unlock() }
-        return (domainDetector, heads, overrides)
-    }
-
-    /// The full verdict for one image.
-    public func detect(cgImage: CGImage, config: InferenceConfig, hint: DetectionDomain? = nil) throws -> (result: InferenceResult, domain: DetectionDomain) {
-        let s = DetectionSignals(cgImage: cgImage, config: config)
-        let (picker, registered, _) = snapshot()
-        let domain = picker.detect(s, hint: hint)
-        let base = try (registered[domain] ?? registered[.camera]!).verdict(s)
-
-        var state = RouteState(base: base)
-        let cap = s.capture()
-        CapturePriors.apply(&state, s, domain: domain, capture: cap)
-        try FrameSeam.apply(&state, s, capture: cap, hint: hint, detector: self)
-        let preSemanticP = state.p
-        let preSemanticPrediction = state.verdict
-        let semanticTiles = SemanticChain.apply(&state, s, capture: cap)
-
-        let diagnostics = RouteDiagnostics(
-            route: domain.rawValue, requestedHint: hint?.rawValue, semanticProfile: config.semanticResponsibility.rawValue,
-            screenshotGate: s.gate.isScreenshot, baseP: base.p, preSemanticP: preSemanticP, preSemanticPrediction: preSemanticPrediction,
-            semanticMajority: state.semanticMajority, semanticEvaluated: state.semanticEvaluated, semanticTriggered: state.semanticTriggered,
-            semanticDecisive: state.semanticDecisive, previewEvaluated: state.previewEvaluated, previewTriggered: state.previewTriggered,
-            previewDecisive: state.previewDecisive)
-        let result = PublicSurface.routed(base: base, prediction: state.verdict, p: state.p, capture: cap, specialists: state.stack,
-                                          semanticTiles: semanticTiles, routeDiagnostics: diagnostics, bundle: config.bundle.hashes)
-        return (result, domain)
+public enum Detector {
+    /// The full result for one image.
+    public static func detect(cgImage: CGImage, config: InferenceConfig = .shipped, pipeline: Pipeline = .v1) throws -> InferenceResult {
+        try pipeline.run(cgImage: cgImage, config: config)
     }
 }

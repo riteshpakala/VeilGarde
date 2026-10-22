@@ -5,8 +5,8 @@
 //
 //  WHAT: The linear head and the stack combiner against float32 replicas of the reference's
 //        arithmetic (written once from the Python reference), the shipped combiner as fitted on
-//        2026-10-21, a combiner that still carries a noiseprint term refused, and the trainer's file
-//        forms loading back as the runtime types.
+//        2026-10-21 and keyed by member, a combiner file of another version refused, and the
+//        trainer's file forms loading back as the runtime types.
 //
 
 import Foundation
@@ -46,51 +46,58 @@ struct HeadsTests {
         #expect(text.contains("\"scaler_mean\"") && text.contains("\"fire_threshold\"") && text.contains("\"embed_source\""))
     }
 
-    @Test("the shipped combiner is the 2026-10-21 fit: five inputs, no art-pair adjudication")
+    @Test("the shipped combiner is the 2026-10-21 fit, keyed by member: the camera anchor, art, blur and human as evidence")
     func combinerWeights() throws {
-        let c = try StackCombiner.load(Fixture.resource("stack_combiner_v3.json"))
+        let c = try StackCombiner.load(Fixture.resource("stack_combiner.json"))
+        #expect(c.model == "stack_combiner" && c.version == 1)
         #expect(abs(c.w0 - -1.0216338510927914) < 1e-6)
-        #expect(abs(c.wBase - 1.664112977699542) < 1e-6)
-        #expect(c.wGen.count == 3 && abs(c.wGen[0] - 0.15331665321009014) < 1e-6 && abs(c.wGen[1] - 0.2197897549987958) < 1e-6 && abs(c.wGen[2] - 0.2999066044320255) < 1e-6)
-        #expect(c.wRescue == 1 && c.capBase == 4 && c.capHead == 2 && c.gateCeiling == 0.75 && c.pairAdjudicates == false)
-        // The research's v1, adjudicated by the art-pair: an art-pair under the art head pulls the pool down; the shipped one ignores it.
-        let v1 = try StackCombiner.load(Fixture.url("stack_combiner_v1.json"))
-        #expect(v1.pairAdjudicates == true)
-        let heads: [Float] = [0.9, 0.2, 0.1]
-        #expect(v1.pool(base: 0.6, heads: heads, pairAI: 0.05) < v1.pool(base: 0.6, heads: heads))
-        #expect(c.pool(base: 0.6, heads: heads, pairAI: 0.05) == c.pool(base: 0.6, heads: heads))
+        #expect(abs(c.anchor.w - 1.664112977699542) < 1e-6 && c.anchor.cap == 4 && c.anchor.gateCeiling == 0.75)
+        #expect(c.evidenceMembers == ["art", "blur", "human"])
+        #expect(abs(c.evidence[0].w - 0.15331665321009014) < 1e-6 && abs(c.evidence[1].w - 0.2197897549987958) < 1e-6 && abs(c.evidence[2].w - 0.2999066044320255) < 1e-6)
+        #expect(c.rescue.w == 1 && c.evidenceCap == 2)
     }
 
-    @Test("a combiner that still carries a noiseprint term is refused")
-    func noiseprintRefused() throws {
+    @Test("a combiner file of another version or model is refused")
+    func otherVersionRefused() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("vg-combiner-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
-        let url = dir.appendingPathComponent("c.json")
-        try Data(#"{"w0": 0, "w_base": 1, "w_gen": [0, 0, 0], "w_rescue": 0.5, "w_np": 0.8, "cap_base": 4, "cap_head": 2, "gate_ceiling": 0.75}"#.utf8).write(to: url)
-        #expect(throws: VeilGardeFailure.self) { try StackCombiner.load(url) }
+        let old = dir.appendingPathComponent("old.json")
+        try Data(#"{"model": "stack_combiner", "version": 3, "w0": 0, "w_base": 1, "w_gen": [0, 0, 0], "w_rescue": 0.5, "cap_base": 4, "cap_head": 2, "gate_ceiling": 0.75}"#.utf8).write(to: old)
+        #expect(throws: VeilGardeFailure.self) { try StackCombiner.load(old) }
+        var other = try JSONSerialization.jsonObject(with: Data(contentsOf: Fixture.resource("stack_combiner.json"))) as! [String: Any]
+        other["version"] = 2
+        let next = dir.appendingPathComponent("next.json")
+        try JSONSerialization.data(withJSONObject: other).write(to: next)
+        #expect(throws: VeilGardeFailure.self) { try StackCombiner.load(next) }
     }
 
-    @Test("pool and contribution match the float32 replica on 28 tuples")
+    @Test("pool and contribution match the float32 replica on the 19 tuples no art-pair moved")
     func combinerArithmetic() throws {
         let reference = try Fixture.json("combiner_reference.json")
-        let c = try StackCombiner.load(Fixture.url("stack_combiner_v1.json"))
+        let c = try StackCombiner.load(Fixture.url("combiner_research.json"))
+        var checked = 0
         for case let t as [String: Any] in reference["cases"] as! [Any] {
-            let base = float(t["base"])!, heads = floats(t["heads"])
-            let pair = float(t["pair"])
-            #expect(abs(c.pool(base: base, heads: heads, pairAI: pair) - float(t["pool"])!) < 1e-6)
+            let anchor = float(t["base"])!, evidence = floats(t["heads"])
+            // The replica's art logit was min(art, art-pair); the cases where the pair moved it left with the art-pair head.
+            if let pair = float(t["pair"]), c.lg(pair, c.evidenceCap) < c.lg(evidence[0], c.evidenceCap) { continue }
+            checked += 1
+            #expect(abs(c.pool(anchor: anchor, evidence: evidence) - float(t["pool"])!) < 1e-6)
             let expected = floats(t["contribution"])
-            for k in 0..<3 { #expect(abs(c.contribution(k, base: base, heads: heads, pairAI: pair) - expected[k]) < 1e-6) }
+            for k in 0..<3 { #expect(abs(c.contribution(k, anchor: anchor, evidence: evidence) - expected[k]) < 1e-6) }
         }
-        // Neutral heads at an even base: only w0 speaks.
-        #expect(abs(c.pool(base: 0.5, heads: [0.5, 0.5, 0.5]) - 1 / (1 + exp(0.6754975))) < 1e-6)
+        #expect(checked == 19)
+        // Neutral evidence at an even anchor: only w0 speaks.
+        #expect(abs(c.pool(anchor: 0.5, evidence: [0.5, 0.5, 0.5]) - 1 / (1 + exp(0.6754975))) < 1e-6)
     }
 
     @Test("a CombinerFile loads as the combiner it describes")
     func combinerFile() throws {
-        let file = CombinerFile(w0: -0.5, wBase: 3, wGen: [0, 0.1, 0.2], wRescue: 0.5, note: "test")
+        let file = CombinerFile(w0: -0.5, anchor: .init(w: 3), evidence: [.init(member: "art", w: 0), .init(member: "blur", w: 0.1), .init(member: "human", w: 0.2)],
+                                rescue: .init(w: 0.5), note: "test")
         let c = try file.combiner()
-        #expect(c.wGen == [0, 0.1, 0.2] && c.pairAdjudicates == true && c.gateCeiling == 0.75)
-        #expect(file.inputs == ["base", "art_gen", "blur_gen", "human_gen", "rescue"])
+        #expect(c.evidence.map(\.w) == [0, 0.1, 0.2] && c.evidenceMembers == ["art", "blur", "human"] && c.anchor.gateCeiling == 0.75 && c.version == 1)
+        let text = String(decoding: try JSONCoding.prettyEncoder().encode(file), as: UTF8.self)
+        #expect(text.contains("\"evidence_cap\"") && text.contains("\"gate_ceiling\"") && !text.contains("w_base"))
     }
 }

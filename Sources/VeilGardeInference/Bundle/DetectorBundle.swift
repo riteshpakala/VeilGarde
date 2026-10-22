@@ -25,9 +25,12 @@ public struct DetectorBundle: Sendable, Equatable {
     /// The bundle the package ships.
     public static var shipped: DetectorBundle { DetectorBundle(directory: ShippedBundle.directory, manifest: ShippedBundle.manifest) }
 
-    /// A bundle directory, every artifact verified.
+    /// A bundle directory, every artifact verified; one without a camera head or a combiner is refused.
     public static func load(_ directory: URL) throws -> DetectorBundle {
         let bundle = try ModelBundle.load(directory)
+        for role in [ArtifactRole.camera, .combiner] where bundle.manifest.artifact(role) == nil {
+            throw VeilGardeFailure.data("the bundle at \(directory.path) has no \(role.rawValue) artifact", hint: "a detector bundle holds a camera head and a stack combiner")
+        }
         return DetectorBundle(directory: bundle.root, manifest: bundle.manifest)
     }
 
@@ -37,20 +40,19 @@ public struct DetectorBundle: Sendable, Equatable {
 
     public var isShipped: Bool { directory.standardizedFileURL == ShippedBundle.directory.standardizedFileURL }
 
-    /// The hashes a result reports: the fusion head's, the combiner's and the manifest's.
+    /// The hashes a result reports: every artifact's by its slot, and the manifest's.
     public var hashes: BundleHashes {
         let manifestSHA = (try? JSONCoding.prettyEncoder().encode(manifest)).map { ContentHash.sha256Hex($0) } ?? ""
-        return BundleHashes(fusionHeadSHA256: manifest.artifact(.fusionHead)?.sha256, combinerSHA256: manifest.artifact(.combiner)?.sha256,
-                            manifestSHA256: manifestSHA)
+        return BundleHashes(manifestSHA256: manifestSHA, artifacts: Dictionary(manifest.artifacts.map { ($0.slot, $0.sha256) }, uniquingKeysWith: { a, _ in a }))
     }
 
-    /// What a report names to say which models it measured: the bundle's directory, the fusion
+    /// What a report names to say which models it measured: the bundle's directory, the camera
     /// head's and the combiner's hashes, and the manifest's hash.
     public var provenance: [String: String] {
         let h = hashes
         var out = ["bundle": directory.path, "manifest_sha256": h.manifestSHA256]
-        if let f = h.fusionHeadSHA256 { out["fusion_head_sha256"] = f }
-        if let c = h.combinerSHA256 { out["combiner_sha256"] = c }
+        if let c = manifest.artifact(.camera)?.sha256 { out["camera_sha256"] = c }
+        if let c = manifest.artifact(.combiner)?.sha256 { out["combiner_sha256"] = c }
         return out
     }
 }

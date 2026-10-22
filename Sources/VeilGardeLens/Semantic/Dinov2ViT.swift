@@ -4,7 +4,7 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: DINOv2-small (ViT-S/14) in MLXNN: the semantic half of VeilGarde. Its 384-value CLS embedding
-//        feeds the fusion head (what the image depicts, beside whether a sensor made it), its
+//        feeds the camera head (what the image depicts, beside whether a sensor made it), its
 //        256 patch tokens feed the semantic-tile head, and the same CLS after a 360×640
 //        force-resize feeds every specialist head.
 //  PIN:  Garde's port, unchanged: 12 blocks, 6 heads, MLP 1536, LayerScale, LayerNorm ε 1e-6,

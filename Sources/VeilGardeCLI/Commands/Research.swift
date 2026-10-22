@@ -4,14 +4,14 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: `veilgarde research`: measurements of the detector, part by part. `census` runs the full
-//        detector over images (the battery's, a final_mixed sample, or any given) and counts how
-//        often each mechanism and stack row runs, how often it decides the call, and how often the
-//        stack and the semantic chain move it; `compare` judges one census against another
-//        (ResearchCompare.swift).
+//        detector over images (the battery's, a final_mixed sample, or any given) and records, for
+//        every image, each stack member's P(AI) and verdict and what each revision did, and counts
+//        how often each member calls each label, how often each revision acts, and how often the
+//        combiner and the later revisions move the call; `compare` judges one census against
+//        another (ResearchCompare.swift).
 //  PIN:  census is one MLX workload, one image at a time. It writes
 //        <work area>/research/census-<stamp>.json and prints a table, and names the bundle it ran
-//        and its hashes. A census written before 2026-10-21 also carries the warp lens's and the
-//        camera-sensor's fields; they read as absent now.
+//        and its hashes. Rows keep path, label and call, which compare joins on.
 //
 
 import ArgumentParser
@@ -31,7 +31,7 @@ struct ResearchCommand: ParsableCommand {
 
     struct Census: ParsableCommand {
         static let configuration = CommandConfiguration(
-            commandName: "census", abstract: "Run the full detector over images and count how often each mechanism runs and decides the call.",
+            commandName: "census", abstract: "Run the full detector over images and count what every member called and what every revision did.",
             discussion: "With no images it takes the battery's (every group) and a final_mixed sample. One MLX workload, one image at a time.")
         @Argument(help: "Images, folders (searched recursively), or text files of image paths (one per line).") var images: [String] = []
         @Option(help: "The label of the images named as arguments: real or generated.") var label: String?
@@ -81,8 +81,7 @@ struct ResearchCommand: ParsableCommand {
                     defer { LensRuntime.releaseMemory() }
                     do {
                         let cg = try loadImage(item.path)
-                        let routed = try Detector.shared.detect(cgImage: cg, config: config)
-                        census.add(item.path, label: item.label, routed.result, domain: routed.domain.rawValue)
+                        census.add(item.path, label: item.label, try Detector.detect(cgImage: cg, config: config))
                     } catch {
                         census.errors.append("\(item.path): \(error)")
                     }
@@ -98,26 +97,25 @@ struct ResearchCommand: ParsableCommand {
     }
 }
 
-/// How often each part of the router ran on a set of images, and how often it decided.
+/// What every member called and every revision did on a set of images.
 struct MechanismCensus: Codable {
     struct Row: Codable {
         var path: String
         var label: String?
-        var route: String
-        var capture: String
-        var baseP: Float?
-        var preSemanticP: Float?
         var p: Float
         var call: String
-        var preSemanticCall: String?
-        var shown: [String]
-        var decisive: [String]
-        var semanticTriggered: Bool
-        var semanticDecisive: Bool
-        var previewTriggered: Bool
-        var previewDecisive: Bool
-        /// The base expert's own call (the first stack row).
-        var baseCall: String? = nil
+        /// The capture member's verdict: real (present), absent or invalid.
+        var capture: String
+        /// The member the combiner anchored on.
+        var anchor: String?
+        /// Each member's P(AI), for the members that score.
+        var members: [String: Float]
+        /// Each member's verdict.
+        var memberCalls: [String: String]
+        /// Whether each revision changed the verdict.
+        var revisions: [String: Bool]
+        /// The verdict the combiner set, before the later revisions.
+        var combinerCall: String?
     }
 
     var date = Date()
@@ -129,68 +127,63 @@ struct MechanismCensus: Codable {
     var coreVersion: String? = nil
     var rows: [Row] = []
     var errors: [String] = []
-    var routes: [String: Int] = [:]
     var capture: [String: Int] = [:]
-    /// Stack rows by name: how many images showed each.
-    var shown: [String: Int] = [:]
-    /// Stack rows at full weight (the part that decided or moved the call), by name, then by label.
-    var decisive: [String: [String: Int]] = [:]
-    /// Capture-absent images whose pre-semantic call differs from the fusion base's call at 0.5.
-    var stackMovedCall = 0
-    /// Images whose final call differs from the pre-semantic one.
-    var semanticMovedCall = 0
+    var anchors: [String: Int] = [:]
+    /// By member, then the member's verdict, how many images.
+    var memberCalls: [String: [String: Int]] = [:]
+    /// By revision, then label ("unlabelled" when unknown), how many images it changed.
+    var revisionsApplied: [String: [String: Int]] = [:]
+    /// Capture-absent images whose combined call differs from the anchor's own call at 0.5.
+    var combinerMovedCall = 0
+    /// Images whose final call differs from the combiner's.
+    var revisionsMovedCall = 0
     /// The final call against the label, where the label is known.
     var correct: [String: Int] = [:]
     var labelled: [String: Int] = [:]
-    /// By label ("unlabelled" when unknown), then the routed call.
-    var finalCalls: [String: [String: Int]]? = nil
+    /// By label ("unlabelled" when unknown), then the call.
+    var finalCalls: [String: [String: Int]] = [:]
 
-    mutating func add(_ path: String, label: String?, _ r: InferenceResult, domain: String) {
-        let cap = r.captureSignature.map { $0.valid ? ($0.present ? "present" : "absent") : "invalid" } ?? "none"
-        let d = r.routeDiagnostics
-        let stack = r.specialists ?? []
-        var row = Row(path: path, label: label, route: domain, capture: cap, baseP: d?.baseP, preSemanticP: d?.preSemanticP, p: r.p,
-                      call: r.prediction, preSemanticCall: d?.preSemanticPrediction, shown: stack.map(\.name),
-                      decisive: stack.filter { $0.weight >= 1 }.map(\.name), semanticTriggered: d?.semanticTriggered ?? false,
-                      semanticDecisive: d?.semanticDecisive ?? false, previewTriggered: d?.previewTriggered ?? false, previewDecisive: d?.previewDecisive ?? false)
-        row.baseCall = stack.first?.verdict
+    mutating func add(_ path: String, label: String?, _ r: InferenceResult) {
+        let combiner = r.revisions.revision("combiner")
+        let row = Row(path: path, label: label, p: r.p, call: r.prediction, capture: r.stack.member("capture")?.verdict ?? "none",
+                      anchor: combiner?.text("anchor"),
+                      members: Dictionary(r.stack.compactMap { m in m.p.map { (m.name, $0) } }, uniquingKeysWith: { a, _ in a }),
+                      memberCalls: Dictionary(r.stack.map { ($0.name, $0.verdict) }, uniquingKeysWith: { a, _ in a }),
+                      revisions: Dictionary(r.revisions.map { ($0.name, $0.applied) }, uniquingKeysWith: { a, _ in a }),
+                      combinerCall: combiner?.prediction)
         rows.append(row)
-        finalCalls = Self.counted(finalCalls, label ?? "unlabelled", row.call)
-        routes[domain, default: 0] += 1
-        capture[cap, default: 0] += 1
-        for name in Set(row.shown) { shown[name, default: 0] += 1 }
-        for name in Set(row.decisive) { decisive[name, default: [:]][label ?? "unlabelled", default: 0] += 1 }
-        if cap != "present", let base = d?.baseP, let pre = d?.preSemanticPrediction, (base > 0.5 ? "generated" : "real") != pre { stackMovedCall += 1 }
-        if let pre = d?.preSemanticPrediction, pre != r.prediction { semanticMovedCall += 1 }
+        finalCalls[label ?? "unlabelled", default: [:]][row.call, default: 0] += 1
+        capture[row.capture, default: 0] += 1
+        if let a = row.anchor { anchors[a, default: 0] += 1 }
+        for (name, call) in row.memberCalls { memberCalls[name, default: [:]][call, default: 0] += 1 }
+        for (name, applied) in row.revisions where applied { revisionsApplied[name, default: [:]][label ?? "unlabelled", default: 0] += 1 }
+        if row.capture != "real", let a = row.anchor, let ap = row.members[a], let c = row.combinerCall, (ap > 0.5 ? "generated" : "real") != c { combinerMovedCall += 1 }
+        if let c = row.combinerCall, c != row.call { revisionsMovedCall += 1 }
         if let label {
             labelled[label, default: 0] += 1
-            if r.prediction == label { correct[label, default: 0] += 1 }
+            if row.call == label { correct[label, default: 0] += 1 }
         }
-    }
-
-    static func counted(_ table: [String: [String: Int]]?, _ label: String, _ call: String) -> [String: [String: Int]] {
-        var t = table ?? [:]
-        t[label, default: [:]][call, default: 0] += 1
-        return t
     }
 
     var table: String {
-        var lines = ["census: \(rows.count) images (\(errors.count) errors); routes " + routes.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")
-                     + "; capture " + capture.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")]
+        func pad(_ s: String, _ n: Int) -> String { s.count >= n ? s : s + String(repeating: " ", count: n - s.count) }
+        var lines = ["census: \(rows.count) images (\(errors.count) errors); capture " + capture.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")
+                     + "; anchor " + anchors.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")]
         if let bundle { lines.append("bundle \(bundle)") }
-        lines.append("  stack row                shown  full weight (by label)")
-        for (name, n) in shown.sorted(by: { $0.value > $1.value }) {
-            let by = (decisive[name] ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")
-            let label = name.count >= 24 ? name : name + String(repeating: " ", count: 24 - name.count)
-            lines.append("  " + label + String(format: " %5d  ", n) + (by.isEmpty ? "—" : by))
+        lines.append("  member            calls")
+        for (name, calls) in memberCalls.sorted(by: { $0.key < $1.key }) {
+            lines.append("  " + pad(name, 18) + calls.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))
         }
-        lines.append("the stack moved the base's call on \(stackMovedCall) capture-absent images; the semantic chain moved the call on \(semanticMovedCall)")
+        lines.append("  revision          applied (by label)")
+        for name in Set(rows.flatMap { $0.revisions.keys }).sorted() {
+            let by = (revisionsApplied[name] ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", ")
+            lines.append("  " + pad(name, 18) + (by.isEmpty ? "—" : by))
+        }
+        lines.append("the combiner moved the anchor's call on \(combinerMovedCall) capture-absent images; the later revisions moved the call on \(revisionsMovedCall)")
         lines.append("correct: " + labelled.sorted { $0.key < $1.key }.map { "\($0.key) \(correct[$0.key] ?? 0) of \($0.value)" }.joined(separator: ", "))
-        if let table = finalCalls {
-            lines.append("routed calls: " + table.sorted { $0.key < $1.key }.map { label, calls in
-                "\(label) " + ["real", "inconclusive", "generated"].map { "\($0) \(calls[$0] ?? 0)" }.joined(separator: " / ")
-            }.joined(separator: "; "))
-        }
+        lines.append("calls: " + finalCalls.sorted { $0.key < $1.key }.map { label, calls in
+            "\(label) " + ["real", "inconclusive", "generated"].map { "\($0) \(calls[$0] ?? 0)" }.joined(separator: " / ")
+        }.joined(separator: "; "))
         return lines.joined(separator: "\n")
     }
 }

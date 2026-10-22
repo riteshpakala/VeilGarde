@@ -237,7 +237,7 @@ struct AcquireTests {
         var rng = SplitMix64(seed: 5)
         func gauss() -> Float { Float((-2 * log(max(1e-12, rng.unit()))).squareRoot() * cos(2 * .pi * rng.unit())) }
         var rows: [FeatureRow] = []
-        var columns: [FeatureColumn: [Float]] = Dictionary(uniqueKeysWithValues: FeatureColumn.allCases.filter { $0 != .residual }.map { ($0, [Float]()) })   // no residual: these rows have no image
+        var columns: [FeatureColumn: [Float]] = Dictionary(uniqueKeysWithValues: FeatureColumn.allCases.map { ($0, [Float]()) })
         for (k, (path, category, label)) in [("/data/atlas/photo/generated", "photo", 1), ("/data/atlas/art/real", "art", 0), ("/x/final_mixed/real", "v197", 0)].enumerated() {
             for i in 0..<40 {
                 rows.append(FeatureRow(id: "g\(k)-\(i)", path: "\(path)/\(i).jpg", label: label, category: category, source: "t"))
@@ -251,7 +251,7 @@ struct AcquireTests {
         let report = try GapMiner.mine(try f.area.liveBundle(), store: FeatureStore(directory: dir), targets: try AcquireTargets.shipped())
         #expect(Set(report.buckets.map(\.name)) == ["processed/photo/gen", "processed/art/real", "camera/photo/real"])
         #expect(report.buckets.map(\.gap) == report.buckets.map(\.gap).sorted(by: >))
-        for b in report.buckets { #expect(abs(b.gap - b.baseError - b.disagreement) < 1e-12 && b.n == 40) }
+        for b in report.buckets { #expect(abs(b.gap - b.cameraError - b.disagreement) < 1e-12 && b.n == 40) }
         let expected = report.buckets.filter { $0.gap >= 0.05 }.flatMap { b in (try! AcquireTargets.shipped()).jobs(domain: b.domain, category: b.category, label: b.label) }
         #expect(report.jobs.count <= expected.count && report.jobs.allSatisfy { j in expected.contains { $0.source == j.source && $0.query == j.query } })
         #expect(GapMiner.category(FeatureRow(id: "x", path: "/x/final_mixed/real/a.jpg", label: 0, category: "v197", source: nil)) == "photo")

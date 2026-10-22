@@ -3,8 +3,8 @@
 //  VeilGardeCoreTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: GBDTModel against the shipped fusion head: decoding then encoding writes the file's exact
-//        bytes; the head is a from-scratch fit over the 393 fusion columns; a fresh model encodes and
+//  WHAT: GBDTModel against the shipped camera head: decoding then encoding writes the file's exact
+//        bytes; the head is a from-scratch fit over the 393-column camera row; a fresh model encodes and
 //        decodes to itself. (The trainer's parity with xgboost 3.2 is BoostTrainerTests'.)
 //
 
@@ -14,19 +14,19 @@ import Testing
 
 @Suite("Boost codec and evaluator")
 struct BoostTests {
-    @Test("the shipped fusion head round-trips to its exact bytes")
+    @Test("the shipped camera head round-trips to its exact bytes")
     func byteIdentity() throws {
-        let data = try Data(contentsOf: Fixture.resource("fusion_head.xgb.json"))
+        let data = try Data(contentsOf: Fixture.resource("camera.xgb.json"))
         let model = try GBDTModel.decode(xgboostJSON: data)
         let encoded = model.encodeXGBoostJSON()
         #expect(encoded == data, "\(encoded.count) bytes vs \(data.count)")
     }
 
-    @Test("the shipped fusion head is 500 trees of depth at most 5 over the 393 fusion columns")
-    func fusionShape() throws {
-        let head = try GBDTModel.load(Fixture.resource("fusion_head.xgb.json"))
+    @Test("the shipped camera head is 500 trees of depth at most 5 over the 393-column camera row")
+    func cameraShape() throws {
+        let head = try GBDTModel.load(Fixture.resource("camera.xgb.json"))
         #expect(head.trees.count == 500)
-        #expect(head.featureCount == FusionVector.count && FusionVector.count == 393)
+        #expect(head.featureCount == CameraRow.width && CameraRow.width == 393)
         #expect((head.trees.map(\.depth).max() ?? 0) <= 5)
     }
 

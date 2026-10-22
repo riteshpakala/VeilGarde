@@ -1,0 +1,30 @@
+{
+  "anchor" : {
+    "cap" : 4,
+    "gate_ceiling" : 0.75,
+    "w" : 1.664112977699542
+  },
+  "evidence" : [
+    {
+      "member" : "art",
+      "w" : 0.15331665321009014
+    },
+    {
+      "member" : "blur",
+      "w" : 0.2197897549987958
+    },
+    {
+      "member" : "human",
+      "w" : 0.2999066044320255
+    }
+  ],
+  "evidence_cap" : 2,
+  "model" : "stack_combiner",
+  "note" : "The fit of 2026-10-21 over the camera head's capture-absent store rows, keyed by member: non-negative weights, reals ×3.0, the rescue weight 1.0 by the sweep's fallback.",
+  "rescue" : {
+    "w" : 1
+  },
+  "threshold" : 0.5,
+  "version" : 1,
+  "w0" : -1.0216338510927914
+}

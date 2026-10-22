@@ -124,9 +124,3 @@ struct RouteOptions: ParsableArguments {
         return InferenceConfig(bundle: detectorBundle, dinoVariant: variant, semanticResponsibility: profile)
     }
 }
-
-func parseHint(_ raw: String?) throws -> DetectionDomain? {
-    guard let raw else { return nil }
-    guard let hint = DetectionDomain(rawValue: raw) else { throw VeilGardeFailure.usage("--hint must be camera or screenshot, not \(raw)") }
-    return hint
-}

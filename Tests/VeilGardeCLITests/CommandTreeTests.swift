@@ -47,15 +47,15 @@ struct CommandTreeTests {
         ["doctor"], ["doctor", "--work-area", "/tmp/vg"],
         ["features", "capture", "x.jpg"],
         ["parity", "dino", "f.safetensors", "--images", "dir", "--dino", "xsmall"],
-        ["route", "x.jpg", "--json", "--hint", "screenshot", "--semantic-profile", "semantic_removed", "--bundle", "/tmp/b", "--dino", "xxsmall", "--weights-dir", "/tmp/w"],
+        ["route", "x.jpg", "--json", "--semantic-profile", "semantic_removed", "--bundle", "/tmp/b", "--dino", "xxsmall", "--weights-dir", "/tmp/w"],
         ["route", "x.jpg", "--cpu"], ["batch", "in.jsonl", "out.jsonl", "--dino", "small"],
         ["features", "extract", "dir", "--shard", "s1", "--label", "1", "--category", "art", "--source", "civitai", "--store", "/tmp/s", "--limit", "5", "--dino", "small"],
         ["features", "extract", "list.jsonl", "--shard", "s", "--columns", "dino_norm,cap", "--store", "/tmp/aux"],
         ["train", "plan", "--preset", "--store", "/tmp/s", "--parent", "live"], ["train", "plan", "--recipe", "r.toml"],
-        ["train", "fusion", "--mode", "scratch", "--trees", "100", "--eta", "0.05", "--new-generator-weight", "2", "--id", "f1", "--replace", "--plan"],
-        ["train", "fusion", "--mode", "scratch", "--trees", "1000", "--depth", "7", "--columns", "dino_fusion,dino_norm,cap", "--plan"],
-        ["train", "heads", "--kinds", "art,art-pair,preview"], ["train", "combiner", "--reals-weight", "3"], ["train", "combiner", "--reals-weight", "2", "--out-of-fold", "5"],
-        ["features", "residual", "--shards", "a,b", "--replace"], ["train", "all"],
+        ["train", "camera", "--mode", "scratch", "--trees", "100", "--eta", "0.05", "--new-generator-weight", "2", "--id", "f1", "--replace", "--plan"],
+        ["train", "camera", "--mode", "scratch", "--trees", "1000", "--depth", "7", "--plan"],
+        ["train", "heads", "--kinds", "art,preview"], ["train", "combiner", "--reals-weight", "3"],
+        ["store", "migrate", "--from", "/tmp/old", "--to", "/tmp/new", "--json", "-"], ["train", "all"],
         ["train", "run", "recipe.toml", "--work-area", "/tmp/vg"],
         ["flywheel", "init", "--work-area", "/tmp/vg"], ["flywheel", "init", "--battery"],
         ["flywheel", "acquire", "--budget", "60", "--per", "10", "--targets", "test", "--shard", "s", "--no-route", "--dry-run"],
@@ -81,10 +81,9 @@ struct CommandTreeTests {
 
 @Suite("Retired commands")
 struct RetiredCommandTests {
-    @Test("the warp's detection commands and the studies are gone", arguments: [
-        ["score", "x.jpg"], ["fuse", "x.jpg"], ["parity", "warp", "f.json"], ["features", "show", "x.jpg"], ["features", "tiles", "/d"],
-        ["train", "warp", "--dataset", "/d"], ["train", "calibration", "--dataset", "/d"], ["train", "noiseprint"], ["research", "prune"],
-        ["research", "core"], ["bundle", "derive", "--from", "shipped", "--id", "v"], ["route", "x.jpg", "--base", "warp"],
+    @Test("the old names and flags are gone", arguments: [
+        ["train", "fusion", "--mode", "warm"], ["features", "residual"], ["route", "x.jpg", "--hint", "camera"],
+        ["train", "combiner", "--out-of-fold", "5"], ["train", "camera", "--columns", "dino_fusion,cap"],
     ])
     func retired(arguments: [String]) {
         #expect(throws: (any Error).self) { _ = try VeilGardeCommand.parseAsRoot(arguments) }

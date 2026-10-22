@@ -3,12 +3,11 @@
 //  VeilGardeCLI
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: `veilgarde route <image>`: the full detector. The router picks the domain, the base expert
-//        runs (camera: the fusion head; screenshot: the content head), and the specialists, the
-//        frame seam and the semantic chain compound on it. Prints the domain, the verdict, the
-//        base expert's own P(AI), the capture signature and the specialist stack, or the schema-v3
-//        JSON with --json. `batch` routes a manifest of images into a JSONL of results.
-//  PIN:  --json writes times_sec [], device "route", route = the domain.
+//  WHAT: `veilgarde route <image>`: the full detector, Decode → Shared Signals → Stack → Revisions →
+//        Result. Prints the verdict, then every member of the stack with its own P(AI) and verdict,
+//        then every revision and what it did, or the schema-v1 JSON with --json. `batch` runs a
+//        manifest of images into a JSONL of results.
+//  PIN:  --json writes times_sec [] and device "route"; batch writes device "route-batch".
 //
 
 import ArgumentParser
@@ -16,37 +15,55 @@ import Foundation
 import VeilGarde
 
 struct RouteCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "route", abstract: "Run the full detector: route, base expert, specialist stack, mechanisms.")
+    static let configuration = CommandConfiguration(commandName: "route", abstract: "Run the full detector: every member of the stack, then the revisions, one verdict.")
 
     @Argument(help: "The image.") var image: String
     @OptionGroup var route: RouteOptions
-    @Option(help: "Skip domain detection: camera or screenshot.") var hint: String?
-    @Flag(help: "The schema-v3 JSON on stdout.") var json = false
+    @Flag(help: "The schema-v1 JSON on stdout.") var json = false
     @Flag(help: "Run MLX on the CPU.") var cpu = false
 
     func run() throws {
         guarded {
             let config = try route.config()
-            let domainHint = try parseHint(hint)
             let cg = try loadImage(image)
-            let routed = try LensRuntime.withDevice(cpu: cpu) { try Detector.shared.detect(cgImage: cg, config: config, hint: domainHint) }
-            let r = routed.result
+            let r = try LensRuntime.withDevice(cpu: cpu) { try Detector.detect(cgImage: cg, config: config) }
             if json {
-                try emitJSON(try ResultJSON.encode(r, times: [], device: "route", route: routed.domain.rawValue), to: "-")
+                try emitJSON(try ResultJSON.encode(r, times: [], device: "route"), to: "-")
                 return
             }
-            let capture = r.captureSignature.map { !$0.valid ? "invalid" : ($0.present ? "present" : "absent") } ?? "n/a"
-            let stack = (r.specialists ?? []).map { String(format: "%@(p=%.2f w=%.1f→%@)", $0.name, $0.pAI, $0.weight, $0.verdict) }.joined(separator: " + ")
-            print(String(format: "route  domain=%@  verdict=%@  p=%.4f  base=%@ %.4f  capture=%@\n  stack: %@",
-                         routed.domain.rawValue, r.prediction, r.p, r.scorer, r.routeDiagnostics?.baseP ?? r.p, capture, stack))
+            print(Self.text(r))
         }
+    }
+
+    /// The result as lines: the verdict, the stack, the revisions.
+    static func text(_ r: InferenceResult) -> String {
+        func number(_ v: Float?) -> String { v.map { String(format: "%.4f", $0) } ?? "—" }
+        func scalars(_ fields: [Field]) -> String {
+            fields.compactMap { f -> String? in
+                switch f.value {
+                case .number(let v): return "\(f.key)=" + String(format: "%.4g", v)
+                case .flag(let v): return "\(f.key)=\(v)"
+                case .text(let v): return "\(f.key)=\(v)"
+                case .map(let m): return "\(f.key)=" + m.sorted { $0.key < $1.key }.map { "\($0.key):" + String(format: "%.3g", $0.value) }.joined(separator: ",")
+                case .grid, .absent: return nil
+                }
+            }.joined(separator: "  ")
+        }
+        func pad(_ s: String, _ n: Int) -> String { s.count >= n ? s : s + String(repeating: " ", count: n - s.count) }
+        var lines = [String(format: "verdict  %@  p=%.4f  (%.2f ± %.2f)", r.prediction, r.p, r.threshold, r.band), "stack"]
+        for m in r.stack { lines.append("  " + pad(m.name, 16) + pad("p=" + number(m.p), 10) + "  " + pad(m.verdict, 13) + scalars(m.fields)) }
+        lines.append("revisions")
+        for v in r.revisions {
+            lines.append("  " + pad(v.name, 16) + pad(v.applied ? "applied" : "skipped", 9) + " " + pad("p=" + number(v.p), 10) + "  " + pad(v.prediction, 13) + scalars(v.fields))
+        }
+        return lines.joined(separator: "\n")
     }
 }
 
 struct BatchCommand: ParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "batch", abstract: "Route a JSONL manifest of {id, path, hint} rows, in order, into a JSONL of results.")
+    static let configuration = CommandConfiguration(commandName: "batch", abstract: "Run a JSONL manifest of {id, path} rows, in order, into a JSONL of results.")
 
-    @Argument(help: "The manifest: one {\"id\", \"path\", \"hint\"} object per line.") var input: String
+    @Argument(help: "The manifest: one {\"id\", \"path\"} object per line.") var input: String
     @Argument(help: "The output JSONL; it must not exist.") var output: String
     @OptionGroup var route: RouteOptions
 
@@ -66,11 +83,11 @@ struct BatchCommand: ParsableCommand {
                 for (index, item) in items.enumerated() {
                     defer { LensRuntime.releaseMemory() }
                     let cg = try loadImage(item.path)
-                    let routed = try Detector.shared.detect(cgImage: cg, config: config, hint: item.hint)
+                    let result = try Detector.detect(cgImage: cg, config: config)
                     var line = Data("{\"id\":".utf8)
                     line.append(try JSONEncoder().encode(item.id))
                     line.append(Data(",\"result\":".utf8))
-                    line.append(try ResultJSON.encode(routed.result, times: [], device: "route-batch", route: routed.domain.rawValue))
+                    line.append(try ResultJSON.encode(result, times: [], device: "route-batch"))
                     line.append(Data("}\n".utf8))
                     try handle.write(contentsOf: line)
                     if (index + 1).isMultiple(of: 64) { try handle.synchronize(); note("batch: \(index + 1)/\(items.count)") }

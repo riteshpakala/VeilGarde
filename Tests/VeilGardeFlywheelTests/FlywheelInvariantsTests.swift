@@ -6,8 +6,9 @@
 //  WHAT: The flywheel's laws on a fixture work area: init seeds live once; a promote moves exactly
 //        its slot behind the battery and logs it; a failed battery restores live byte for byte; a
 //        rollback returns live to the snapshot byte for byte; the frozen weights never move; the
-//        base moves only by a warm start of the live head; an atlas head must pass admission;
-//        training and measuring never write live/.
+//        camera head moves only by a warm start of the live head; a category head must pass
+//        admission; a combiner must pool members live holds; training and measuring never write
+//        live/.
 //
 
 import Foundation
@@ -17,9 +18,9 @@ import VeilGardeCore
 
 @Suite("Flywheel invariants", .serialized)
 struct FlywheelInvariantsTests {
-    static func candidate(_ f: FlywheelFixture, id: String = "cand", @TrainingBuilder _ models: () -> [ModelRecipe]) throws -> URL {
+    static func candidate(_ f: FlywheelFixture, id: String = "cand", @TrainingBuilder _ members: () -> [AnyTrainable]) throws -> URL {
         let engine = TrainingEngine(area: f.area.area, parent: f.area.live, store: f.area.store)
-        return try engine.train(TrainingRecipe(id: id, models: models())).candidate.root
+        return try engine.train(TrainingRecipe(id: id, members: members())).candidate.root
     }
 
     static func frozen(_ live: ModelBundle) -> [String: String] {
@@ -41,8 +42,8 @@ struct FlywheelInvariantsTests {
         let before = try f.area.liveHashes()
         let frozenBefore = Self.frozen(try f.area.liveBundle())
         let root = try Self.candidate(f) {
-            FusionHead().warmStart(add: 2, eta: 0.03)
-            DinoHead(.human)
+            CameraHead().warmStart(add: 2, eta: 0.03)
+            SpecialistHead(.human)
         }
         #expect(try f.area.liveHashes() == before, "training never writes live/")
         let promoter = Promoter(area: f.area, battery: f.battery)
@@ -55,13 +56,13 @@ struct FlywheelInvariantsTests {
         #expect(Self.frozen(live) == frozenBefore)
         #expect(live.manifest.history.last?.kind == .promote)
 
-        let base = try promoter.promote(.base, from: root, store: nil)
-        #expect(base.kind == .promote)
-        let shippedFusion = try ModelBundle.load(Fixture.resources).sha256(.fusionHead)
-        #expect(try f.area.liveBundle().manifest.artifact(.fusionHead)?.parent == shippedFusion, "the base records the head it continues")
+        let camera = try promoter.promote(.camera, from: root, store: nil)
+        #expect(camera.kind == .promote)
+        let shippedCamera = try ModelBundle.load(Fixture.resources).sha256(.camera)
+        #expect(try f.area.liveBundle().manifest.artifact(.camera)?.parent == shippedCamera, "the camera head records the head it continues")
         #expect(Self.frozen(try f.area.liveBundle()) == frozenBefore)
 
-        // Back to before the head promote: two rollbacks (the base, then the head).
+        // Back to before the head promote: two rollbacks (the camera head, then the human head).
         try promoter.rollback()
         let afterOne = try f.area.liveHashes()
         #expect(afterOne != before)
@@ -75,7 +76,7 @@ struct FlywheelInvariantsTests {
     @Test("a failed battery restores live byte for byte")
     func failedBattery() throws {
         let f = try FlywheelFixture()
-        let root = try Self.candidate(f) { DinoHead(.human) }
+        let root = try Self.candidate(f) { SpecialistHead(.human) }
         let before = try f.area.liveHashes()
         f.fail()
         #expect(throws: VeilGardeFailure.self) { try Promoter(area: f.area, battery: f.battery).promote(.head(.human), from: root, store: FeatureStore(directory: f.area.store)) }
@@ -84,16 +85,16 @@ struct FlywheelInvariantsTests {
         #expect(last.contains("\"kind\":\"failed\""))
     }
 
-    @Test("frozen and retired slots, a cold base and a blocking head are refused before live moves")
+    @Test("frozen and retired slots, a cold camera head, a blocking head and a combiner over a missing member are refused before live moves")
     func refusals() throws {
         let f = try FlywheelFixture()
-        for name in ["dinov2-small", "clip-vision", "warp-tile", "calibration", "fusion-reference", "noiseprint"] {
+        for name in ["dinov2-small", "clip-vision", "warp-tile", "calibration", "fusion-reference", "noiseprint", "base", "fusion", "fusion-head", "pair", "art-pair", "cgi"] {
             #expect(throws: VeilGardeFailure.self) { try FlywheelSlot(parsing: name) }
         }
         let before = try f.area.liveHashes()
         let promoter = Promoter(area: f.area, battery: f.battery)
-        let cold = try Self.candidate(f, id: "cold") { FusionHead().scratch(trees: 3, eta: 0.1) }
-        #expect(throws: VeilGardeFailure.self) { try promoter.promote(.base, from: cold) }
+        let cold = try Self.candidate(f, id: "cold") { CameraHead().scratch(trees: 3, eta: 0.1) }
+        #expect(throws: VeilGardeFailure.self) { try promoter.promote(.camera, from: cold) }
 
         // A head that fires on every calm real.
         var c = try CandidateBundle.open(cold)
@@ -103,9 +104,18 @@ struct FlywheelInvariantsTests {
         try c.put(try JSONCoding.prettyEncoder().encode(blocking), as: "heads/human/head.json", role: .head, head: .human)
         #expect(throws: VeilGardeFailure.self) { try promoter.promote(.head(.human), from: cold, store: FeatureStore(directory: f.area.store)) }
         #expect(throws: VeilGardeFailure.self) { try promoter.promote(.head(.human), from: cold, store: nil) }
+
+        // A combiner that pools a member live has no head for.
+        var file = CombinerFile(w0: -1, anchor: .init(w: 1), evidence: [.init(member: "art", w: 0.1), .init(member: "faces", w: 0.1), .init(member: "human", w: 0.1)],
+                                rescue: .init(w: 1), note: "test")
+        try c.put(try JSONCoding.prettyEncoder().encode(file), as: "combiner/stack_combiner.json", role: .combiner)
+        #expect(throws: VeilGardeFailure.self) { try promoter.promote(.combiner, from: cold) }
+        file.evidence[1] = .init(member: "blur", w: -0.1)
+        try c.put(try JSONCoding.prettyEncoder().encode(file), as: "combiner/stack_combiner.json", role: .combiner)
+        #expect(throws: VeilGardeFailure.self, "a negative weight") { try promoter.promote(.combiner, from: cold) }
         #expect(try f.area.liveHashes() == before)
         let refused = try String(contentsOf: f.area.promoteLog, encoding: .utf8).split(separator: "\n").filter { $0.contains("\"kind\":\"refused\"") }
-        #expect(refused.count == 3)
+        #expect(refused.count == 5)
     }
 
     @Test("the weekly candidates and the agreement read live and never write it")
@@ -113,8 +123,8 @@ struct FlywheelInvariantsTests {
         let f = try FlywheelFixture()
         let before = try f.area.liveHashes()
         var recipe = WeeklyCandidates.recipe(id: "weekly-test")
-        recipe.models = recipe.models.map { m in
-            if case .fusion(let fusion) = m { return .fusion(fusion.warmStart(add: 2, eta: 0.03)) }
+        recipe.members = recipe.members.map { m in
+            if let camera = m.member as? CameraHead { return AnyTrainable(camera.warmStart(add: 2, eta: 0.03)) }
             return m
         }
         let outcome = try WeeklyCandidates.run(recipe, area: f.area)
@@ -123,7 +133,7 @@ struct FlywheelInvariantsTests {
         #expect(review.contains("## The decision rule") && review.contains("veilgarde flywheel promote"))
         #expect(outcome.liveAgreement.rows > 0 && (0...1).contains(outcome.liveAgreement.agreementAll))
         let csv = try String(contentsOf: f.area.metricsCSV, encoding: .utf8).split(separator: "\n")
-        #expect(csv.count == 3 && csv[0].hasPrefix("date,fusion,corpus_n,agreement_all"))
+        #expect(csv.count == 3 && csv[0].hasPrefix("date,bundle,corpus_n,agreement_all"))
         #expect(Agreement.domain("/data/final_mixed/real/x.jpg") == "camera")
         #expect(Agreement.domain("/data/atlas/anchors/art/real/a_shot.jpg") == "processed")
         #expect(Agreement.domain("/pools/art/1.jpg") == "other")

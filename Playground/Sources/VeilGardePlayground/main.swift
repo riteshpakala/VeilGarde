@@ -4,18 +4,18 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: VeilGarde end to end, top to bottom, in its two lanes. The detector first, one part at a
-//        time: the capture signature, DINOv2's two views of the image, the fusion head's 393-column
-//        row and its P(AI), then the stacked specialists and the full verdict, the combiner's
-//        arithmetic printed term by term. Then the training regime in miniature (step 6: a recipe,
-//        its plan, the engine, a candidate bundle), the flywheel loop (step 7: a live bundle, a
-//        battery, a promote and its rollback), and the other lane, the watermark (step 8: a
-//        signature read off the warp residual, matched by a crop and a re-encode). Every step that
-//        has a golden checks itself against it.
+//        time: the capture signature and the screenshot gate, DINOv2's two views of the image, the
+//        camera head's 393-column row and its P(AI), then every member of the stack and the
+//        revisions, the combiner's arithmetic printed term by term. Then the training regime in
+//        miniature (step 6: a recipe, its plan, the engine, a candidate bundle), the flywheel loop
+//        (step 7: a live bundle, a battery, a promote and its rollback), and the other lane, the
+//        watermark (step 8: a signature read off the warp residual, matched by a crop and a
+//        re-encode). Every step that has a golden checks itself against it.
 //  IN:   The DINOv2 weights in the work area or VEILGARDE_WEIGHTS; final_mixed under
 //        VEILGARDE_DATASETS for the iPhone sample (optional). Run by Playground/run.sh.
 //  OUT:  One numbered block per step; Playground/.work for the training steps. Exit 0 only when
 //        every checkpoint holds.
-//  PIN:  One MLX workload at a time; everything runs on this thread. The routed result is held to
+//  PIN:  One MLX workload at a time; everything runs on this thread. The result is held to
 //        VeilGarde's own goldens with labels exact and numbers within 1e-4 (Frigate's Metal kernels
 //        move DINOv2 by about 1e-5).
 //
@@ -52,63 +52,65 @@ func run() throws {
     let norm = try SemanticLens.normalizedEmbedding(cg)
     func l2(_ v: [Float]) -> Float { v.map { $0 * $0 }.reduce(0, +).squareRoot() }
     Show.step(3, "semantics", "DINOv2-small, two views of the same image, 384 numbers each")
-    Show.line("the fusion view (short edge 256, centre crop 224): norm \(Show.f(l2(embedding), 2)), first values " + embedding.prefix(4).map { Show.f($0) }.joined(separator: " "))
-    Show.line("the heads' view (force-resized to 360×640):          norm \(Show.f(l2(norm), 2)), first values " + norm.prefix(4).map { Show.f($0) }.joined(separator: " "))
+    Show.line("the camera view (short edge 256, centre crop 224): norm \(Show.f(l2(embedding), 2)), first values " + embedding.prefix(4).map { Show.f($0) }.joined(separator: " "))
+    Show.line("the heads' view (force-resized to 360×640):           norm \(Show.f(l2(norm), 2)), first values " + norm.prefix(4).map { Show.f($0) }.joined(separator: " "))
 
-    // 4. The fusion head: the camera base expert, its row in the layout its width names.
-    let fusionHead = try TreeModelCache.shared.model(bundle.url(.fusionHead)!)
-    let layout = try FusionLayout.of(width: fusionHead.numFeatures)
-    let vector = embedding + (layout == .bothReadings ? norm : []) + capture.asVector
-    let baseP = fusionHead.predict(vector)
-    let routed = try Detector.shared.detect(cgImage: cg, config: config)
-    let r = routed.result
-    let shippedTrees = try GBDTModel.load(bundle.url(.fusionHead)!).trees.count
-    Show.step(4, "fusion", (layout == .bothReadings ? "DINOv2 CLS (384) ⊕ the heads' view (384) ⊕ capture (9)" : "DINOv2 CLS (384) ⊕ capture (9)")
-              + " = \(vector.count) columns through the fusion head (\(shippedTrees) trees)")
-    Show.line("→ base P(AI) \(Show.f(baseP)) at 0.5 ± 0.04: \(config.decision.label(baseP))")
-    checks.record("the fusion row built by hand gives the detector's base P(AI)", abs(baseP - (r.routeDiagnostics?.baseP ?? -1)) < 1e-6)
+    // 4. The camera head: the camera member's row and its P(AI).
+    let cameraHead = try TreeModelCache.shared.model(bundle.url(.camera)!)
+    let row = CameraRow(dino: embedding, capture: capture).asVector
+    let cameraP = cameraHead.predict(row)
+    let r = try Detector.detect(cgImage: cg, config: config)
+    let shippedTrees = try GBDTModel.load(bundle.url(.camera)!).trees.count
+    Show.step(4, "camera", "DINOv2 CLS (384) ⊕ capture (9) = \(row.count) columns through the camera head (\(shippedTrees) trees)")
+    Show.line("→ the camera member's P(AI) \(Show.f(cameraP)) at 0.5 ± 0.04: \(config.decision.label(cameraP))")
+    checks.record("the camera row built by hand gives the camera member's P(AI)", abs(cameraP - (r.stack.member("camera")?.p ?? -1)) < 1e-6)
 
-    // 5. The stacked specialists and the full verdict.
-    Show.step(5, "specialists", "domain \(routed.domain.rawValue); the stack compounds on the base expert:")
-    for c in r.specialists ?? [] { Show.line("  " + c.name.padding(toLength: 16, withPad: " ", startingAt: 0) + "P(AI) \(Show.f(c.pAI))  \(c.verdict.padding(toLength: 12, withPad: " ", startingAt: 0)) weight \(Show.f(c.weight, 2))") }
-    if let comb = HeadRegistry.shared.combiner(in: config.bundle), !(r.captureSignature?.present ?? false) {
-        let heads = HeadKind.combinerOrder.map { HeadRegistry.shared.head($0, in: config.bundle)!.pAI(norm) }
-        let ls = comb.headLogits(heads, pairAI: nil)
-        var z = comb.w0 + comb.wBase * comb.lg(baseP, comb.capBase)
-        Show.line("the combiner, term by term (capture absent, so it runs):")
-        Show.line(String(format: "  w0 %.4f + w_base %.4f · lg(base %.4f) %.4f", comb.w0, comb.wBase, baseP, comb.lg(baseP, comb.capBase)))
-        for (k, kind) in HeadKind.combinerOrder.enumerated() {
-            z += comb.wGen[k] * max(0, ls[k])
-            Show.line(String(format: "  + w_gen[%@] %.4f · max(0, lg %.4f)", kind.rawValue, comb.wGen[k], ls[k]))
+    // 5. Every member of the stack, then the revisions.
+    Show.step(5, "stack", "every member speaks on its own; then the revisions read them:")
+    for m in r.stack {
+        Show.line("  " + m.name.padding(toLength: 16, withPad: " ", startingAt: 0) + "P(AI) " + (m.p.map { Show.f($0) } ?? "  —   ") + "  " + m.verdict)
+    }
+    for v in r.revisions {
+        Show.line("  revision " + v.name.padding(toLength: 13, withPad: " ", startingAt: 0) + (v.applied ? "applied" : "skipped") + "  P(AI) \(Show.f(v.p))  \(v.prediction)")
+    }
+    if let comb = HeadRegistry.shared.combiner(in: config.bundle), r.stack.member("capture")?.flag("present") == false, !gate.isScreenshot {
+        let evidence = comb.evidenceMembers.map { r.stack.member($0)!.p! }
+        let ls = comb.evidenceLogits(evidence)
+        var z = comb.w0 + comb.anchor.w * comb.lg(cameraP, comb.anchor.cap)
+        Show.line("the combiner revision, term by term (capture absent and the gate quiet, so it pools around the camera member):")
+        Show.line(String(format: "  w0 %.4f + anchor %.4f · lg(camera %.4f) %.4f", comb.w0, comb.anchor.w, cameraP, comb.lg(cameraP, comb.anchor.cap)))
+        for (k, member) in comb.evidenceMembers.enumerated() {
+            z += comb.evidence[k].w * max(0, ls[k])
+            Show.line(String(format: "  + %@ %.4f · max(0, lg %.4f)", member, comb.evidence[k].w, ls[k]))
         }
-        if baseP < comb.gateCeiling {
-            let rescue = comb.wRescue * max(0, -(ls.max() ?? -comb.capHead))
+        if cameraP < comb.anchor.gateCeiling {
+            let rescue = comb.rescue.w * max(0, -(ls.max() ?? -comb.evidenceCap))
             z -= rescue
-            Show.line(String(format: "  − rescue %.4f   (base below the 0.75 gate)", rescue))
+            Show.line(String(format: "  − rescue %.4f   (the camera member below the 0.75 gate)", rescue))
         } else {
-            Show.line(String(format: "  base %.4f ≥ the 0.75 gate: no rescue", baseP))
+            Show.line(String(format: "  camera %.4f ≥ the 0.75 gate: no rescue", cameraP))
         }
         let pooled = 1 / (1 + exp(-z))
         Show.line(String(format: "  z = %.4f → pooled P(AI) %.4f", z, pooled))
-        checks.record("the hand-computed pool equals the router's pre-semantic score", abs(pooled - (r.routeDiagnostics?.preSemanticP ?? -1)) < 1e-6)
+        checks.record("the hand-computed pool equals the combiner revision's P(AI)", abs(pooled - (r.revisions.revision("combiner")?.p ?? -1)) < 1e-6)
     }
     Show.line("verdict: P(AI) \(Show.f(r.p)) → \(r.prediction)")
     for crop in crops {
-        let routedCrop = try Detector.shared.detect(cgImage: try ImageDecoding.cgImage(contentsOf: crop.url), config: config)
-        let ours = try ResultJSON.encode(routedCrop.result, times: [], device: "route", route: routedCrop.domain.rawValue)
+        let result = try Detector.detect(cgImage: try ImageDecoding.cgImage(contentsOf: crop.url), config: config)
+        let ours = try ResultJSON.encode(result, times: [], device: "route")
         let (worst, mismatches) = try Golden.compare(ours, try Data(contentsOf: crop.golden!), tolerance: 1e-4)
-        checks.record("the routed result matches VeilGarde's golden for \(crop.name): labels exact, numbers within 1e-4 (max |Δ| \(String(format: "%.2g", worst)))", mismatches.isEmpty)
+        checks.record("the result matches VeilGarde's golden for \(crop.name): labels exact, numbers within 1e-4 (max |Δ| \(String(format: "%.2g", worst)))", mismatches.isEmpty)
     }
     if !sample.isEmpty {
         Show.line("")
         Show.line("the full detector on the final_mixed sample:")
-        Show.line("image".padding(toLength: 28, withPad: " ", startingAt: 0) + "truth      base p   P(AI)    call          capture")
+        Show.line("image".padding(toLength: 28, withPad: " ", startingAt: 0) + "truth      camera   P(AI)    call          capture")
         for image in sample {
-            let ri = try Detector.shared.detect(cgImage: try ImageDecoding.cgImage(contentsOf: image.url), config: config).result
+            let ri = try Detector.detect(cgImage: try ImageDecoding.cgImage(contentsOf: image.url), config: config)
             let truth = image.label == 0 ? "camera" : "generated"
             Show.line(image.name.padding(toLength: 28, withPad: " ", startingAt: 0) + truth.padding(toLength: 11, withPad: " ", startingAt: 0)
-                      + Show.f(ri.routeDiagnostics?.baseP ?? 0) + "   " + Show.f(ri.p) + "   " + ri.prediction.padding(toLength: 14, withPad: " ", startingAt: 0)
-                      + (ri.captureSignature.map { $0.present ? "present" : ($0.valid ? "absent" : "invalid") } ?? "?"))
+                      + Show.f(ri.stack.member("camera")?.p ?? 0) + "   " + Show.f(ri.p) + "   " + ri.prediction.padding(toLength: 14, withPad: " ", startingAt: 0)
+                      + (ri.stack.member("capture")?.verdict ?? "?"))
             LensRuntime.releaseMemory()
         }
     }
@@ -118,11 +120,11 @@ func run() throws {
     let rows = try Toy.writeStore()
     Show.line("store: \(rows)")
     let recipe = TrainingRecipe(id: "playground") {
-        FusionHead().warmStart(add: 2, eta: 0.03)                    // the flywheel's only base move
-        DinoHead(.human)                                             // one atlas head, the shipped recipe
+        CameraHead().warmStart(add: 2, eta: 0.03)                    // the flywheel's only camera move
+        SpecialistHead(.human)                                       // one category head, the shipped recipe
         Combiner()                                                   // pooled over the candidate's heads
     }
-    Show.line("the recipe, as Swift:  FusionHead().warmStart(add: 2) · DinoHead(.human) · Combiner()")
+    Show.line("the recipe, as Swift:  CameraHead().warmStart(add: 2) · SpecialistHead(.human) · Combiner()")
     let engine = TrainingEngine(area: Scratch.workArea, parent: ShippedBundle.directory, store: Toy.store) { event in
         if let line = event.line { Show.line("  · " + line) }
     }
@@ -134,21 +136,20 @@ func run() throws {
     let candidate = outcome.candidate
     Show.line("these are toy fits (a few hundred rows), so their numbers mean little; `veilgarde train …` runs the same code on the whole store")
 
-    // The warm start: the shipped fusion head's trees, untouched, and two more.
-    let shippedHead = try GBDTModel.load(bundle.url(.fusionHead)!)
-    let warm = try GBDTModel.load(candidate.url(.fusionHead)!)
+    // The warm start: the shipped camera head's trees, untouched, and two more.
+    let shippedHead = try GBDTModel.load(bundle.url(.camera)!)
+    let warm = try GBDTModel.load(candidate.url(.camera)!)
     let untouched = zip(shippedHead.trees, warm.trees).allSatisfy { $0.raw == $1.raw }
-    checks.record("the warm start keeps the shipped fusion head's \(shippedHead.trees.count) trees byte for byte and adds \(warm.trees.count - shippedHead.trees.count)",
+    checks.record("the warm start keeps the shipped camera head's \(shippedHead.trees.count) trees byte for byte and adds \(warm.trees.count - shippedHead.trees.count)",
                   untouched && warm.trees.count == shippedHead.trees.count + 2)
     // The candidate's head is XGBoost JSON Frigate's evaluator reads unchanged.
-    let frigate = try TreeModelCache.shared.model(candidate.url(.fusionHead)!)
-    let columns = try FusionLayout.of(width: warm.featureCount).columns
-    let width = columns.map(\.width).reduce(0, +)
-    let storeRows = try FeatureStore(directory: Toy.store).select(columns: Set(columns))
-    let flat = storeRows.matrix(columns)
-    let fusionRows = (0..<storeRows.count).map { Array(flat[($0 * width)..<(($0 + 1) * width)]) }
-    checks.record("the candidate's fusion head reads back through Frigate's evaluator with identical predictions on \(fusionRows.count) store rows",
-                  fusionRows.allSatisfy { frigate.predict($0) == warm.predict($0) })
+    let frigate = try TreeModelCache.shared.model(candidate.url(.camera)!)
+    let width = CameraRow.width
+    let storeRows = try FeatureStore(directory: Toy.store).select(columns: Set(CameraRow.columns))
+    let flat = storeRows.matrix(CameraRow.columns)
+    let cameraRows = (0..<storeRows.count).map { Array(flat[($0 * width)..<(($0 + 1) * width)]) }
+    checks.record("the candidate's camera head reads back through Frigate's evaluator with identical predictions on \(cameraRows.count) store rows",
+                  cameraRows.allSatisfy { frigate.predict($0) == warm.predict($0) })
 
     // The trained human head beside the shipped one, on the parity crops.
     let human = try LinearHead.load(candidate.url(.head, head: .human)!)
@@ -193,7 +194,7 @@ func run() throws {
         return report
     }
     let promoter = Promoter(area: fly, battery: battery) { Show.line("  · " + $0) }
-    for name in ["dinov2-small", "fusion-reference"] {
+    for name in ["dinov2-small", "fusion-head"] {
         do {
             _ = try FlywheelSlot(parsing: name)
             checks.record("promote refuses \(name)", false)

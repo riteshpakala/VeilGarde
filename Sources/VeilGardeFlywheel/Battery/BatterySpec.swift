@@ -3,7 +3,7 @@
 //  VeilGardeFlywheel
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The battery spec (battery_spec_v2.json) as a value, and how its groups become files:
+//  WHAT: The battery spec (battery_spec.json) as a value, and how its groups become files:
 //        each group names images by explicit path and by glob, filters them by substring, and
 //        says what every image in it must read (real or generated) and how strictly.
 //  PIN:  The Python battery's resolve_groups, step for step: `{VAR}` substitution from the spec's

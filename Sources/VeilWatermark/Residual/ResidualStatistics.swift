@@ -3,20 +3,27 @@
 //  VeilWatermark
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The warp residual summarised for detection: each of the 19 tile features' mean, then
-//        its spread, over every tile of the image at the 512-px cap, 38 numbers. The fusion head
-//        reads them as the store's `residual` column; the residual's code stays here, in the
-//        watermark, and detection reads only these numbers.
+//  WHAT: The warp residual summarised as numbers: each of the 19 tile features' mean, then its
+//        spread, over every tile of the image at the 512-px cap, 38 numbers. No detector reads
+//        them today; a stack member that does would take them as a shared signal, while the
+//        residual's code stays here, in the watermark.
 //  PIN:  Mean and population standard deviation, accumulated in Double over every tile of the
 //        padded grid, as the research's pre-test computed them from its tiles (2026-10-21). The
-//        order is FeatureColumn.residualNames.
+//        order is `names`: each feature's mean, then each feature's spread.
 //
 
 import CoreGraphics
 import Foundation
 
 public enum ResidualStatistics {
-    public static let count = FeatureColumn.residual.width
+    /// The 19 tile features, in the tile extractor's order.
+    public static let features = ["FR", "LV", "CV", "CM", "CC", "CR", "SH", "SV", "SH_S", "SV_S", "xcorr_RG", "cfa_G",
+                                  "xcorr_BG", "xcorr_RB", "cfa_R", "cfa_B", "noise_ratio", "diag_axial", "nyq_R"]
+
+    /// The 38 numbers' names: each feature's mean, then each feature's spread.
+    public static var names: [String] { features.map { "\($0)_mean" } + features.map { "\($0)_std" } }
+
+    public static let count = 2 * features.count
 
     /// The 38 numbers of one image.
     public static func measure(_ cg: CGImage) throws -> [Float] {

@@ -1,17 +1,17 @@
 {
   "artifacts": [
     {
-      "bytes": 666,
-      "file": "stack_combiner_v3.json",
-      "role": "combiner",
-      "sha256": "cdd0cb2e40fe7127482a0c66c3cb26df814dee26db297985f50ea5fe93d99f52",
+      "bytes": 1873810,
+      "file": "camera.xgb.json",
+      "role": "camera",
+      "sha256": "b142e661c609070a7838fb015ae47a8b9ccce2ab1d539c3dac29afadc48b8f9e",
       "source": "candidates/fusion-20261021"
     },
     {
-      "bytes": 1873810,
-      "file": "fusion_head.xgb.json",
-      "role": "fusion-head",
-      "sha256": "b142e661c609070a7838fb015ae47a8b9ccce2ab1d539c3dac29afadc48b8f9e",
+      "bytes": 659,
+      "file": "stack_combiner.json",
+      "role": "combiner",
+      "sha256": "3088ff2f65285c55c0f7e2d2dfaeea6572223e4a527299c0c38b1902a9b1a028",
       "source": "candidates/fusion-20261021"
     },
     {
@@ -66,48 +66,10 @@
   "format": "veilgarde-bundle-v1",
   "history": [
     {
-      "date": "2026-10-19T00:00:00Z",
-      "kind": "seed",
-      "note": "ported from Garde dbc6277; human heads v1-v3 and the MLX resource bundle left behind",
-      "slot": "bundle"
-    },
-    {
-      "date": "2026-10-20T04:49:59Z",
-      "from_sha256": "64688a4fc431593b97cec335353e440cf3c88b2707fcb97bcc831afb4d550057",
-      "kind": "promote",
-      "note": "the camera-sensor call as two cuts on the tile vote, real <= 0.71687186 and generated >= 0.83653802, the Platt contract's call on every float32 vote (the owner's answer to question-4)",
-      "slot": "calibration",
-      "to_sha256": "8ab4e50eb9f4c9ddd5b18f2a393c108886a5b8d42f1fdf33ef3063120111f8b7"
-    },
-    {
-      "date": "2026-10-20T04:49:59Z",
-      "from_sha256": "bb7103516a6d69a48160972dc8409fadd82e96dd11ff243c010f5149fa2ae4ab",
-      "kind": "promote",
-      "note": "the art-pair adjudicator taken out of the combiner, and its head out of the bundle (the owner's answer to question-4)",
-      "slot": "combiner",
-      "to_sha256": "c6d138f537b82ea6c1d0d3053030ee00853cf7e9ac7964829b548da20b781d16"
-    },
-    {
       "date": "2026-10-21T00:00:00Z",
       "kind": "seed",
-      "note": "the warp leaves detection and survives only in the watermark: the warp tile model and its sensor copy, the sensor calibration, the fusion reference, the x-domain centroids, the cgi head and the noiseprint removed; the fusion head and the combiner are refit next",
+      "note": "v1: the stack as a list of members (the camera head, the screenshot head, the capture signature, the art, blur, human and preview heads, the semantic tiles) and the combiner keyed by member; the camera head's bytes are the fit of 2026-10-21, the combiner's numbers that fit's, the six heads as they were",
       "slot": "bundle"
-    },
-    {
-      "date": "2026-10-21T00:00:00Z",
-      "from_sha256": "b142e661c609070a7838fb015ae47a8b9ccce2ab1d539c3dac29afadc48b8f9e",
-      "kind": "promote",
-      "note": "a scratch fit over [dino_fusion | cap] (393 columns): 500 trees, depth 5, eta 0.04, seed 0, on the store's 113,195 rows; its evaluation twin's AUC 0.9817 on 11,212 held-out rows",
-      "slot": "base",
-      "to_sha256": "b142e661c609070a7838fb015ae47a8b9ccce2ab1d539c3dac29afadc48b8f9e"
-    },
-    {
-      "date": "2026-10-21T00:00:00Z",
-      "from_sha256": "cdd0cb2e40fe7127482a0c66c3cb26df814dee26db297985f50ea5fe93d99f52",
-      "kind": "promote",
-      "note": "refit on the new head's capture-absent store rows: five inputs (no noiseprint term), reals x3, the rescue weight 1.0 by the sweep's fallback",
-      "slot": "combiner",
-      "to_sha256": "cdd0cb2e40fe7127482a0c66c3cb26df814dee26db297985f50ea5fe93d99f52"
     }
   ],
   "weights": [

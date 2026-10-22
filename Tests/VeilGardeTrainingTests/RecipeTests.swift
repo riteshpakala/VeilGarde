@@ -4,10 +4,9 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The recipe DSL: the builder takes `if` and `for`, modifiers return changed copies, the
-//        engine's order is the dependency order (fusion, heads, combiner), recipes round-trip as
-//        JSON, and recipe.toml reads into the same values, the fusion head's columns and depth
-//        among them, refusing what it does not know (the retired warp, calibration and noiseprint
-//        tables among it).
+//        engine's order is the dependency order (the camera head, the heads, the combiner), recipes
+//        round-trip as JSON through their members' kinds, and recipe.toml reads into the same
+//        values, refusing what it does not know (the fusion table and its columns among it).
 //
 
 import Foundation
@@ -19,71 +18,68 @@ import VeilGardeCore
 struct RecipeTests {
     @Test("the builder, the modifiers and the dependency order")
     func builder() throws {
-        let withPair = true
+        let withPreview = true
         let recipe = TrainingRecipe(id: "r") {
             Combiner().realsWeight(2)
-            for kind in [HeadKind.art, .blur] { DinoHead(kind).regularization(C: 0.25) }
-            if withPair { DinoHead(.artPair) }
-            FusionHead().warmStart(add: 10)
+            for kind in [HeadKind.art, .blur] { SpecialistHead(kind).regularization(C: 0.25) }
+            if withPreview { SpecialistHead(.preview) }
+            CameraHead().warmStart(add: 10)
         }
-        #expect(recipe.ordered.map(\.name) == ["fusion-head", "head:art", "head:blur", "head:art-pair", "combiner"])
-        guard case .fusion(let f) = recipe.ordered[0] else { Issue.record("no fusion"); return }
-        #expect(f.settings.mode == .warmStart(add: 10, eta: 0.03))
-        guard case .head(let pair) = recipe.ordered[3] else { Issue.record("no pair"); return }
-        #expect(pair.settings.classWeight == .none && pair.settings.fireThreshold == nil && !pair.settings.admission)
-        let base = DinoHead(.human)
-        #expect(base.regularization(C: 2).settings.C == 2 && base.settings.C == 0.5)
+        #expect(recipe.ordered.map(\.name) == ["camera", "head:art", "head:blur", "head:preview", "combiner"])
+        let camera = try #require(recipe.ordered[0] as? CameraHead)
+        #expect(camera.settings.mode == .warmStart(add: 10, eta: 0.03))
+        let preview = try #require(recipe.ordered[3] as? SpecialistHead)
+        #expect(!preview.settings.admission && preview.negatives == .real("preview"))
+        let human = SpecialistHead(.human)
+        #expect(human.regularization(C: 2).settings.C == 2 && human.settings.C == 0.5)
         let data = try JSONEncoder().encode(recipe)
         #expect(try JSONDecoder().decode(TrainingRecipe.self, from: data) == recipe)
+        let text = String(decoding: data, as: UTF8.self)
+        #expect(text.contains("\"kind\":\"camera\"") && text.contains("\"kind\":\"specialist\"") && text.contains("\"kind\":\"combiner\""))
+        #expect(throws: (any Error).self, "a recipe.json naming a kind this build does not train") {
+            try JSONDecoder().decode(TrainingRecipe.self, from: Data(#"{"id":"x","members":[{"kind":"fusion","member":{}}]}"#.utf8))
+        }
     }
 
-    @Test("the shipped preset trains every model the store reproduces: the fusion head from scratch, three heads, the preview head, the combiner")
-    func shipped() {
+    @Test("the shipped preset trains every member the store reproduces: the camera head from scratch, three heads, the preview head, the combiner")
+    func shipped() throws {
         let recipe = TrainingRecipe.shipped(id: "s")
-        #expect(recipe.ordered.map(\.name) == ["fusion-head", "head:art", "head:blur", "head:human", "head:preview", "combiner"])
-        guard case .fusion(let f) = recipe.ordered[0] else { Issue.record("no fusion"); return }
-        #expect(f.settings.mode == .scratch(trees: 500, eta: 0.04))
+        #expect(recipe.ordered.map(\.name) == ["camera", "head:art", "head:blur", "head:human", "head:preview", "combiner"])
+        let camera = try #require(recipe.ordered[0] as? CameraHead)
+        #expect(camera.settings.mode == .scratch(trees: 500, eta: 0.04))
         #expect(HeadKind.flywheelCategories == [.art, .blur, .human])
+        #expect(TrainingRecipe.kindNames == ["camera", "specialist", "combiner"])
     }
 
     @Test("recipe.toml reads into the same recipe")
     func toml() throws {
         let text = """
         id = "weekly"   # a comment
-        [fusion]
+        [camera]
         mode = "warm"
         add = 20
         [heads]
-        kinds = ["art", "art-pair"]
+        kinds = ["art", "preview"]
         [combiner]
         reals_weight = 2.0
         """
         let recipe = try RecipeFile.parse(text)
         let expected = TrainingRecipe(id: "weekly") {
-            FusionHead().warmStart(add: 20, eta: 0.03)
-            DinoHead(.art)
-            DinoHead(.artPair)
+            CameraHead().warmStart(add: 20, eta: 0.03)
+            SpecialistHead(.art)
+            SpecialistHead(.preview)
             Combiner().realsWeight(2)
         }
         #expect(recipe == expected)
-        let scratch = try RecipeFile.parse("id = \"s\"\n[fusion]\nmode = \"scratch\"\ntrees = 50")
-        #expect(scratch == TrainingRecipe(id: "s") { FusionHead().scratch(trees: 50, eta: 0.04) })
-        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[fusion]\ncolour = 1") }
+        let scratch = try RecipeFile.parse("id = \"s\"\n[camera]\nmode = \"scratch\"\ntrees = 50\ndepth = 7")
+        #expect(scratch == TrainingRecipe(id: "s") { CameraHead().scratch(trees: 50, eta: 0.04).depth(7) })
+        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[camera]\ncolour = 1") }
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[optimizer]\nlr = 1") }
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("[heads]\nkinds = [\"art\"]") }
         #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[heads]\nkinds = [\"faces\"]") }
-        let wide = try RecipeFile.parse("id = \"w\"\n[fusion]\nmode = \"scratch\"\ntrees = 1000\ndepth = 7\ncolumns = \"dino_fusion,dino_norm,cap\"")
-        #expect(wide == TrainingRecipe(id: "w") { FusionHead().scratch(trees: 1000, eta: 0.04).depth(7).columns(.bothReadings) })
-        guard case .fusion(let f) = wide.ordered[0] else { Issue.record("no fusion"); return }
-        #expect(f.settings.resolvedLayout.width == 777 && f.settings.maxDepth == 7)
-        #expect(FusionHead().settings.resolvedLayout == .dinoCapture, "a recipe that names no columns means the 393-column row")
-        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[fusion]\ncolumns = \"dino_norm\"") }
-        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[fusion]\ndepth = 40") }
-        let oof = try RecipeFile.parse("id = \"o\"\n[fusion]\nmode = \"scratch\"\ncolumns = \"dino_fusion,dino_norm,cap,residual\"\n[combiner]\nreals_weight = 2.0\nout_of_fold = 5")
-        #expect(oof == TrainingRecipe(id: "o") { FusionHead().scratch().columns(.bothReadingsResidual); Combiner().realsWeight(2).outOfFold(folds: 5) })
-        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[combiner]\nout_of_fold = 1") }
-        for retired in ["warp", "calibration", "noiseprint"] {
-            #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[\(retired)]\nseed = 1") }
-        }
+        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[camera]\ndepth = 40") }
+        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[fusion]\nmode = \"warm\"") }
+        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[camera]\ncolumns = \"dino_fusion,cap\"") }
+        #expect(throws: VeilGardeFailure.self) { try RecipeFile.parse("id = \"x\"\n[combiner]\nout_of_fold = 5") }
     }
 }

@@ -7,21 +7,19 @@
 //
 //            id = "weekly-2026-10-21"
 //
-//            [fusion]
+//            [camera]
 //            mode = "warm"                # warm | scratch
 //            add = 80
 //            eta = 0.03
 //            depth = 5
-//            columns = "dino_fusion,cap"  # or "dino_fusion,dino_norm,cap"
 //
 //            [heads]
 //            kinds = ["art", "blur", "human", "preview"]
 //
 //            [combiner]
 //            reals_weight = 3.0
-//            out_of_fold = 5              # the base out-of-fold over 5 folds
 //
-//  PIN:  Each table is one model recipe (heads is one per kind); a table that is absent trains
+//  PIN:  Each table is one trainable member (heads is one per kind); a table that is absent trains
 //        nothing; an unknown table or key is refused, never ignored.
 //
 
@@ -31,9 +29,9 @@ import VeilGardeCore
 public enum RecipeFile {
     static let keys: [String: Set<String>] = [
         "": ["id"],
-        "fusion": ["mode", "add", "trees", "eta", "depth", "columns", "new_generator_weight", "preview_weight"],
+        "camera": ["mode", "add", "trees", "eta", "depth", "new_generator_weight", "preview_weight"],
         "heads": ["kinds", "C", "version"],
-        "combiner": ["reals_weight", "out_of_fold"],
+        "combiner": ["reals_weight"],
     ]
 
     public static func load(_ url: URL) throws -> TrainingRecipe {
@@ -51,27 +49,21 @@ public enum RecipeFile {
         func v(_ table: String, _ key: String) -> TOMLValue? { TOMLSubset.value(document, table, key) }
         func has(_ table: String) -> Bool { document.contains { $0.table == table } }
         guard let id = v("", "id")?.string else { throw VeilGardeFailure.usage("recipe: the top level needs id = \"…\"") }
-        var models: [ModelRecipe] = []
-        if has("fusion") {
-            var f = FusionHead()
-            switch v("fusion", "mode")?.string ?? "warm" {
-            case "warm": f = f.warmStart(add: v("fusion", "add")?.integer ?? 80, eta: v("fusion", "eta")?.float ?? 0.03)
-            case "scratch": f = f.scratch(trees: v("fusion", "trees")?.integer ?? 500, eta: v("fusion", "eta")?.float ?? 0.04)
-            case let other: throw VeilGardeFailure.usage("recipe: [fusion] mode is warm or scratch, not \(other)")
+        var members: [AnyTrainable] = []
+        if has("camera") {
+            var c = CameraHead()
+            switch v("camera", "mode")?.string ?? "warm" {
+            case "warm": c = c.warmStart(add: v("camera", "add")?.integer ?? 80, eta: v("camera", "eta")?.float ?? 0.03)
+            case "scratch": c = c.scratch(trees: v("camera", "trees")?.integer ?? 500, eta: v("camera", "eta")?.float ?? 0.04)
+            case let other: throw VeilGardeFailure.usage("recipe: [camera] mode is warm or scratch, not \(other)")
             }
-            if let d = v("fusion", "depth")?.integer {
-                guard (1...12).contains(d) else { throw VeilGardeFailure.usage("recipe: [fusion] depth is 1 to 12, not \(d)") }
-                f = f.depth(d)
+            if let d = v("camera", "depth")?.integer {
+                guard (1...12).contains(d) else { throw VeilGardeFailure.usage("recipe: [camera] depth is 1 to 12, not \(d)") }
+                c = c.depth(d)
             }
-            if let c = v("fusion", "columns")?.string {
-                guard let layout = FusionLayout(rawValue: c.replacingOccurrences(of: " ", with: "")) else {
-                    throw VeilGardeFailure.usage("recipe: [fusion] columns is one of \(FusionLayout.allCases.map { "\"\($0.rawValue)\"" }.joined(separator: ", ")), not \"\(c)\"")
-                }
-                f = f.columns(layout)
-            }
-            if let w = v("fusion", "new_generator_weight")?.float { f = f.newGeneratorWeight(w) }
-            if let w = v("fusion", "preview_weight")?.float { f = f.previewWeight(w) }
-            models.append(.fusion(f))
+            if let w = v("camera", "new_generator_weight")?.float { c = c.newGeneratorWeight(w) }
+            if let w = v("camera", "preview_weight")?.float { c = c.previewWeight(w) }
+            members.append(AnyTrainable(c))
         }
         if has("heads") {
             let kinds = v("heads", "kinds")?.strings ?? HeadKind.flywheelCategories.map(\.rawValue)
@@ -79,21 +71,17 @@ public enum RecipeFile {
                 guard let kind = HeadKind(rawValue: name) else {
                     throw VeilGardeFailure.usage("recipe: [heads] kind \(name) is not one of \(HeadKind.allCases.map(\.rawValue).joined(separator: ", "))")
                 }
-                var h = DinoHead(kind)
+                var h = SpecialistHead(kind)
                 if let C = v("heads", "C")?.float { h = h.regularization(C: C) }
                 if let version = v("heads", "version")?.string { h = h.version(version) }
-                models.append(.head(h))
+                members.append(AnyTrainable(h))
             }
         }
         if has("combiner") {
             var c = Combiner()
             if let w = v("combiner", "reals_weight")?.float { c = c.realsWeight(w) }
-            if let k = v("combiner", "out_of_fold")?.integer {
-                guard (2...20).contains(k) else { throw VeilGardeFailure.usage("recipe: [combiner] out_of_fold is 2 to 20 folds, not \(k)") }
-                c = c.outOfFold(folds: k)
-            }
-            models.append(.combiner(c))
+            members.append(AnyTrainable(c))
         }
-        return TrainingRecipe(id: id, models: models)
+        return TrainingRecipe(id: id, members: members)
     }
 }

@@ -3,10 +3,10 @@
 //  VeilGardeLens
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: Frigate's XGBoostTreeModel, the evaluator the detector scores the fusion head with, parsed
+//  WHAT: Frigate's XGBoostTreeModel, the evaluator the detector scores the camera head with, parsed
 //        once per file and shared.
 //  PIN:  The only file in the Lens that imports the Frigate umbrella, for FrigateBoost's evaluator;
-//        Core's GBDTModel agrees with it bit for bit on the shipped fusion head (ScorerTests).
+//        Core's GBDTModel agrees with it bit for bit on the shipped camera head (ScorerTests).
 //
 
 import Foundation

@@ -3,10 +3,10 @@
 //  VeilGardeCore
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The shared primitive of every DINOv2 specialist (screenshot, art, blur, human, art-pair,
-//        cgi, preview, semantic tiles): a standardized linear probe on a 384-value embedding,
-//        P(AI) = σ(Σ coef · (e − mean) / scale + intercept). A new specialist is a new head file,
-//        not new plumbing.
+//  WHAT: The shared primitive of every DINOv2 member of the stack (screenshot, art, blur, human,
+//        preview, semantic tiles): a standardized linear probe on a 384-value embedding,
+//        P(AI) = σ(Σ coef · (e − mean) / scale + intercept). A new head is a new file and one line
+//        in the pipeline, not new plumbing.
 //  PIN:  Arithmetic is Garde's LinearHead.pAI in Float, accumulated in index order, a zero scale
 //        read as 1. A head file is read with JSONDecoder into Float, as Garde reads it. HeadFile
 //        is what the trainer writes: the same keys, in Double, so Python reads full precision.

@@ -1,30 +1,32 @@
 // swift-tools-version: 6.4
 // SPDX-License-Identifier: GPL-3.0-only
 // VeilGarde — an AI-generated-image detector and a crop-robust watermark, as one package anyone
-// can train and run: a fusion head over DINOv2 and the capture signature with a specialist stack
-// on it, the trainers and the flywheel that grow them, and a watermark read off a perspective-warp
-// residual.
+// can train and run: a stack of independent members (the camera head over DINOv2 and the capture
+// signature, the screenshot head, the specialist heads, the semantic tiles) and the revisions that
+// read them, the trainers and the flywheel that grow them, and a watermark read off a
+// perspective-warp residual.
 //
 // Four products: VeilGarde (everything), VeilGardeInference (the detector alone), VeilWatermark
 // (the signature alone) and the `veilgarde` executable. Eight targets, in layers:
 //   VeilGardeCore       the domain, Foundation + Crypto only, Swift 6 strict: Support/ (JSON,
 //                       hashing, failures, the work area, safetensors, seeded splits), Features/
-//                       (capture 9, the screenshot gate, the fusion vector), Boost/ (GBDTModel:
-//                       the XGBoost JSON codec and evaluator), Heads/ (linear heads, the stack
+//                       (capture 9, the screenshot gate, the camera row), Boost/ (GBDTModel: the
+//                       XGBoost JSON codec and evaluator), Heads/ (linear heads, the stack
 //                       combiner), Bundle/ (artifacts, the manifest, SHA-256 binding), Result/
-//                       (InferenceResult, the schema-v3 JSON, the verdict law, route batches),
-//                       Store/ (the features-only store)
+//                       (members' outputs, revisions' records, the schema-v1 JSON, the verdict
+//                       law, route batches), Store/ (the features-only store, its migration)
 //   VeilGardeLens       the extractors, in the order a pixel travels: Image/, Capture/,
 //                       Semantic/ (DINOv2, CLIP vision), Scoring/
 //                                                          (MLX through Frigate, Swift 5 mode)
-//   VeilGardeInference  the detector, in the order a verdict is built: Config/, Fusion/,
-//                       Specialists/, Route/ (signals, domain heads, mechanisms, the Detector),
-//                       Bundle/ (the shipped artifacts)               (Swift 5 mode, resources)
-//   VeilGardeTraining   the trainers: Data/, Extract/, Boost/ (a native GBDT), Linear/, Fusion/,
-//                       Heads/, Combiner/, Backbone/ (DINOv2 and CLIP imports), Recipe/, Engine/,
-//                       Artifacts/                                               (Swift 5 mode)
-//   VeilGardeFlywheel   the regime that grows the fusion head and the specialist stack: Area/,
-//                       Store/, Acquire/, Ingest/, Candidates/, Battery/, Promote/ (Swift 5 mode)
+//   VeilGardeInference  the detector as one pipeline, Decode → Shared Signals → Stack → Revisions
+//                       → Result: Config/, Route/ (the signals, the Detector), Stack/ (the
+//                       pipeline, the members), Revisions/, Bundle/ (the shipped artifacts)
+//                                                                     (Swift 5 mode, resources)
+//   VeilGardeTraining   the trainers: Data/, Extract/, Boost/ (a native GBDT), Linear/, Camera/,
+//                       Heads/, Combiner/, Backbone/ (DINOv2 and CLIP imports), Recipe/ (the
+//                       trainable members), Engine/, Artifacts/                  (Swift 5 mode)
+//   VeilGardeFlywheel   the regime that grows the stack: Area/, Store/, Acquire/, Ingest/,
+//                       Candidates/, Battery/, Promote/                          (Swift 5 mode)
 //   VeilWatermark       the crop-robust signature on the warp residual: Residual/ (the warp
 //                       round trip and the fragility rate), Signature/, Sections/, Match/,
 //                       Acceptance/                            (MLX through Frigate, Swift 5 mode)
@@ -105,15 +107,14 @@ let package = Package(
         ),
         .target(
             name: "VeilGardeInference",
-            // The watermark's residual statistics, which a fusion head of the residual layout reads.
-            dependencies: ["VeilGardeLens", "VeilWatermark"],
+            dependencies: ["VeilGardeLens"],
             // The shipped bundle: the shipped artifacts, by name, bound by manifest.json. Weights are
             // gitignored and resolved at run time (WeightLocator); copied into this folder they ship
             // inside the bundle.
             resources: [
                 .copy("Resources/manifest.json"),
-                .copy("Resources/fusion_head.xgb.json"),
-                .copy("Resources/stack_combiner_v3.json"),
+                .copy("Resources/camera.xgb.json"),
+                .copy("Resources/stack_combiner.json"),
                 .copy("Resources/screenshot_dinov2_v1.10.json"),
                 .copy("Resources/art_dinov2_v2.json"),
                 .copy("Resources/blur_dinov2_v1.json"),
@@ -127,8 +128,6 @@ let package = Package(
             name: "VeilGardeTraining",
             dependencies: [
                 "VeilGardeLens",
-                // The watermark's residual statistics, the store's residual column.
-                "VeilWatermark",
                 .product(name: "MLX", package: "Frigate"),
                 .product(name: "MLXNN", package: "Frigate"),
                 .product(name: "FrigateHub", package: "Frigate"),
@@ -142,8 +141,8 @@ let package = Package(
             // the work area, where the battery reads them); the category router's prompt matrix;
             // the collector jobs that fill each blind spot.
             resources: [
-                .copy("Resources/battery_spec_v3.json"),
-                .copy("Resources/battery_v3_baseline.json"),
+                .copy("Resources/battery_spec.json"),
+                .copy("Resources/battery_baseline.json"),
                 .copy("Resources/clip_prompts_v1.safetensors"),
                 .copy("Resources/acquire_targets_v1.json"),
             ],
@@ -154,7 +153,7 @@ let package = Package(
             dependencies: [
                 "VeilGardeLens",
                 // The warp residual it reads: Frigate's warp tap tables, bicubic gathers and Gaussian blur;
-                // the seams' rFFT for the 19 tile features detection summarises.
+                // the seams' rFFT for the 19 tile features its residual statistics summarise.
                 .product(name: "MLX", package: "Frigate"),
                 .product(name: "MLXAccelerate", package: "Frigate"),
                 .product(name: "MLXFFT", package: "Frigate"),
@@ -176,7 +175,7 @@ let package = Package(
         ),
         .testTarget(name: "VeilGardeCoreTests", dependencies: ["VeilGardeCore"], exclude: ["Fixtures"]),
         .testTarget(name: "VeilGardeLensTests", dependencies: ["VeilGardeLens"], exclude: ["Fixtures"], swiftSettings: v5),
-        .testTarget(name: "VeilGardeInferenceTests", dependencies: ["VeilGardeInference", "VeilWatermark"], exclude: ["Fixtures"], swiftSettings: v5),
+        .testTarget(name: "VeilGardeInferenceTests", dependencies: ["VeilGardeInference"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeTrainingTests", dependencies: ["VeilGardeTraining"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeFlywheelTests", dependencies: ["VeilGardeFlywheel"], swiftSettings: v5),
         .testTarget(name: "VeilWatermarkTests", dependencies: ["VeilWatermark"], exclude: ["Fixtures"], swiftSettings: v5),

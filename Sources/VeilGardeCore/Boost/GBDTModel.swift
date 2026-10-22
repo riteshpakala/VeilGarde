@@ -4,7 +4,7 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: A gradient-boosted tree ensemble (binary logistic) as a value: decoded from and encoded to
-//        the XGBoost ≥ 2.0 JSON every VeilGarde booster ships as (the fusion head), and evaluated
+//        the XGBoost ≥ 2.0 JSON every VeilGarde booster ships as (the camera head), and evaluated
 //        on feature rows. It is what the trainer writes and
 //        what a warm start continues.
 //  PIN:  Byte-identical round trip: encoding a decoded model writes the file's exact bytes,

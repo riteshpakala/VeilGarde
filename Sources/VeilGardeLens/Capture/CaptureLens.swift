@@ -6,7 +6,7 @@
 //  WHAT: The camera-capture signature, computed: a square centre crop at native resolution (at most
 //        1024 px), its luma high-pass residual, the residual's power spectrum and radial profile;
 //        the profile's outer-half peak over its median is the Nyquist peak a Bayer mosaic leaves.
-//        Nine values for the fusion head, four for the verdict.
+//        Nine values for the camera head, four for the capture member, from one measurement.
 //  PIN:  Garde's captureCompute, unchanged (Python capture_signature.py): gray = 0.299R + 0.587G +
 //        0.114B in float (not cv2's uint8 gray), residual = gray − GaussianBlur(7, σ 1) reflect-101,
 //        mean removed; |fftshift(fft2)|²; numpy-bincount radial profile; peak = max(outer half) /
@@ -21,19 +21,22 @@ import MLXAccelerate
 import MLXFFT
 
 public enum CaptureLens {
-    /// The nine fusion values; zeros (valid = present = 0) when the image cannot be measured.
-    public static func features(_ cgImage: CGImage) -> CaptureFeatures {
-        compute(cgImage) ?? .zero
+    /// Both forms from one measurement: the nine values (zeros when the image cannot be measured)
+    /// and the signature (then valid by the native size alone, never present).
+    public static func reading(_ cgImage: CGImage) -> CaptureReading {
+        guard let features = compute(cgImage) else {
+            return CaptureReading(features: .zero, signature: CaptureSignature(
+                peak: 0, valid: cgImage.width >= CaptureLaw.minNativePixels && cgImage.height >= CaptureLaw.minNativePixels,
+                nativePixels: min(cgImage.width, cgImage.height), present: false))
+        }
+        return CaptureReading(features: features, signature: features.signature)
     }
 
-    /// The signature the verdict reads.
-    public static func signature(_ cgImage: CGImage) -> CaptureSignature {
-        guard let features = compute(cgImage) else {
-            return CaptureSignature(peak: 0, valid: cgImage.width >= CaptureLaw.minNativePixels && cgImage.height >= CaptureLaw.minNativePixels,
-                                    nativePixels: min(cgImage.width, cgImage.height), present: false)
-        }
-        return features.signature
-    }
+    /// The nine values the camera head reads.
+    public static func features(_ cgImage: CGImage) -> CaptureFeatures { reading(cgImage).features }
+
+    /// The signature the capture member reports.
+    public static func signature(_ cgImage: CGImage) -> CaptureSignature { reading(cgImage).signature }
 
     static func compute(_ cgImage: CGImage) -> CaptureFeatures? {
         let W = cgImage.width, H = cgImage.height

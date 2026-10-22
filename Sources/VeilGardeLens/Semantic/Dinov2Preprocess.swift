@@ -7,7 +7,7 @@
 //        quality interpolation, centre crop 224, /255, ImageNet mean and std. The specialist heads'
 //        variant first force-resizes the image to 360×640, so the source resolution cannot leak
 //        into the embedding (phone screenshots are huge, the training reels were small).
-//  PIN:  Garde's Dinov2Preprocess (HF BitImageProcessor replica). The fusion head reads the plain
+//  PIN:  Garde's Dinov2Preprocess (HF BitImageProcessor replica). The camera head reads the plain
 //        path; every linear head reads the force-resized one: two different embeddings of one
 //        image, and the store keeps both (dino_fusion, dino_norm).
 //

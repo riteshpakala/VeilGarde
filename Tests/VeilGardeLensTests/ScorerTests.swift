@@ -4,7 +4,7 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: Frigate's XGBoostTreeModel (what the detector scores with) and Core's GBDTModel (what the
-//        trainer writes and evaluates) agree bit for bit on the shipped fusion head, missing values
+//        trainer writes and evaluates) agree bit for bit on the shipped camera head, missing values
 //        included; the decoder applies EXIF orientation as NSImage does.
 //
 
@@ -17,9 +17,9 @@ import UniformTypeIdentifiers
 
 @Suite("Scorers and decoding")
 struct ScorerTests {
-    @Test("Frigate's evaluator and GBDTModel agree bit for bit on the shipped fusion head")
+    @Test("Frigate's evaluator and GBDTModel agree bit for bit on the shipped camera head")
     func evaluatorsAgree() throws {
-        let url = Fixture.resource("fusion_head.xgb.json")
+        let url = Fixture.resource("camera.xgb.json")
         let frigate = try TreeModelCache.shared.model(url)
         let core = try GBDTModel.load(url)
         #expect(frigate.numFeatures == core.featureCount)

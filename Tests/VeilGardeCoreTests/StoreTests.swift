@@ -3,9 +3,10 @@
 //  VeilGardeCoreTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The features-only store: a shard round-trips its rows and columns, is never overwritten,
-//        reads the seed store's shards as they were written (their retired columns and row keys
-//        ignored), and a selection filters, keeps or drops duplicates, and stacks the fusion row.
+//  WHAT: The features-only store: a v1 shard round-trips its rows and columns and is never
+//        overwritten; a shard of an older format is refused with the migrate hint, and the
+//        migration rewrites it whole (the same rows, the three columns' bytes, the rest left
+//        behind); a selection filters, keeps or drops duplicates, and stacks the camera row.
 //
 
 import Foundation
@@ -43,7 +44,7 @@ struct StoreTests {
         #expect(throws: VeilGardeFailure.self) { try written.write(to: dir) }
     }
 
-    @Test("a selection keeps duplicates as the Python store does, dedups on request, filters, and stacks the fusion columns")
+    @Test("a selection keeps duplicates as the Python store does, dedups on request, filters, and stacks the camera row")
     func selection() throws {
         let dir = try tempDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -52,64 +53,74 @@ struct StoreTests {
         let store = FeatureStore(directory: dir)
         #expect(store.shardNames() == ["a_first", "b_second"])
         #expect(try store.select(columns: [.cap]).rows.map(\.id) == ["x", "y", "y", "z"])
-        let all = try store.select(columns: Set(FusionLayout.bothReadings.columns), dedup: true)
+        let all = try store.select(columns: Set(FeatureColumn.allCases), dedup: true)
         #expect(all.rows.map(\.id) == ["x", "y", "z"])
         #expect(all.shards == ["a_first", "a_first", "b_second"])
-        let fusion = all.matrix(FusionLayout.dinoCapture.columns)
-        #expect(fusion.count == 3 * 393 && all.matrix(FusionLayout.bothReadings.columns).count == 3 * 777)
-        #expect(fusion[0] == 0.5)                 // x's first dino_fusion value
-        #expect(fusion[384] == 0.5)               // x's first capture value
-        #expect(fusion[393 * 2] == 384)           // z's first dino_fusion value (row 1 of b_second)
+        let camera = all.matrix(CameraRow.columns)
+        #expect(camera.count == 3 * 393)
+        #expect(camera[0] == 0.5)                 // x's first dino_fusion value
+        #expect(camera[384] == 0.5)               // x's first capture value
+        #expect(camera[393 * 2] == 384)           // z's first dino_fusion value (row 1 of b_second)
         let reals = all.filter { !$0.isGenerated }
         #expect(reals.rows.map(\.id) == ["z"])
         #expect(try store.ids() == ["x", "y", "z"])
     }
 
-    @Test("the seed store's shards read as they were written", .enabled(if: FileManager.default.fileExists(atPath: Fixture.seedStore.appendingPathComponent("ai_video_0711_meta.json").path)))
+    @Test("the work area's store reads as v1 shards", .enabled(if: FileManager.default.fileExists(atPath: Fixture.seedStore.appendingPathComponent("ai_video_0711_meta.json").path)))
     func readsSeedStore() throws {
         let shard = try FeatureShard.read("ai_video_0711", in: Fixture.seedStore)
         #expect(shard.count == 112)
         #expect(shard.columns[.dinoNorm]?.count == 112 * 384)
         #expect(shard.columns[.cap]?.count == 112 * 9)
         #expect(shard.rows.allSatisfy { $0.label == 1 && $0.id.count == 40 })
-        #expect(shard.metadata.isEmpty)
+        #expect(shard.metadata["format"] == FeatureShard.format)
     }
 
-    @Test("a row written before 2026-10-21 still decodes, its warp model key ignored")
-    func olderRow() throws {
-        let json = #"{"id": "a", "path": "/a.jpg", "label": 1, "category": "art", "source": "s", "nsfw": false, "golden": false, "warp_model": "516119c92d36"}"#
-        let row = try JSONDecoder().decode(FeatureRow.self, from: Data(json.utf8))
-        #expect(row.id == "a" && row.isGenerated)
+    /// A shard as the seed store and the older format wrote it: no format in the header, the
+    /// retired tensors beside the kept ones, a row key the store no longer reads.
+    func olderShard(_ dir: URL, name: String = "old") throws -> FeatureShard {
+        let rows = [FeatureRow(id: "a", path: "/a.jpg", label: 1, category: "art", source: "s"), FeatureRow(id: "b", path: "/b.jpg", label: 0, category: "photo", source: "s")]
+        var meta = try JSONSerialization.jsonObject(with: JSONEncoder().encode(rows)) as! [[String: Any]]
+        meta[0]["warp_model"] = "516119c92d36"
+        try JSONSerialization.data(withJSONObject: meta).write(to: FeatureShard.metaURL(dir, name))
+        var entries: [SafetensorsWriter.Entry] = []
+        var columns: [FeatureColumn: [Float]] = [:]
+        for column in FeatureColumn.allCases {
+            let values = (0..<(2 * column.width)).map { Float($0) * 0.25 }
+            columns[column] = values
+            entries.append(.init(column.rawValue, shape: [2, column.width], .float32(values)))
+        }
+        entries.append(.init("warp", shape: [2, 4], .float32([1, 2, 3, 4, 5, 6, 7, 8])))
+        entries.append(.init("noiseprint", shape: [2, 2], .float32([1, 2, 3, 4])))
+        try SafetensorsWriter.write(entries, to: FeatureShard.tensorsURL(dir, name))
+        return FeatureShard(name: name, rows: rows, columns: columns)
     }
 
-    @Test("a column measured later lives in a side file bound to its shard's ids; one bound to other rows is refused")
-    func sideColumn() throws {
+    @Test("a shard of an older format is refused with the migrate hint")
+    func olderRefused() throws {
         let dir = try tempDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
-        var old = shard("seed", ids: ["a", "b"], label: 1)
-        old.columns[.residual] = nil
-        try old.write(to: dir)
-        let store = FeatureStore(directory: dir)
-        let before = try store.select(columns: [.residual])
-        let missing = before.vector(.residual, row: 0).allSatisfy { $0.isNaN }
-        #expect(missing, "no side file yet: the column reads as missing")
-        let values = (0..<(2 * 38)).map { Float($0) }
-        try FeatureShard.writeSide(.residual, values: values, for: "seed", in: dir)
-        #expect(throws: VeilGardeFailure.self, "a side file is written once") { try FeatureShard.writeSide(.residual, values: values, for: "seed", in: dir) }
-        let after = try store.select(columns: [.residual, .cap])
-        #expect(Array(after.vector(.residual, row: 1)) == Array(values[38..<76]) && store.shardNames() == ["seed"])
-        // The side file belongs to rows a, b: a shard whose rows changed refuses it.
-        var moved = shard("seed", ids: ["a", "c"], label: 1)
-        moved.columns[.residual] = nil
-        try moved.write(to: dir, replacing: true)
-        #expect(throws: VeilGardeFailure.self) { try FeatureShard.read("seed", in: dir, columns: [.residual]) }
+        _ = try olderShard(dir)
+        #expect(throws: VeilGardeFailure.self) { try FeatureShard.read("old", in: dir) }
+        do { _ = try FeatureShard.read("old", in: dir) } catch let failure as VeilGardeFailure {
+            #expect(failure.description.contains("store migrate"))
+        }
     }
 
-    @Test("the residual column is the 19 tile features' mean then spread, and the residual layout reads it after capture")
-    func residualColumn() {
-        #expect(FeatureColumn.residual.width == 38 && FeatureColumn.residualFeatures.count == 19)
-        #expect(FeatureColumn.residualNames.first == "FR_mean" && FeatureColumn.residualNames[19] == "FR_std" && FeatureColumn.residualNames.last == "nyq_R_std")
-        #expect(FusionLayout.bothReadingsResidual.width == 815 && FusionLayout.bothReadingsResidual.columns.last == .residual)
-        #expect(FusionLayout.bothReadingsResidual.names[777] == "res_FR_mean" && FusionLayout(width: 815) == .bothReadingsResidual)
+    @Test("the migration rewrites a shard whole: the same rows, the three columns' bytes, the rest left behind; it never overwrites")
+    func migration() throws {
+        let dir = try tempDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let old = dir.appendingPathComponent("old", isDirectory: true), new = dir.appendingPathComponent("new", isDirectory: true)
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        let expected = try olderShard(old)
+        let reports = try StoreMigration.migrate(from: old, to: new)
+        #expect(reports.count == 1 && reports[0].equal && reports[0].rowsIn == 2 && reports[0].rowsOut == 2)
+        #expect(Set(reports[0].left) == ["noiseprint", "warp"] && reports[0].columns.count == 3)
+        let read = try FeatureShard.read("old", in: new)
+        #expect(read.rows == expected.rows && read.columns == expected.columns && read.metadata["format"] == FeatureShard.format)
+        let meta = try String(contentsOf: FeatureShard.metaURL(new, "old"), encoding: .utf8)
+        #expect(!meta.contains("warp_model"), "a row key the store no longer reads is not written back")
+        #expect(throws: VeilGardeFailure.self) { try StoreMigration.migrate(from: old, to: new) }
     }
 }

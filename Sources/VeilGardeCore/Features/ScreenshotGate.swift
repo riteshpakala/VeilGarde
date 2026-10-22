@@ -3,10 +3,10 @@
 //  VeilGardeCore
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The flat-UI gate: a screenshot is real but not a camera capture, so the camera-anchored
-//        fusion false-positives on it. Three tells taken together (many zero-gradient pixels,
-//        many perfectly flat 16-px blocks, one dominant colour) mark a synthetic render; the
-//        router then sends the image to the screenshot head.
+//  WHAT: The flat-UI gate: a screenshot is real but not a camera capture, so the camera head
+//        false-positives on it. Three tells taken together (many zero-gradient pixels, many
+//        perfectly flat 16-px blocks, one dominant colour) mark a synthetic render. The screenshot
+//        member reports the tells; when they fire, the combiner anchors on the screenshot head.
 //  PIN:  The joint rule is gradZero ≥ 0.50 and flatStrict ≥ 0.30 and topColor ≥ 0.18, on the image
 //        capped at 2048 px (capture_signature.py screenshot_gate; AI false-fire about 2%, only on
 //        flat graphic art). The tells are computed in Lens/Capture.

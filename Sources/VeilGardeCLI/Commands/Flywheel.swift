@@ -3,10 +3,10 @@
 //  VeilGardeCLI
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: `veilgarde flywheel`: the regime that grows the fusion head and the specialist stack. `init` seeds the live
-//        bundle and the battery, `seed` copies a feature store in, `acquire` fetches images from the
-//        collectors into a features-only shard (no image is written), `gap` says where the base
-//        is weakest and which jobs would fill it, `ingest` measures labeled local images into a
+//  WHAT: `veilgarde flywheel`: the regime that grows the stack. `init` seeds the live bundle and
+//        the battery, `seed` copies a feature store in, `acquire` fetches images from the
+//        collectors into a features-only shard (no image is written), `gap` says where the camera
+//        head is weakest and which jobs would fill it, `ingest` measures labeled local images into a
 //        new shard, `candidates` trains the weekly candidates and writes their review,
 //        `agreement` measures the north star, `battery` gates a bundle, `promote` and `rollback`
 //        are the only writers of live/, `status` says what is live.
@@ -20,7 +20,7 @@ import VeilGarde
 
 struct FlywheelCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "flywheel", abstract: "Grow the fusion head and the specialist stack: the live bundle, the features-only store, candidates, the battery, promote and rollback.",
+        commandName: "flywheel", abstract: "Grow the stack: the live bundle, the features-only store, candidates, the battery, promote and rollback.",
         discussion: "Run `flywheel init` once; then ingest or seed, `candidates`, review REVIEW.md, and `promote` what passes.",
         subcommands: [Init.self, Seed.self, Acquire.self, Gap.self, IngestImages.self, Candidates.self, AgreementCommand.self, Battery.self, Promote.self, Rollback.self, Status.self])
 
@@ -116,7 +116,7 @@ struct FlywheelCommand: ParsableCommand {
     }
 
     struct Gap: ParsableCommand {
-        static let configuration = CommandConfiguration(commandName: "gap", abstract: "Rank the store's (domain, category, label) buckets by the base's error plus its disagreement with the pooled verdict, and write the jobs that fill the worst.")
+        static let configuration = CommandConfiguration(commandName: "gap", abstract: "Rank the store's (domain, category, label) buckets by the camera head's error plus its disagreement with the pooled verdict, and write the jobs that fill the worst.")
         @Option(help: "Comma-separated shards to read (default: all).") var shards: String?
         @Flag(name: .customLong("no-write"), help: "Print the report without writing acquire/targets.json.") var noWrite = false
         @OptionGroup var workArea: WorkAreaOptions
@@ -156,7 +156,7 @@ struct FlywheelCommand: ParsableCommand {
     }
 
     struct Candidates: ParsableCommand {
-        static let configuration = CommandConfiguration(commandName: "candidates", abstract: "Train the weekly candidates (a warm-started base and the atlas heads) on top of live, measure them, write REVIEW.md.")
+        static let configuration = CommandConfiguration(commandName: "candidates", abstract: "Train the weekly candidates (a warm-started camera head and the category heads) on top of live, measure them, write REVIEW.md.")
         @Option(help: "The candidate's id (default: weekly-<date>).") var id: String?
         @Flag(help: "Replace a candidate with the same id.") var replace = false
         @Flag(help: "Print the plan and stop.") var plan = false
@@ -184,7 +184,7 @@ struct FlywheelCommand: ParsableCommand {
     }
 
     struct AgreementCommand: ParsableCommand {
-        static let configuration = CommandConfiguration(commandName: "agreement", abstract: "Measure the north star on the store: base ↔ pooled agreement and both AUCs, for live or a bundle.")
+        static let configuration = CommandConfiguration(commandName: "agreement", abstract: "Measure the north star on the store: camera ↔ pooled agreement and both AUCs, for live or a bundle.")
         @Option(help: "A bundle to measure instead of live (a candidate).") var bundle: String?
         @Flag(name: .customLong("no-log"), help: "Do not append the row to flywheel_metrics.csv.") var noLog = false
         @OptionGroup var workArea: WorkAreaOptions
@@ -198,8 +198,8 @@ struct FlywheelCommand: ParsableCommand {
                 print(String(format: "%@: %d rows (camera %d, processed %d)", r.bundle, r.rows, r.camera, r.processed))
                 print(String(format: "  agreement %.4f all, %@ camera, %@ processed", r.agreementAll, r.agreementCamera.map { String(format: "%.4f", $0) } ?? "n/a",
                              r.agreementProcessed.map { String(format: "%.4f", $0) } ?? "n/a"))
-                print(String(format: "  test %d rows: base AUC %.4f (real FPR %.3f, gen FNR %.3f); pooled AUC %.4f (real FPR %.3f, gen FNR %.3f); gap %+.4f",
-                             r.testRows, r.baseAUC, r.baseRealFPR, r.baseGenFNR, r.weightedAUC, r.weightedRealFPR, r.weightedGenFNR, r.aucGap))
+                print(String(format: "  test %d rows: camera AUC %.4f (real FPR %.3f, gen FNR %.3f); pooled AUC %.4f (real FPR %.3f, gen FNR %.3f); gap %+.4f",
+                             r.testRows, r.cameraAUC, r.cameraRealFPR, r.cameraGenFNR, r.pooledAUC, r.pooledRealFPR, r.pooledGenFNR, r.aucGap))
             }
         }
     }
@@ -236,7 +236,7 @@ struct FlywheelCommand: ParsableCommand {
 
     struct Promote: ParsableCommand {
         static let configuration = CommandConfiguration(commandName: "promote", abstract: "Promote one slot from a candidate into live, behind its battery; a failure restores live.")
-        @Argument(help: "base, combiner, or a head (art, blur, human, cgi, preview, art-pair, screenshot, semtile).") var slot: String
+        @Argument(help: "camera, combiner, or a head (art, blur, human, preview, screenshot, semtile).") var slot: String
         @Option(help: "The candidate bundle.") var from: String
         @Flag(name: .customLong("dry-run"), help: "Run every check and print what would change; write nothing, run no battery.") var dryRun = false
         @OptionGroup var workArea: WorkAreaOptions

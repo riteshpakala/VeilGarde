@@ -3,16 +3,16 @@
 //  VeilGardeCore
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: One file a detector bundle holds, named by its role (the fusion head, the combiner, a
-//        specialist head, a weight) and bound by its SHA-256, size, provenance and, for a
-//        warm-started model, its parent's hash.
+//  WHAT: One file a detector bundle holds, named by its role (the camera head, the combiner, a
+//        linear head, a weight) and bound by its SHA-256, size, provenance and, for a warm-started
+//        model, its parent's hash.
 //  PIN:  `frozen` marks what the flywheel may never move: the weights, the embeddings every model
 //        was trained on (Flywheel/Promote's policy reads it). A file's name is free; what binds it
 //        is its hash.
 //
 
 public enum ArtifactRole: String, Codable, Sendable, CaseIterable {
-    case fusionHead = "fusion-head"
+    case camera
     case combiner
     case head
     case dinov2Small = "dinov2-small"
@@ -24,7 +24,7 @@ public enum ArtifactRole: String, Codable, Sendable, CaseIterable {
     public var isFrozen: Bool {
         switch self {
         case .dinov2Small, .dinov2XSmall, .dinov2XXSmall, .clipVision: return true
-        case .fusionHead, .combiner, .head: return false
+        case .camera, .combiner, .head: return false
         }
     }
 
@@ -45,7 +45,7 @@ public struct Artifact: Codable, Sendable, Equatable {
     public var bytes: Int
     /// Where the bytes came from: "candidates/<recipe>", an import, the research's heads.
     public var source: String?
-    /// The hash of the artifact this one continues (a warm-started fusion head's parent).
+    /// The hash of the artifact this one continues (a warm-started camera head's parent).
     public var parent: String?
 
     public init(role: ArtifactRole, head: HeadKind? = nil, file: String, sha256: String, bytes: Int, source: String? = nil, parent: String? = nil) {

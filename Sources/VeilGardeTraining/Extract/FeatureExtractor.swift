@@ -3,10 +3,9 @@
 //  VeilGardeTraining
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: One image to the store's columns, the inputs every head, the fusion head and the combiner
-//        train on: dino_norm (the heads' 360×640 embedding), dino_fusion (the fusion head's plain
-//        embedding), cap (nine capture values at native resolution) and residual (the warp
-//        residual's 38 statistics at 512 px, measured by the watermark's code).
+//  WHAT: One image to the store's three columns, the inputs every head, the camera head and the
+//        combiner train on: dino_norm (the linear heads' 360×640 embedding), dino_fusion (the
+//        camera head's plain embedding) and cap (nine capture values at native resolution).
 //  PIN:  The detector's own calls in the detector's order (SemanticLens, CaptureLens), so a stored
 //        row is what inference would compute for that image. The shard records which DINOv2
 //        variant measured it and, when the weights are found, the first 12 hex of their SHA-256.
@@ -17,21 +16,18 @@ import CoreGraphics
 import Foundation
 import VeilGardeCore
 import VeilGardeLens
-import VeilWatermark
 
 public struct ExtractedFeatures: Sendable, Equatable {
     public var dinoNorm: [Float]
     public var dinoFusion: [Float]
     public var cap: [Float]
-    public var residual: [Float]
     public var width: Int
     public var height: Int
 
-    public init(dinoNorm: [Float], dinoFusion: [Float], cap: [Float], residual: [Float]? = nil, width: Int, height: Int) {
+    public init(dinoNorm: [Float], dinoFusion: [Float], cap: [Float], width: Int, height: Int) {
         self.dinoNorm = dinoNorm
         self.dinoFusion = dinoFusion
         self.cap = cap
-        self.residual = residual ?? [Float](repeating: .nan, count: FeatureColumn.residual.width)
         self.width = width
         self.height = height
     }
@@ -41,7 +37,6 @@ public struct ExtractedFeatures: Sendable, Equatable {
         case .dinoNorm: return dinoNorm
         case .dinoFusion: return dinoFusion
         case .cap: return cap
-        case .residual: return residual
         }
     }
 }
@@ -65,7 +60,6 @@ public final class FeatureExtractor: FeatureMeasuring {
         if let url = WeightLocator.shared.url(variant.weightFile), let sha = try? ContentHash.sha256Hex(fileAt: url) {
             provenance["dino_sha256_prefix"] = String(sha.prefix(12))
         }
-        if columns.contains(.residual) { provenance["residual"] = "warp19 mean and spread at \(TilePlane.maxDim) px" }
         self.provenance = provenance
     }
 
@@ -74,8 +68,7 @@ public final class FeatureExtractor: FeatureMeasuring {
         let dinoNorm = columns.contains(.dinoNorm) ? try SemanticLens.normalizedEmbedding(cg, variant: variant) : nan384
         let dinoFusion = columns.contains(.dinoFusion) ? try SemanticLens.fusionEmbedding(cg, variant: variant) : nan384
         let cap = columns.contains(.cap) ? CaptureLens.features(cg).asVector : [Float](repeating: .nan, count: CaptureFeatures.count)
-        let residual = columns.contains(.residual) ? try ResidualStatistics.measure(cg) : nil
-        return ExtractedFeatures(dinoNorm: dinoNorm, dinoFusion: dinoFusion, cap: cap, residual: residual, width: cg.width, height: cg.height)
+        return ExtractedFeatures(dinoNorm: dinoNorm, dinoFusion: dinoFusion, cap: cap, width: cg.width, height: cg.height)
     }
 
     public func extract(contentsOf url: URL) throws -> ExtractedFeatures { try extract(try ImageDecoding.cgImage(contentsOf: url)) }

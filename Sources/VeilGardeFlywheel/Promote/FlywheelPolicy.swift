@@ -4,34 +4,33 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: What the flywheel may move, how, and what must hold first. The backbones' weights are
-//        frozen: no automated path ever writes them. The fusion head (the base) moves only by a
-//        warm start of the live head; the combiner only with non-negative evidence weights; an
-//        atlas head only when it leaves calm real photos alone.
+//        frozen: no automated path ever writes them. The camera head moves only by a warm start of
+//        the live head; the combiner only with non-negative weights over members live holds; a
+//        category head only when it leaves calm real photos alone.
 //  PIN:  The flywheel's laws, from the promote scripts and the baseline audit: promote is the
-//        sole deploy writer; the base gates on the battery's HARD groups, everything else on the
-//        full battery (heads reach every arbiter); the admission pre-gate is block@0.8 ≤ 10% on
-//        golden real anchors whose path does not contain "bsky", for art, blur, human and cgi.
+//        sole deploy writer; the camera head gates on the battery's HARD groups, everything else
+//        on the full battery (heads reach every revision); the admission pre-gate is block@0.8 ≤
+//        10% on golden real anchors whose path does not contain "bsky", for art, blur and human.
 //
 
 import Foundation
 import VeilGardeCore
 
 public enum FlywheelSlot: Equatable, Hashable, Sendable, CustomStringConvertible {
-    case base
+    case camera
     case combiner
     case head(HeadKind)
 
     public init(parsing name: String) throws {
         switch name {
-        case "base", "fusion", "fusion-head": self = .base
+        case "camera": self = .camera
         case "combiner": self = .combiner
-        case "pair": self = .head(.artPair)
         default:
             guard let kind = HeadKind(rawValue: name) else {
                 if ArtifactRole.allCases.filter(\.isFrozen).map(\.rawValue).contains(name) {
                     throw VeilGardeFailure.usage("\(name) is frozen: the flywheel never promotes it")
                 }
-                throw VeilGardeFailure.usage("no promotable slot \(name); slots are base, combiner and the heads \(HeadKind.allCases.map(\.rawValue).joined(separator: ", "))")
+                throw VeilGardeFailure.usage("no promotable slot \(name); slots are camera, combiner and the heads \(HeadKind.allCases.map(\.rawValue).joined(separator: ", "))")
             }
             self = .head(kind)
         }
@@ -39,7 +38,7 @@ public enum FlywheelSlot: Equatable, Hashable, Sendable, CustomStringConvertible
 
     public var role: ArtifactRole {
         switch self {
-        case .base: return .fusionHead
+        case .camera: return .camera
         case .combiner: return .combiner
         case .head: return .head
         }
@@ -49,7 +48,7 @@ public enum FlywheelSlot: Equatable, Hashable, Sendable, CustomStringConvertible
 
     public var description: String {
         switch self {
-        case .base: return "base"
+        case .camera: return "camera"
         case .combiner: return "combiner"
         case .head(let k): return k.rawValue
         }
@@ -57,7 +56,7 @@ public enum FlywheelSlot: Equatable, Hashable, Sendable, CustomStringConvertible
 }
 
 public enum FlywheelPolicy {
-    public static let admissionHeads: Set<HeadKind> = [.art, .blur, .human, .cgi]
+    public static let admissionHeads: Set<HeadKind> = [.art, .blur, .human]
     public static let admissionCeiling = 0.10
     public static let admissionThreshold: Float = 0.8
 
@@ -65,7 +64,7 @@ public enum FlywheelPolicy {
     public static let frozen: [ArtifactRole] = ArtifactRole.allCases.filter(\.isFrozen)
 
     /// The battery a promote of `slot` must pass.
-    public static func gate(for slot: FlywheelSlot) -> BatterySpec.Gate { slot == .base ? .promote : .full }
+    public static func gate(for slot: FlywheelSlot) -> BatterySpec.Gate { slot == .camera ? .promote : .full }
 
     public struct Admission: Codable, Sendable, Equatable {
         public var anchors: Int

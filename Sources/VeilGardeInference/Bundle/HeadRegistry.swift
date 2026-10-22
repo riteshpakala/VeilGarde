@@ -3,8 +3,8 @@
 //  VeilGardeInference
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The specialist heads and the stack combiner of a bundle, each read once per file and
-//        shared. A head the bundle does not name is nil, and the specialist it powers stays inert.
+//  WHAT: The linear heads and the stack combiner of a bundle, each read once per file and shared.
+//        A head the bundle does not name is nil, and the member it powers has nothing to say.
 //  PIN:  The reference's head and combiner caches, keyed by the artifact's path so two
 //        bundles in one process (the live bundle and a candidate under the battery) never mix,
 //        and by the file's modification date and size, so a file the flywheel rewrites in place

@@ -108,8 +108,8 @@ struct PackageLayeringTests {
     static let layers: [String: Set<String>] = [
         "VeilGardeCore": [],
         "VeilGardeLens": ["VeilGardeCore"],
-        "VeilGardeInference": ["VeilGardeLens", "VeilWatermark"],
-        "VeilGardeTraining": ["VeilGardeLens", "VeilWatermark"],
+        "VeilGardeInference": ["VeilGardeLens"],
+        "VeilGardeTraining": ["VeilGardeLens"],
         "VeilGardeFlywheel": ["VeilGardeTraining", "VeilGardeInference"],
         "VeilWatermark": ["VeilGardeLens"],
         "VeilGarde": ["VeilGardeInference", "VeilGardeTraining", "VeilGardeFlywheel", "VeilWatermark"],

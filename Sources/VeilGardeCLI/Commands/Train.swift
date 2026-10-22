@@ -3,10 +3,10 @@
 //  VeilGardeCLI
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: `veilgarde train`: every model VeilGarde ships, trained into a candidate bundle at
-//        <work area>/candidates/<id>/ that `veilgarde route --bundle` runs. `plan` prints what a
-//        recipe would do without doing it; `fusion`, `heads` and `combiner` train one model; `all`
-//        trains the shipped preset and `run` a recipe.toml.
+//  WHAT: `veilgarde train`: every trainable member of the stack, trained into a candidate bundle
+//        at <work area>/candidates/<id>/ that `veilgarde route --bundle` runs. `plan` prints what a
+//        recipe would do without doing it; `camera`, `heads` and `combiner` train one member;
+//        `all` trains the shipped preset and `run` a recipe.toml.
 //  PIN:  The parent bundle is the shipped one unless --parent names another (a candidate, or
 //        <work area>/live). The store defaults to <work area>/store/shards; --store names
 //        another (any store in the same shard format reads as is). Train in release:
@@ -61,16 +61,12 @@ struct TrainingOptions: ParsableArguments {
         let outcome = try engine.train(recipe)
         print("candidate \(outcome.candidate.id): \(outcome.candidate.root.path)")
         print(String(format: "  %d artifacts, trained in %.1fs", outcome.candidate.manifest.artifacts.count, outcome.seconds))
-        for model in recipe.ordered.map(\.name) { print("  \(model): \(outcome.candidate.root.path)/\(metricsFile(model))") }
+        for member in recipe.ordered.map(\.name) { print("  \(member): \(outcome.candidate.root.path)/\(metricsFile(member))") }
         print("run it:  veilgarde route <image> --bundle \(outcome.candidate.root.path)")
     }
 
-    func metricsFile(_ model: String) -> String {
-        switch model {
-        case "fusion-head": return "fusion/metrics.json"
-        case "combiner": return "combiner/metrics.json"
-        default: return "heads/\(model.dropFirst("head:".count))/metrics.json"
-        }
+    func metricsFile(_ member: String) -> String {
+        member.hasPrefix("head:") ? "heads/\(member.dropFirst("head:".count))/metrics.json" : "\(member)/metrics.json"
     }
 }
 
@@ -78,9 +74,9 @@ func datasetURL(_ path: String) -> URL { URL(fileURLWithPath: (path as NSString)
 
 struct TrainCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "train", abstract: "Train VeilGarde's models into a candidate bundle: the fusion head, the heads, the combiner.",
+        commandName: "train", abstract: "Train the stack's trainable members into a candidate bundle: the camera head, the heads, the combiner.",
         discussion: "Train in release (VEILGARDE_CONFIG=release scripts/cli.sh train …). A candidate is a full bundle: run it with `veilgarde route <image> --bundle <candidate>`.",
-        subcommands: [Plan.self, Fusion.self, Heads.self, Combine.self, All.self, Run.self])
+        subcommands: [Plan.self, Camera.self, Heads.self, CombinerFit.self, All.self, Run.self])
 
     struct Plan: ParsableCommand {
         static let configuration = CommandConfiguration(commandName: "plan", abstract: "Print what a recipe would train and why, without training (no writes).")
@@ -101,41 +97,34 @@ struct TrainCommand: ParsableCommand {
         }
     }
 
-    struct Fusion: ParsableCommand {
-        static let configuration = CommandConfiguration(commandName: "fusion", abstract: "Train the fusion head on the store: a warm start on the parent's (the flywheel's way) or from scratch.")
+    struct Camera: ParsableCommand {
+        static let configuration = CommandConfiguration(commandName: "camera", abstract: "Train the camera head on the store: a warm start on the parent's (the flywheel's way) or from scratch.")
         @Option(help: "warm or scratch.") var mode: String = "warm"
         @Option(help: "Trees to add (warm) or to grow (scratch).") var trees: Int?
         @Option(help: "The learning rate.") var eta: Double?
         @Option(name: .customLong("new-generator-weight"), help: "The weight on new-generator rows.") var newGeneratorWeight: Double = 1.0
-        @Option(help: "The row's columns: dino_fusion,cap (393) or dino_fusion,dino_norm,cap (777).") var columns: String?
         @Option(help: "The trees' depth (default 5).") var depth: Int?
         @OptionGroup var options: TrainingOptions
 
         func run() throws {
             guarded {
-                var f = FusionHead().newGeneratorWeight(newGeneratorWeight)
-                if let columns {
-                    guard let layout = FusionLayout(rawValue: columns.replacingOccurrences(of: " ", with: "")) else {
-                        throw VeilGardeFailure.usage("--columns is one of \(FusionLayout.allCases.map(\.rawValue).joined(separator: " or ")), not \(columns)")
-                    }
-                    f = f.columns(layout)
-                }
+                var c = CameraHead().newGeneratorWeight(newGeneratorWeight)
                 if let depth {
                     guard (1...12).contains(depth) else { throw VeilGardeFailure.usage("--depth is 1 to 12, not \(depth)") }
-                    f = f.depth(depth)
+                    c = c.depth(depth)
                 }
                 switch mode {
-                case "warm": f = f.warmStart(add: trees ?? 80, eta: eta ?? 0.03)
-                case "scratch": f = f.scratch(trees: trees ?? 500, eta: eta ?? 0.04)
+                case "warm": c = c.warmStart(add: trees ?? 80, eta: eta ?? 0.03)
+                case "scratch": c = c.scratch(trees: trees ?? 500, eta: eta ?? 0.04)
                 default: throw VeilGardeFailure.usage("--mode is warm or scratch, not \(mode)")
                 }
-                try options.run(TrainingRecipe(id: options.candidateID("fusion")) { f })
+                try options.run(TrainingRecipe(id: options.candidateID("camera")) { c })
             }
         }
     }
 
     struct Heads: ParsableCommand {
-        static let configuration = CommandConfiguration(commandName: "heads", abstract: "Train specialist heads on the store's dino_norm column (each head's recipe, admission measured).")
+        static let configuration = CommandConfiguration(commandName: "heads", abstract: "Train linear heads on the store's dino_norm column (each head's recipe, admission measured).")
         @Option(help: "Comma-separated kinds (default: art,blur,human).") var kinds: String = HeadKind.flywheelCategories.map(\.rawValue).joined(separator: ",")
         @OptionGroup var options: TrainingOptions
 
@@ -147,31 +136,23 @@ struct TrainCommand: ParsableCommand {
                     }
                     return kind
                 }
-                try options.run(TrainingRecipe(id: options.candidateID("heads")) { for kind in parsed { DinoHead(kind) } })
+                try options.run(TrainingRecipe(id: options.candidateID("heads")) { for kind in parsed { SpecialistHead(kind) } })
             }
         }
     }
 
-    struct Combine: ParsableCommand {
-        static let configuration = CommandConfiguration(commandName: "combiner", abstract: "Fit the stack combiner on the store's capture-absent rows under the parent's base and heads.")
+    struct CombinerFit: ParsableCommand {
+        static let configuration = CommandConfiguration(commandName: "combiner", abstract: "Fit the stack combiner on the store's capture-absent rows under the parent's camera head and heads.")
         @Option(name: .customLong("reals-weight"), help: "The weight on real rows.") var realsWeight: Double = 3
-        @Option(name: .customLong("out-of-fold"), help: "Fit on out-of-fold base predictions over this many folds (the parent must be a candidate that trained a scratch fusion head).") var outOfFold: Int?
         @OptionGroup var options: TrainingOptions
 
         func run() throws {
-            guarded {
-                var c = Combiner().realsWeight(realsWeight)
-                if let outOfFold {
-                    guard (2...20).contains(outOfFold) else { throw VeilGardeFailure.usage("--out-of-fold is 2 to 20 folds, not \(outOfFold)") }
-                    c = c.outOfFold(folds: outOfFold)
-                }
-                try options.run(TrainingRecipe(id: options.candidateID("combiner")) { c })
-            }
+            guarded { try options.run(TrainingRecipe(id: options.candidateID("combiner")) { Combiner().realsWeight(realsWeight) }) }
         }
     }
 
     struct All: ParsableCommand {
-        static let configuration = CommandConfiguration(commandName: "all", abstract: "Train the shipped preset: every model VeilGarde ships that the store reproduces.")
+        static let configuration = CommandConfiguration(commandName: "all", abstract: "Train the shipped preset: every trainable member the store reproduces.")
         @OptionGroup var options: TrainingOptions
 
         func run() throws {

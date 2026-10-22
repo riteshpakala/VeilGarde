@@ -6,7 +6,7 @@
 //  WHAT: What an acquired image depicts, from CLIP: its category among five prompts (a
 //        person, a sharp scene, a blur, a render, art) and its NSFW margin (the best NSFW prompt's
 //        logit minus the best safe prompt's). The category decides which head a generated image
-//        trains; the margin keeps NSFW rows out of the base corpus. It never touches a label.
+//        trains; the margin keeps NSFW rows out of the camera head's corpus. It never touches a label.
 //  PIN:  atlas_route_gen.py: argmax over 100·cos(image, prompt) for the five category prompts,
 //        "photo" (a sharp scene) folded into art, applied to generated images only.
 //        atlas_nsfw_scan.py with flywheel_nsfw_list.py's aggressive bar: flagged when the margin
