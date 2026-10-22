@@ -8,12 +8,15 @@ Inputs:  this folder's rr-mark.png; Playfair Display Italic from ~/Library/Fonts
          semantic-tile probabilities and the numbers each stage gave it; and its signature's fixture,
          Tests/VeilWatermarkTests/Fixtures/crop_ben.fr.json: each tile's fragility rate and the signature's id.
 Outputs: hero.png in argv[1], 2400×1260 (1200×630 at scale 2), in the style of Veil8's hero: one image's tiles
-         feeding two lanes, the verdict above and the signature, through the sixteen warps, below.
+         feeding two lanes, the verdict above and the signature, through the sixteen warps, below; and README.md's
+         links to it tagged ?v=<its hash>, so caches fetch a new hero.
 """
 
+import hashlib
 import json
 import math
 import os
+import re
 import sys
 import tempfile
 
@@ -24,6 +27,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.abspath(sys.argv[1])
 GOLDEN = os.path.join(HERE, "..", "..", "Tests", "VeilGardeInferenceTests", "Fixtures", "crops", "crop_ben.route.json")
 SIGNATURE = os.path.join(HERE, "..", "..", "Tests", "VeilWatermarkTests", "Fixtures", "crop_ben.fr.json")
+README = os.path.join(HERE, "..", "..", "README.md")
 PLAYFAIR = os.path.expanduser("~/Library/Fonts/PlayfairDisplay-Italic-VariableFont_wght.ttf")
 
 # Veil8's hero colours: green for a tile that reads real, red for one that reads generated.
@@ -218,6 +222,16 @@ def main():
     path = os.path.join(OUT, "hero.png")
     with Image.open(path) as im:
         print(f"hero.png: {im.size[0]}×{im.size[1]}, {os.path.getsize(path) // 1024} KB")
+    # The README links the hero with its hash as a query, so a new hero is a new URL and no cache keeps the old one.
+    with open(path, "rb") as f:
+        version = hashlib.sha256(f.read()).hexdigest()[:8]
+    with open(README, encoding="utf-8") as f:
+        text = f.read()
+    tagged = re.sub(r"README_Assets/hero\.png(\?v=[0-9a-f]+)?", f"README_Assets/hero.png?v={version}", text)
+    if tagged != text:
+        with open(README, "w", encoding="utf-8") as f:
+            f.write(tagged)
+    print(f"README.md: hero.png?v={version}")
 
 
 if __name__ == "__main__":
