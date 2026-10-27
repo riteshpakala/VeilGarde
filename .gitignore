@@ -29,7 +29,7 @@ __pycache__/
 
 # Local only: everything in Docs/ but the site (Docs/site is the documentation), and the maintainer's own scripts,
 # which need the research environment, Garde or this Mac's layout
-/Docs/*
+/Docs/*.md
 !/Docs/site/
 /Scripts/fixtures/
 /Scripts/lib.sh
