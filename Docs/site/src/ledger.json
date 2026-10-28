@@ -1237,7 +1237,7 @@
       "chose": "The README's hero is redrawn for the two lanes from VeilGarde's own goldens and a committed signature of the same crop",
       "rejected": "keeping the old hero",
       "reason": "its generator read schema v2's majority and sensor keys, which no longer exist",
-      "file": "README_Assets/src/build.py"
+      "file": "Docs/README_Assets/src/build.py"
     },
     {
       "id": "decision-119",

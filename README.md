@@ -1,4 +1,4 @@
-[![VeilGarde: one verdict, and a signature that survives a crop. An image's 16 by 16 tiles, coloured by how generated each reads and lit by its fragility, feed two lanes: above, the stack's members and the combined verdict, ending in a gold mark; below, sixteen warps and the signature's id, ending in a square.](README_Assets/hero.png?v=88537041)](README_Assets/hero.png?v=88537041)
+![VeilGarde: one verdict, and a signature that survives a crop. An image's 16 by 16 tiles, coloured by how generated each reads and lit by its fragility, feed two lanes: above, the stack's members and the combined verdict, ending in a gold mark; below, sixteen warps and the signature's id, ending in a square.](Docs/README_Assets/hero.png?v=f339c7c2)
 
 # VeilGarde
 

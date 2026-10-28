@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Builds the README's hero from HTML, rendered by the installed Google Chrome through Playwright.
 
-    README_Assets/src/build.sh            # runs this
+    Docs/README_Assets/src/build.sh       # runs this
 
 Inputs:  this folder's rr-mark.png; Playfair Display Italic from ~/Library/Fonts; crop_ben.png's routed result,
          VeilGarde's own golden, Tests/VeilGardeInferenceTests/Fixtures/crops/crop_ben.route.json: its 16×16
@@ -25,9 +25,9 @@ from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.abspath(sys.argv[1])
-GOLDEN = os.path.join(HERE, "..", "..", "Tests", "VeilGardeInferenceTests", "Fixtures", "crops", "crop_ben.route.json")
-SIGNATURE = os.path.join(HERE, "..", "..", "Tests", "VeilWatermarkTests", "Fixtures", "crop_ben.fr.json")
-README = os.path.join(HERE, "..", "..", "README.md")
+GOLDEN = os.path.join(HERE, "..", "..", "..", "Tests", "VeilGardeInferenceTests", "Fixtures", "crops", "crop_ben.route.json")
+SIGNATURE = os.path.join(HERE, "..", "..", "..", "Tests", "VeilWatermarkTests", "Fixtures", "crop_ben.fr.json")
+README = os.path.join(HERE, "..", "..", "..", "README.md")
 PLAYFAIR = os.path.expanduser("~/Library/Fonts/PlayfairDisplay-Italic-VariableFont_wght.ttf")
 
 # Veil8's hero colours: green for a tile that reads real, red for one that reads generated.
@@ -41,6 +41,15 @@ LENS = (556, 618)    # the sixteen warps, on the signature's lane
 REACH = 40           # the warps' half-height about the signature's lane, short of the verdict's
 WORDS_END = 1040     # the stage words stop here; a short line runs on to each lane's mark at 1102
 
+# The mark's ink, the mosaic, the subtitle and the legend start at x 66.
+# The title's and the subtitle's first ink sit on EDGE: an italic first glyph overhangs, or sits in, by its own
+# amount, so the page measures it with the font and places each line by it.
+EDGE = 66
+ALIGN = f"""document.fonts.ready.then(() => {{ const ctx = document.createElement('canvas').getContext('2d');
+    for (const el of document.querySelectorAll('.title, .sub')) {{ const cs = getComputedStyle(el), text = el.textContent.trim();
+        ctx.font = `italic ${{cs.fontWeight}} ${{cs.fontSize}} Playfair`;
+        el.style.left = ({EDGE} - parseFloat(cs.paddingLeft) + ctx.measureText(text[0]).actualBoundingBoxLeft) + 'px'; }} }})"""
+
 
 def shoot(browser, page_html, path, viewport=(1200, 630), scale=2, prepare=None):
     """Writes `page_html` beside the inputs (so relative URLs resolve) and screenshots it, after the fonts load and
@@ -52,6 +61,7 @@ def shoot(browser, page_html, path, viewport=(1200, 630), scale=2, prepare=None)
         page = browser.new_page(device_scale_factor=scale, viewport={"width": viewport[0], "height": viewport[1]})
         page.goto("file://" + name)
         page.evaluate("document.fonts.ready.then(() => true)")
+        page.evaluate(ALIGN)
         if prepare:
             page.evaluate(prepare)
         page.wait_for_timeout(150)
@@ -227,7 +237,7 @@ def main():
         version = hashlib.sha256(f.read()).hexdigest()[:8]
     with open(README, encoding="utf-8") as f:
         text = f.read()
-    tagged = re.sub(r"README_Assets/hero\.png(\?v=[0-9a-f]+)?", f"README_Assets/hero.png?v={version}", text)
+    tagged = re.sub(r"(?:Docs/)?README_Assets/hero\.png(\?v=[0-9a-f]+)?", f"Docs/README_Assets/hero.png?v={version}", text)
     if tagged != text:
         with open(README, "w", encoding="utf-8") as f:
             f.write(tagged)
