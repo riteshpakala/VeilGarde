@@ -40,10 +40,12 @@
 // under Sources/ imports MLXLLM, MLXLMCommon, AppKit or UIKit; no type is named like a module;
 // every Swift file opens with a WHAT: header.
 //
-// Frigate, the family's vendored MLX stack, is taken by path, as every consumer in the family
-// takes it: VEILGARDE_FRIGATE_DIR, else ../Frigate, else ../../rao/repositories/Frigate (this
-// Mac's layout). MLX-facing targets use Swift 5 language mode because Frigate's MLX types are not
-// Sendable (Braid's choice).
+// Frigate, the family's vendored MLX stack, is taken by path at home: VEILGARDE_FRIGATE_DIR, else
+// ../Frigate, else ../../rao/repositories/Frigate (this Mac's layout). Inside another package's
+// graph (a SwiftPM checkout, as Veil takes VeilGarde by URL, or VEILGARDE_FRIGATE_URL set) it is
+// the family's URL instead, so the graph holds one Frigate: two packages named Frigate, one by path
+// and one by URL, are refused. MLX-facing targets use Swift 5 language mode because Frigate's MLX
+// types are not Sendable (Braid's choice).
 
 import Foundation
 import PackageDescription
@@ -62,6 +64,17 @@ let frigate: String = {
     }
     return "../Frigate"
 }()
+
+/// In another package's graph, Frigate by URL, the one the consumer takes; at home, the checkout by
+/// path. SwiftPM reads a dependency's manifest at "/" while it resolves (from the repository, not a
+/// folder) and in its checkouts while it builds; VEILGARDE_FRIGATE_URL asks for the URL anywhere.
+let frigateByURL: Bool = Context.packageDirectory == "/"
+    || Context.packageDirectory.contains("/.build/checkouts/")
+    || Context.packageDirectory.contains("/SourcePackages/checkouts/")
+    || !(Context.environment["VEILGARDE_FRIGATE_URL"] ?? "").isEmpty
+let frigateDependency: Package.Dependency = frigateByURL
+    ? .package(url: "https://github.com/rao-studios/Frigate.git", branch: "main")
+    : .package(path: frigate)
 
 /// Weights stay out of git. Copied into the Inference resources, the DINOv2 files ship inside the bundle;
 /// otherwise WeightLocator finds them in the work area or an override folder.
@@ -83,7 +96,7 @@ let package = Package(
         .executable(name: "veilgarde", targets: ["VeilGardeCLI"]),
     ],
     dependencies: [
-        .package(path: frigate),
+        frigateDependency,
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.2.0"),
     ],
