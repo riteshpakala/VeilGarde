@@ -244,7 +244,7 @@
     var layers = Array.prototype.map.call(document.querySelectorAll("#system .layer"), function (g) { return g.getAttribute("data-layer"); });
     var missing = [];
     idx.trails.forEach(function (t) { t.steps.forEach(function (st) { Object.keys(layersOf(st)).forEach(function (l) { if (layers.indexOf(l) < 0) missing.push(l); }); }); });
-    out.push({ name: "the picture has a box for every layer any trail lights", ok: !missing.length && layers.length === 8, detail: missing.join(", ") || layers.join(", ") });
+    out.push({ name: "the picture has a box for every layer any trail lights", ok: !missing.length && layers.length === 9, detail: missing.join(", ") || layers.join(", ") });
     out.push({ name: "the picker has a button per trail, and the stepper one per step of the chosen trail",
                ok: document.querySelectorAll("#stepper .trail-pick button").length === idx.trails.length && document.querySelectorAll("#stepper button.step").length === trailOf(state.trail).steps.length });
     // The grid lines up: a column's cells share a left edge, and a row's cells a top and a height.

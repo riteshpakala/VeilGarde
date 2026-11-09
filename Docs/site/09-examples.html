@@ -13,7 +13,7 @@
 <div class="shell">
 <nav class="side" aria-label="Chapters"></nav>
 <main class="page" id="main">
-<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 9 of 10</span><a href="code.html#Examples/Sources/VeilGardeExamples/main.swift">Open the examples in the explorer</a></header>
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 9 of 11</span><a href="code.html#Examples/Sources/VeilGardeExamples/main.swift">Open the examples in the explorer</a></header>
 
 <h1 id="ch-examples">How do I run each stage myself?</h1>
 <p class="lede"><em>On the examples that walk both lanes stage by stage, from the capture signature to a signature read off the warp residual.</em></p>
@@ -34,12 +34,13 @@
 <div class="code" data-excerpt="Examples/Sources/VeilGardeExamples/Toy.swift:Toy.writeStore()"></div>
 <p>A toy fit on a few hundred rows means little, so the step proves the machinery instead. The warm start keeps the shipped head's trees byte for byte and adds two. Frigate's evaluator reads the candidate's head with predictions identical to VeilGarde's own. The candidate verifies, every hash against its manifest.</p>
 
-<h2 id="flywheel">The flywheel, and the watermark</h2>
+<h2 id="flywheel">The flywheel, the watermark, and sound</h2>
 <p>Step 7 copies the shipped bundle as a live bundle and builds a small battery: every image must keep the call the shipped detector gives it today. Promote refuses a frozen weight and a slot that no longer exists. The human head from step 6 goes through admission and the battery, and is rolled back. The checkpoints say the weights never moved and live is byte for byte what it was.</p>
 <p>Step 8 is the other lane. It signs the first crop with its own fragility pattern, read off the warp residual, and matches it against itself. It then reports a half-area crop and a JPEG re-encode; whether the signature holds on real crops is the acceptance run's question, chapter 8's.</p>
+<p>Step 9 is the watermark on sound. It draws a seeded music-like clip as its spectrogram, signs the picture with the same code as step 8, matches the clip against itself and takes the transform back to sound. A half-length cut, an AAC re-encode and the sound rebuilt from the picture alone are reported; whether they hold is <a href="11-audio.html">chapter 11</a>'s question.</p>
 
-<h2 id="showed">What it showed on 2026-10-21</h2>
-<p>The run after the stack became a list of members held all 12 checkpoints, with the same numbers as the run after the warp left. Its numbers, by step:</p>
+<h2 id="showed">What it showed on 2026-11-08</h2>
+<p>The run after the audio step was added held all 14 checkpoints. Steps 0 to 8 printed the same numbers as the run of 2026-10-21, when the stack became a list of members. Its numbers, by step:</p>
 <div class="scroll">
 <table class="data">
 <thead><tr><th>Step</th><th>What the run printed</th></tr></thead>
@@ -49,7 +50,8 @@
 <tr><td>6, training</td><td>the shipped head's 500 trees kept byte for byte, 2 added; Frigate equal on 830 store rows; the candidate's 8 artifacts verified</td></tr>
 <tr><td>7, the flywheel</td><td>a battery of 13 images that must stay real and 1 that must stay generated; dinov2-small and fusion-head refused; the human head promoted, the battery passed, then rolled back; the 3 weights unmoved</td></tr>
 <tr><td>8, the watermark</td><td>16×16 tiles and 930 measured bits; a self-match of 1.000; a half-area crop matched at 0.789 over 379 bits, found 0.12 tiles off; a JPEG at quality 0.75 matched at 0.894</td></tr>
-<tr><td>9, verify</td><td>12 of 12 checkpoints</td></tr>
+<tr><td>9, audio</td><td>a 12-second clip drawn as 1034 by 1024 pixels, 32 by 32 tiles and 3906 bits; a self-match of 1.000; the exact path back at 128.9 dB SNR and the picture's at 42.2 dB; a half-length cut not matched at 0.679, placed 0.05 s from the truth; an AAC at 128 kb/s matched at 0.837</td></tr>
+<tr><td>10, verify</td><td>14 of 14 checkpoints</td></tr>
 </tbody>
 </table>
 </div>
@@ -64,6 +66,7 @@
 <tr><td>12 of 12 checkpoints; 500 trees kept; the battery's 13 and 1; the refusals; the 3 weights</td><td><a href="index.html#command-102">Ledger command-102</a>; the run after the restructure, <a href="index.html#command-120">command-120</a></td><td>2026-10-21</td></tr>
 <tr><td>crop_ben's camera member 0.6304 and pooled 0.1059</td><td><a href="index.html#command-94">Ledger command-94</a>, the goldens the examples hold themselves to</td><td>2026-10-21</td></tr>
 <tr><td>930 bits; 0.789 over 379 bits; 0.894</td><td>The run's output, step 8; the same numbers as the run of 2026-10-19, since the residual is unchanged</td><td>2026-10-21</td></tr>
+<tr><td>14 of 14 checkpoints; 3906 bits; 1.000; 128.9 and 42.2 dB; 0.679; 0.837</td><td><a href="index.html#command-132">Ledger command-132</a>, the run with the audio step; step 8 printed the same numbers as above</td><td>2026-11-08</td></tr>
 </tbody>
 </table>
 </div>

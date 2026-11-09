@@ -24,7 +24,8 @@
     { file: "07-residual.html", n: 7, short: "What does the warp residual measure?" },
     { file: "08-watermark.html", n: 8, short: "How does a signature survive a crop?" },
     { file: "09-examples.html", n: 9, short: "How do I run each stage myself?" },
-    { file: "10-record.html", n: 10, short: "What did the research find?" }
+    { file: "10-record.html", n: 10, short: "What did the research find?" },
+    { file: "11-audio.html", n: 11, short: "How does the warp residual read a clip?" }
   ];
   V.appendices = [
     { file: "code.html", short: "The change explorer" },

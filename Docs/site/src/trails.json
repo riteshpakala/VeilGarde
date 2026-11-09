@@ -71,6 +71,27 @@
       "watermark-signing",
       "watermark-matching"
      ]
+    },
+    {
+     "label": "Audio",
+     "trails": [
+      "audio-residual",
+      "audio-matching"
+     ]
+    }
+   ]
+  },
+  {
+   "title": "The watermark's research",
+   "kinds": [
+    "matching"
+   ],
+   "rows": [
+    {
+     "label": "Time phases",
+     "trails": [
+      "audio-phases"
+     ]
     }
    ]
   }
@@ -1182,6 +1203,546 @@
        "note": "Signs the battery's 105 images again and lists every way a signature departs from the recorded one. After the detection change and after the residual moved, all 105 were equal.",
        "cite": "ledger#command-100",
        "link": "none"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio-residual",
+   "kind": "signing",
+   "title": "Audio to the residual",
+   "mark": "AR",
+   "subtitle": "a clip to the picture the warp round trip reads, and its signature",
+   "say": "From a clip to its watermark, with nothing written into the sound: the clip is read through one door, mixed to one channel at the profile's rate, cut into windowed frames and transformed on the GPU, each bin's magnitude mapped to one of 256 grey levels in a picture the lens reads unchanged, and that picture signed by the watermark's own residual: the same sixteen warps, the same fragility rate, the same four bits a tile.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The command reads the clip through one door",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "AudioCommand.Sign.run()",
+       "anchor": "let image = try AudioWatermark.picture(clip, profile: try profile.resolve())",
+       "note": "veilgarde audio sign draws the clip's picture under the chosen profile and prints the picture's signature as vw1 text or JSON, naming its grid, its bits and its fragility on stderr. Nothing is written into the sound.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "loadClip(_:)",
+       "anchor": "try AudioFiles.read(datasetURL(path))",
+       "note": "Every audio command reads its clip through the carrier's one door."
+      },
+      {
+       "scope": "AudioFiles.read(_:)",
+       "anchor": "for c in 0..<channelCount { channels[c].append(contentsOf: UnsafeBufferPointer(start: data[c], count: n)) }",
+       "note": "Door one decodes whatever CoreAudio reads as Float32 at the file's own rate and channel count, chunk by chunk to the end. It is one of the two files that import AVFoundation, so a change to how sound is read is one file.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "One channel at the profile's rate",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "AudioWatermark.picture(_:profile:)",
+       "anchor": "SpectrogramImage(Spectrogram(try AnalysisSignal(clip, profile: profile)))",
+       "note": "A clip's picture is three steps: the analysis signal, its transform, and the transform drawn as grey levels.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "AnalysisSignal.init(_:profile:)",
+       "anchor": "let resampled = try AudioConverting.resampled(clip.mono, from: clip.sampleRate, to: profile.sampleRate)",
+       "note": "The channels are averaged and resampled to the profile's rate. A clip already at that rate keeps its samples exactly, so a cut of it holds its source's samples.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "AudioConverting.resampled(_:from:to:)",
+       "anchor": "converter.sampleRateConverterAlgorithm = AVSampleRateConverterAlgorithm_Mastering",
+       "note": "Door two resamples with AVAudioConverter at its mastering algorithm and highest quality, fed once and flushed, and trims the output to the length the two rates imply.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "SpectrogramProfile",
+       "anchor": "public static let music = SpectrogramProfile(name: \"music\", sampleRate: 44_100, fftSize: 2048, hop: 512",
+       "note": "The two profiles the owner fixed: music at 44.1 kHz with 2048-sample frames every 512, a picture 1024 rows tall, and speech at 16 kHz with 1024 every 256, 512 rows tall. They are to merge once the research says how.",
+       "cite": "ledger#decision-139",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Frames under a window, transformed on the GPU",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "Spectrogram.init(_:framesPerEval:)",
+       "anchor": "let x = MLXFFT.rfft(chunk, axis: 1)",
+       "note": "The frames go to Frigate's FFT in chunks, and the real and imaginary parts come back as Float; everything else runs on the CPU in Double. The chunk size changes no value.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "Framing.frames(_:)",
+       "anchor": "for n in n0..<n1 { out[base + n] = Float(x[start + n] * w[n]) }",
+       "note": "Half a frame of zeros on each side, then a frame every hop, each multiplied by the window. Zeros rather than a reflection, so a frame depends only on the samples inside it and a cut's inner frames equal its source's.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "SpectrogramProfile.window",
+       "anchor": "0.5 - 0.5 * cos(2 * Double.pi * Double($0) / Double(fftSize))",
+       "note": "A periodic Hann built in Double: its four overlapping copies square-sum to 1.5 at every inner sample, which is what makes the inverse exact.",
+       "cite": "test:the periodic Hann: w[0] = 0, w[N/2] = 1, Σw = N/2, Σw² = 3N/8, and four copies sum to 1.5",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "A magnitude to a grey level",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "SpectrogramImage.init(_:)",
+       "anchor": "g[(height - bin) * width + t] = GrayMapping.level(magnitude: m, profile: profile)",
+       "note": "The picture keeps bins 1 to N/2, the highest in the top row and time left to right, one byte a bin. The DC bin is left out, so an offset in the sound cannot reach the picture.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "GrayMapping.level(magnitude:profile:)",
+       "anchor": "return UInt8(min(Double(SpectrogramProfile.levels), x.rounded(.toNearestOrAwayFromZero)))",
+       "note": "A magnitude becomes one of 256 levels on a fixed scale from −96 to 0 dBFS, 0.376 dB a level. A fixed scale, never the clip's own peak, so a cut's pixels equal its source's.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "GrayMapping.decibels(magnitude:profile:)",
+       "anchor": "magnitude > 0 ? 20 * log10(magnitude / profile.magnitudeReference) : -.infinity",
+       "note": "0 dBFS is a full-scale sine's peak bin under the periodic Hann, a quarter of the frame length.",
+       "cite": "test:fixed points and clamps"
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "A picture the lens reads unchanged",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "AudioWatermark.sign(_:)",
+       "anchor": "try Watermark.sign(try image.cgImage)",
+       "note": "A clip's signature is the image watermark's signature of its picture, with nothing bypassed.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "SpectrogramImage.cgImage(gray:width:height:)",
+       "anchor": "space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }",
+       "note": "The bitmap is 8-bit device RGB with no alpha and the level in all three channels, the context the lens draws into, so the lens reads these bytes as they are; the study's figures are written through the same function.",
+       "cite": "test:flat device RGB, R = G = B, the lens reads the bytes unchanged, and the levels read back",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "The same round trip, on sound",
+     "chapters": [
+      "11-audio.html",
+      "07-residual.html"
+     ],
+     "entries": [
+      {
+       "scope": "Watermark.sign(_:)",
+       "anchor": "defer { LensRuntime.releaseMemory() }",
+       "note": "From here the code is the image watermark's own, unchanged: a picture of sound is a plane like any photograph's.",
+       "cite": "ledger#decision-137"
+      },
+      {
+       "scope": "NativePlane.init(_:)",
+       "anchor": "array = MLXArray(pixels, [cg.height, cg.width, 3])",
+       "note": "The picture's bytes become a plane at native size, 1024 or 512 pixels tall and as wide as the clip has frames."
+      },
+      {
+       "scope": "NativePlane.fragility(originX:originY:quantizeLikeCV2:)",
+       "anchor": "let tiles = region.reshaped([rows, ts, cols, ts, 3]).transposed(0, 2, 1, 3, 4).reshaped([rows * cols, ts * ts, 3])",
+       "note": "Every full 32 by 32 tile is cut out. On sound a tile is 32 frames by 32 bins: 371 ms by 689 Hz under the music profile, 512 ms by 500 Hz under speech.",
+       "cite": "ledger#decision-139"
+      },
+      {
+       "scope": "WarpResidual.batch(_:forward:back:)",
+       "anchor": "return R - batchedGaussianBlur(R, kernelSize: WarpConstants.highPassKernel, sigma: WarpConstants.highPassSigma)",
+       "note": "Each tile goes through the sixteen homographies and back at two strengths, and the high frequencies of what the round trip loses are kept. On a picture of sound that loss is read off the texture harmonics, onsets and noise draw.",
+       "cite": "chapter:11-audio.html#residual"
+      }
+     ]
+    },
+    {
+     "n": 7,
+     "title": "Four bits a tile, and the words",
+     "chapters": [
+      "11-audio.html",
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "TileCodeGrid.init(_:)",
+       "anchor": "masks[r * g.cols + c] |= 1 << k",
+       "note": "Each tile's fragility against its east, south, south-east and north-east neighbours gives four ordinal bits. On sound east is later in time and south is lower in pitch.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "WatermarkSignature.init(grid:)",
+       "anchor": "rows = grid.rows",
+       "note": "The signature is a vw1 signature like an image's; its tile rows, 32 or 16, name the profile it was drawn under.",
+       "cite": "ledger#decision-141"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio-matching",
+   "kind": "matching",
+   "title": "Audio matching",
+   "mark": "AM",
+   "subtitle": "a cut found in time, and the picture back to sound",
+   "say": "From a clip and a signature to a match, and from the picture back to sound: the signature names its profile by its tile rows, the clip's picture is read at four grid phases along time, each slides over the signature, the best column becomes seconds, the transform goes back to sound through the window-square sum, and the acceptance holds it all to the image lane's kill criterion.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The command reads the cut and the signature",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "AudioCommand.Match.run()",
+       "anchor": "let r = try AudioWatermark.match(try loadClip(audio), against: try WatermarkCommand.signature(signature),",
+       "note": "veilgarde audio match prints where a clip sits on a signature, in tiles and in seconds, with its score and its z-score.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "WatermarkCommand.signature(_:)",
+       "anchor": "return try JSONDecoder().decode(WatermarkSignature.self, from: Data(body.utf8))",
+       "note": "The signature is read as the image watermark reads one: vw1 text, or a file holding vw1 text or JSON."
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The profile from the signature's rows",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "AudioWatermark.match(_:against:profile:options:)",
+       "anchor": "let p = try profile ?? self.profile(of: signature)",
+       "note": "Unless the caller names a profile, the signature's own is used, so a music signature is never read as speech.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "AudioWatermark.profile(of:)",
+       "anchor": "guard let p = SpectrogramProfile.inferred(rows: signature.rows) else {",
+       "note": "A signature whose tile rows fit no profile is refused.",
+       "cite": "doc:AudioWatermark.profile(of:)"
+      },
+      {
+       "scope": "SpectrogramProfile.inferred(rows:)",
+       "anchor": "all.first { $0.rows == rows }",
+       "note": "32 tile rows is music and 16 is speech.",
+       "cite": "doc:SpectrogramProfile.inferred(rows:)"
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Four grid phases along time",
+     "chapters": [
+      "11-audio.html",
+      "08-watermark.html"
+     ],
+     "entries": [
+      {
+       "scope": "AudioWatermark.match(_:against:options:)",
+       "anchor": "let result = Watermark.match(codes: try phaseCodes(image, phases: options.phases), against: signature, options: options)",
+       "note": "The clip's picture is matched with the watermark's own matcher and thresholds, a score of 0.75 over at least 256 bits.",
+       "cite": "ledger#decision-141"
+      },
+      {
+       "scope": "AudioWatermark.phaseCodes(_:phases:)",
+       "anchor": "return phases.map { px in (px, 0, TileCodeGrid(plane.fragility(originX: px, originY: 0))) }",
+       "note": "The grid is read at 0, 8, 16 and 24 frames along time and at row 0 alone: a cut keeps every frequency, so four reads replace the image's sixteen.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "Watermark.match(codes:against:options:)",
+       "anchor": "best.matched = best.score >= options.threshold && best.bitsCompared >= options.minimumBits",
+       "note": "Each phase slides over the signature at every whole-tile offset, and the best agreement wins."
+      },
+      {
+       "scope": "Matcher.best(crop:stored:margin:minimumBits:)",
+       "anchor": "let score = 1 - Double(bad) / Double(bits)",
+       "note": "The score is the share of the bits both sides measured that agree.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "Tiles to seconds",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "AudioMatchResult.seconds",
+       "anchor": "Double(result.pixelX) * Double(hop) / sampleRate",
+       "note": "The matched column times the hop over the rate is where the cut starts in the signed clip.",
+       "link": "none"
+      },
+      {
+       "scope": "AudioMatchResult.frequencyRows",
+       "anchor": "result.offsetY",
+       "note": "The matcher may still slide a row up or down. A true match of a cut has none, and the acceptance counts the matches that do.",
+       "link": "none"
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The picture back to sound",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "AudioCommand.RoundTrip.run()",
+       "anchor": "let viaImage = AudioRoundTrip.throughImage(signal)",
+       "note": "veilgarde audio roundtrip rebuilds the sound two ways, from the exact transform and from the 8-bit picture, and reports how far it moved.",
+       "cite": "WHAT",
+       "link": "none"
+      },
+      {
+       "scope": "AudioRoundTrip.throughImage(_:)",
+       "anchor": "let back = spectrogram.replacingMagnitudes(with: image).inverse()",
+       "note": "The picture's levels replace the magnitudes under the original phase, and the transform goes back to sound.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "Spectrogram.replacingMagnitudes(with:)",
+       "anchor": "let scale = GrayMapping.magnitude(level: level, profile: profile) / m",
+       "note": "Each complex value is scaled to the centre of its level's step, and level 0 is silence.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "Spectrogram.inverse()",
+       "anchor": "out[s] = wss[j] > 0 ? acc[j] / wss[j] : 0",
+       "note": "The windowed overlap-add is divided by the window-square sum at every sample, so the exact transform returns the sound to float precision.",
+       "cite": "chapter:11-audio.html#back"
+      },
+      {
+       "scope": "AudioRoundTripMetrics.measure(reference:candidate:referenceSpectrogram:)",
+       "anchor": "let snr: Double = noise == 0 ? .infinity : (signal == 0 ? -.infinity : 10 * log10(signal / noise))",
+       "note": "The signal-to-noise ratio, the largest sample error and the log-spectral deviation say how far the sound moved.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 6,
+     "title": "The acceptance, mirrored",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "AudioCommand.Accept.run()",
+       "anchor": "let report = try AudioAcceptance.run(inputs, settings: settings, note: note, measured: { try? rows?.append($0) })",
+       "note": "veilgarde audio accept samples clips, runs the acceptance and prints whether v1 on sound is killed.",
+       "cite": "WHAT",
+       "link": "none"
+      },
+      {
+       "scope": "AudioAcceptance.run(_:settings:note:measured:)",
+       "anchor": "let m = Watermark.match(codes: codes, against: signature, options: options)",
+       "note": "Each clip is matched against itself, by a half-length cut at a random sample, with its first fractions of a hop dropped too when asked and the best kept, by an AAC re-encode and by the next clip's cut, as the image acceptance does with crops, JPEG and strangers.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "AudioConverting.aacRoundTrip(_:kilobitsPerSecond:)",
+       "anchor": "let used = offered.isEmpty ? requested : (offered.filter { $0 <= requested }.max() ?? offered.min() ?? requested)",
+       "note": "The re-encode is AAC at the profile's rate, 128 kb/s for music and 64 for speech, or the highest rate the encoder offers below it, and both are recorded.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "SignalAlignment.lag(of:against:maximumLag:)",
+       "anchor": "let correlation = MLXFFT.irfft(spectrumB * spectrumA.conjugate(), n: size)",
+       "note": "The decode's lag is measured by cross-correlation and corrected before the match.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "AudioAcceptance.summarize(_:settings:)",
+       "anchor": "if cutRate < 0.60 { reasons.append(",
+       "note": "The kill criterion is the image lane's, fixed before the run: a cut found with its offset in at least 60% of clips, a median re-encode score of at least 0.75, and 80% recall at no more than 5% false matches.",
+       "cite": "test:each rule kills on its own, and the image lane's summarize agrees on the same rows"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio-phases",
+   "kind": "matching",
+   "title": "Audio time phases",
+   "mark": "AT",
+   "subtitle": "a clip's fragility dense in time, its recurrences and its time steps",
+   "say": "The time-phase study, the owner's slicing idea as an instrument: a clip's picture is read by the watermark's own residual at every time phase, so the fragility becomes a trace dense in time, with the residual's slope finer than a tile beside it; sections of half a second to two seconds are compared with the whole trace at every offset; the trace's spectrum gives the time steps that stand above their baseline and carry harmonics; and the rows fixed before the run read the result.",
+   "steps": [
+    {
+     "n": 1,
+     "title": "The command and the clip's report",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "AudioCommand.Phases.run()",
+       "anchor": "let (report, trace) = try TimePhaseStudy.measure(input.clip, path: input.name, kind: input.kind, profile: p, sectionSeconds: lengths, subHop: subHop, reencode: aac)",
+       "note": "veilgarde audio phases studies clips from files, cut into segments, or synthetic clips with a known answer, and writes one report and one figure per clip and a summary for the run.",
+       "cite": "WHAT"
+      },
+      {
+       "scope": "TimePhaseStudy.measure(_:path:kind:profile:sectionSeconds:subHop:reencode:)",
+       "anchor": "let trace = try FragilityTrace.measure(clip, profile: profile, subHop: subHop)",
+       "note": "One clip's report: the trace, the sections' recurrences, the periodicity of T and of E, the flags the hypothesis rows read, and the AAC re-encode's trace beside the original when asked.",
+       "cite": "PIN"
+      }
+     ]
+    },
+    {
+     "n": 2,
+     "title": "The fragility dense in time",
+     "chapters": [
+      "11-audio.html",
+      "07-residual.html"
+     ],
+     "entries": [
+      {
+       "scope": "FragilityTrace.measure(_:profile:subHop:)",
+       "anchor": "let signal = try AnalysisSignal(clip, profile: profile)",
+       "note": "A clip's trace at frame resolution, or at quarter or eighth hops."
+      },
+      {
+       "scope": "FragilityTrace.measure(_:subHop:)",
+       "anchor": "let shifted = AnalysisSignal(profile: signal.profile, samples: Array(signal.samples.dropFirst(delta)))",
+       "note": "For a finer time axis the signal is shifted by a fraction of a hop and analysed again; the framing centres frame t on sample t times the hop of whatever it is given, so no framing code changes.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "FragilityTrace.measure(_:)",
+       "anchor": "fr[r * traceColumns + f] = rates[k - a]",
+       "note": "The watermark's grid read at all 32 time phases and interleaved: T at frame f is the fragility of the tile anchored there, and at every tile boundary it is the signature's own value. From the same pass, E: the residual's slope per picture column, averaged over the tiles that cover it.",
+       "cite": "test:T at the tile boundaries is the signature's own grid, exactly, and E averages to T"
+      },
+      {
+       "scope": "WarpResidual.batch(_:forward:back:)",
+       "anchor": "let diff = MLX.abs(tiles.reshaped([N, 1, ts * ts, 3]) - returned.reshaped([N, WarpConstants.trials, ts * ts, 3]))",
+       "note": "The round trip's error per pixel, before it is averaged over the trials and high-passed: what E reads column by column.",
+       "cite": "chapter:07-residual.html#warps"
+      },
+      {
+       "scope": "FragilityTrace.interleave(_:)",
+       "anchor": "fr[(r * tc + f) * subHop + q] = t.fr[r * t.columns + f]",
+       "note": "The shifted traces interleaved as column subHop times f plus q, so each column stands for one fraction of a hop."
+      }
+     ]
+    },
+    {
+     "n": 3,
+     "title": "Sections against the whole",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "SectionRecurrence.scan(_:sectionSeconds:)",
+       "anchor": "let length = max(1, Int((seconds / t.columnSeconds).rounded()))",
+       "note": "The owner's slicing: sections of 0.5, 1, 1.5 and 2 s, each compared with the whole trace at frame resolution.",
+       "cite": "ledger#decision-148"
+      },
+      {
+       "scope": "FragilityTrace.frameResolution",
+       "anchor": "f[r * tc + c] = fr[r * columns + c * subHop]",
+       "note": "A finer trace read back at frame resolution for the sections, every subHop-th column.",
+       "link": "none"
+      },
+      {
+       "scope": "SectionRecurrence.section(_:codes:start:length:)",
+       "anchor": "for o in 0...(columns - l) where abs(o - a) >= l + ts {",
+       "note": "A section's block slid over the whole trace: the Pearson correlation and the matcher's bit agreement at every offset, offsets that share a picture column with the section left out, a peak at z of 4 against the admitted offsets' median and MAD.",
+       "cite": "PIN"
+      },
+      {
+       "scope": "SectionRecurrence.recurrence(start:peaks:columnSeconds:)",
+       "anchor": "let residue = ((o - a) % step + step) % step",
+       "note": "Three or more peaks congruent modulo one spacing are a recurrence: the spacing is the step, the section's start modulo it the phase. On music that is a returning phrase, and the report says recurrence, never generated.",
+       "cite": "test:a block planted three times is a recurrence with its step and phase"
+      }
+     ]
+    },
+    {
+     "n": 4,
+     "title": "The time steps, from the spectrum",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "TimePhaseStudy.periodicities(_:probes:)",
+       "anchor": "let e = PeriodicityScan.scan((0..<trace.rows).map(trace.residualRow), lagMin: 2, columnSeconds: trace.columnSeconds, columnSamples: trace.columnSamples, probes: probes)",
+       "note": "T is scanned for periods of 32 frames and longer, E from two steps up: E is the instrument for anything under a tile."
+      },
+      {
+       "scope": "PeriodicityScan.scan(_:lagMin:columnSeconds:columnSamples:probes:longestLagSeconds:smoothingSeconds:)",
+       "anchor": "let x = MLXFFT.rfft(MLXArray(rows, [used, nfft]), axis: 1)",
+       "note": "The rows windowed, zero-padded and transformed on Frigate's FFT, their power pooled and read in the log over a running-median baseline; a line is a local maximum at z of 4, confirmed by its harmonics at z of 2, and a fundamental when no lower confirmed line divides it.",
+       "cite": "test:a planted pulse train of period 21 is a confirmed fundamental; a bare sinusoid is a line without harmonics"
+      },
+      {
+       "scope": "PeriodicityScan.prepared(_:window:)",
+       "anchor": "out[i] = x[i] - (prefix[hi + 1] - prefix[lo]) / Double(hi - lo + 1)",
+       "note": "Each row standardized and freed of its centred four-second moving average, so the slow drift does not swamp the lines."
+      }
+     ]
+    },
+    {
+     "n": 5,
+     "title": "The rows read the result",
+     "chapters": [
+      "11-audio.html"
+     ],
+     "entries": [
+      {
+       "scope": "TimePhaseStudy.summarize(_:)",
+       "anchor": "stepUnder20ms: reports.filter(\\.flags.stepUnder20ms).count",
+       "note": "A corpus summary: the confirmed fundamentals of every clip, the dominant steps binned in milliseconds, the clips flagged under 20 ms, and the codec frame found in re-encodes. The hypothesis rows are judged on these counts.",
+       "cite": "ledger#decision-148"
+      },
+      {
+       "scope": "TimePhaseStudy.figure(_:t:e:)",
+       "anchor": "paint(trace.fr, columns: trace.columns, y0: 0)",
+       "note": "A figure per clip: T with each tile row eight pixels tall, E beneath it, and the two spectra's z over the band as strips."
       }
      ]
     }

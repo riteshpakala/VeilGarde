@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How does the warp residual read a clip? · VeilGarde</title>
+<meta name="description" content="On VeilGardeAudio: a clip drawn as its spectrogram, the picture signed by the image watermark unchanged, the mapping that lets the warp round trip read sound, the way back to sound, and the acceptance that decided v1 on audio.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body data-groups="Sources-VeilGardeAudio,Sources-VeilWatermark">
+<a class="skip" href="#main">Skip to the chapter</a>
+<div class="shell">
+<nav class="side" aria-label="Chapters"></nav>
+<main class="page" id="main">
+<header class="top"><button class="menu" type="button" aria-expanded="false">☰ Contents</button><span>VeilGarde · chapter 11 of 11</span><a href="code.html#trail-audio-residual-1">Walk the audio in the explorer</a></header>
+
+<h1 id="ch-audio">How does the warp residual read a clip?</h1>
+<p class="lede"><em>On the spectrogram as the picture the watermark signs, the way back to sound, and the acceptance that decided v1 on audio.</em></p>
+
+<p>The watermark reads pictures, so a sound is first drawn as one. A spectrogram puts time left to right and pitch bottom to top, and each pixel says how loud one band is at one moment. That picture goes to the image watermark unchanged: the same sixteen warps, the same fragility rate, the same four bits a tile. Nothing is written into the sound.</p>
+<p>The owner asked for it on 2026-11-08 to test whether the paradigm crosses domains. Behind it is a theory: a generated sound, drawn this way, may show the warp residual the same kind of trace a generated image shows. This chapter covers the first half. It sets out the medium and the mapping, then asks whether a signature read off them survives what happens to sound.</p>
+
+<h2 id="picture">A clip becomes a picture</h2>
+<p>A clip is mixed to one channel and resampled to its profile's rate. Two profiles were fixed before any number was measured, one for music and one for speech, and the owner means to merge them once the research says how.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th></th><th>Music</th><th>Speech</th></tr></thead>
+<tbody>
+<tr><td>Rate</td><td>44.1 kHz</td><td>16 kHz</td></tr>
+<tr><td>Frame and hop</td><td>2048 and 512 samples</td><td>1024 and 256 samples</td></tr>
+<tr><td>Picture height</td><td>1024 rows, 32 tiles</td><td>512 rows, 16 tiles</td></tr>
+<tr><td>One tile</td><td>371 ms by 689 Hz</td><td>512 ms by 500 Hz</td></tr>
+<tr><td>Bits for c tile columns</td><td>125c − 94</td><td>61c − 46</td></tr>
+<tr><td>Admitted to the acceptance</td><td>4 s and longer</td><td>8 s and longer</td></tr>
+<tr><td>The re-encode</td><td>AAC at 128 kb/s</td><td>AAC at 64 kb/s</td></tr>
+</tbody>
+</table>
+</div>
+<div class="code" data-excerpt="Sources/VeilGardeAudio/Spectrogram/AnalysisSignal.swift:AnalysisSignal.init(_:profile:)"></div>
+<p>Each frame is a stretch of the clip under a periodic Hann window, and the frames step one hop apart, with half a frame of zeros added at each end. Zeros rather than a mirrored edge, so a frame holds only the samples inside it. A cut of the clip then draws the same columns as its source, everywhere but its own two ends.</p>
+<div class="code" data-excerpt="Sources/VeilGardeAudio/Spectrogram/Framing.swift:Framing.frames(_:)"></div>
+
+<h2 id="mapping">The mapping onto the residual's domain</h2>
+<p>The warp residual was built for photographs, so the picture is made to look like one to it. Each choice has a reason:</p>
+<ul class="plain">
+<li>A linear frequency axis: every tile covers the same band, so a warp moves energy between equal neighbours, as it moves pixels.</li>
+<li>A fixed loudness scale, −96 to 0 dBFS in 256 levels: the same sound is the same pixel in any clip, so a cut's pixels equal its source's. A scale set by each clip's own peak would move them all.</li>
+<li>Eight bits a pixel, the level in all three channels of the lens's own bitmap: the lens reads the bytes as they are.</li>
+<li>A Hann window at 75% overlap: a held note draws a horizontal line, an onset a vertical one, and noise a grain, the texture the bicubic warps disturb.</li>
+<li>No DC row: an offset in the sound cannot reach the picture.</li>
+</ul>
+<div class="code" data-excerpt="Sources/VeilGardeAudio/Spectrogram/GrayMapping.swift:GrayMapping.level(magnitude:profile:)"></div>
+<p>The floor at −96 dBFS keeps quiet passages textured instead of flat. A floor at −80 would flatten them into tiles that agree with any other quiet tile. It is named as a fallback and was not used.</p>
+<div class="code" data-excerpt="Sources/VeilGardeAudio/Spectrogram/SpectrogramImage.swift:SpectrogramImage.cgImage(gray:width:height:)"></div>
+
+<h2 id="residual">The same round trip, on sound</h2>
+<p>From the picture on, the code is the image watermark's own. Every full tile of 32 frames by 32 bins is warped through the sixteen homographies of <a href="07-residual.html#warps">chapter 7</a> and back at two strengths. Its <a href="07-residual.html#fragility">fragility rate</a> is how much more the stronger warp loses. Its four bits compare it with its neighbours: east is later in time, south is lower in pitch.</p>
+<div class="code" data-excerpt="Sources/VeilGardeAudio/Watermark/AudioWatermark.swift:AudioWatermark.sign(_:)"></div>
+<p>On a photograph the round trip loses the fine structure a camera leaves. On a spectrogram it loses the fine structure of harmonics, onsets and noise. Whether a generated sound loses it differently from a recorded one is the next question; this chapter measures the signature, not that.</p>
+<p>The bits read off sound lean towards zero, where a photograph's are even. A tile tends to be less fragile than the one below it, which is lower in pitch. So two unrelated clips agree on more bits than two unrelated photographs do, and the music table below gives the shares.</p>
+
+<h2 id="time">Finding a cut in time</h2>
+<p>A cut keeps every frequency, so its picture is a band of the signed one, offset in time alone. The matcher reads the cut's grid at four phases every 8 frames, where an image needs sixteen, and slides each over the signature at every whole-tile offset. The best column, times the hop over the rate, is where the cut starts. The thresholds are the watermark's own.</p>
+<div class="code" data-excerpt="Sources/VeilGardeAudio/Watermark/AudioWatermark.swift:AudioWatermark.phaseCodes(_:phases:)"></div>
+<p>A cut that starts on a hop is a shifted picture. One that starts on a tile boundary matches exactly: a test cut 96 hops into the music-like clip scores 1 at its column. A cut that starts between hops holds other samples in every frame, so its columns are near the source's but not equal. The same test's cut 87 samples past a hop scored 0.680, at the right place. That case is what the acceptance measures.</p>
+
+<h2 id="back">The picture back to sound</h2>
+<p>The transform has an exact inverse. Each frame goes back through the inverse FFT, is windowed again and added where frames overlap, and the sum is divided by the squared windows' sum at every sample.</p>
+<div class="code" data-excerpt="Sources/VeilGardeAudio/Spectrogram/Spectrogram.swift:Spectrogram.inverse()"></div>
+<p>From the picture alone the sound comes back too: each bin keeps its phase and takes its loudness from its level. The bars were fixed before measuring, and the second one missed.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Round trip</th><th class="n">Measured</th><th>Bar</th></tr></thead>
+<tbody>
+<tr><td>Exact, SNR on the three pinned clips</td><td class="n">128.9 to 130.1 dB</td><td>at least 90 dB</td></tr>
+<tr><td>From the picture, SNR on the three pinned clips</td><td class="n">36.1 to 43.2 dB</td><td>at least 30 dB</td></tr>
+<tr><td>From the picture, log-spectral deviation</td><td class="n">0.273 to 0.503 dB</td><td>at most 0.2 dB, missed</td></tr>
+<tr><td>From the picture, SNR on 40 music segments</td><td class="n">median 39.3 dB, 7 under 30, lowest 18.0</td><td>measured, not gated</td></tr>
+<tr><td>From the picture, SNR on 39 utterances</td><td class="n">median 43.4 dB, lowest 34.9</td><td>measured, not gated</td></tr>
+</tbody>
+</table>
+</div>
+<p>The deviation bar counted the 0.376 dB step alone. Rebuilding the sound spreads each bin's rounding into its neighbours, where weaker bins read it as decibels, so the bar stands as a miss. Why seven music segments fell under 30 dB is not yet measured.</p>
+<p>The signature survives the way back. The owner's track, rebuilt by the exact path, matched its signature with score 1. The music-like test clip, rebuilt from its picture, matched at 0.963.</p>
+
+<h2 id="rule">The test it had to pass</h2>
+<p>The acceptance is the image watermark's, mirrored one to one and fixed in code before the run. Each clip is signed and matched against itself. Then three things are scored: a cut of half its length at a random sample, an AAC re-encode, and the cut against the next clip's signature. On every fourth clip the cut's speed is also changed to 0.9 and 0.75 of the original, and those are measured, not claimed.</p>
+<p>v1 on audio dies on any of three counts:</p>
+<ul class="plain">
+<li>the cut matches with its offset in fewer than 60% of clips;</li>
+<li>the median re-encode score falls under 0.75;</li>
+<li>no threshold reaches 80% cut recall with at most 5% false matches.</li>
+</ul>
+<p>The fallbacks were named before the run: a phase search at quarter hops, the hop halved, the floor at −80 dB, and the image lane's own.</p>
+
+<h2 id="result">What the run showed</h2>
+<p>v1 on audio was killed under both profiles in the runs of 2026-11-08, for different reasons. The picture is faithful: every cut that started on a tile boundary matched, under both profiles. What fails is the cut that starts anywhere else.</p>
+<h3 id="result-music">Music: the owner's three masters</h3>
+<p>Ten-second segments of the owner's three AIFF masters, seed 0. The cut and the re-encode passed. False matches killed it, and nearly all of them paired two neighbouring segments of one track.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Measure</th><th class="n">Result</th><th>Bar</th></tr></thead>
+<tbody>
+<tr><td>Self-match</td><td class="n">100%</td><td>100%</td></tr>
+<tr><td>A half-length cut at a random sample, matched with its offset</td><td class="n">72.5%</td><td>at least 60%</td></tr>
+<tr><td>AAC at 128 kb/s, median score</td><td class="n">0.894</td><td>at least 0.75</td></tr>
+<tr><td>Cut recall at the best threshold, 0.74</td><td class="n">82.5%</td><td>at least 80%</td></tr>
+<tr><td>False matches at that threshold</td><td class="n">35.0%</td><td>at most 5%, missed</td></tr>
+<tr><td>The cut moved to a tile boundary</td><td class="n">40 of 40</td><td>measured</td></tr>
+<tr><td>−6 dB; 16 bits; white noise at 30 dB</td><td class="n">40, 40 and 0 of 40</td><td>measured</td></tr>
+<tr><td>Speed 0.9 and 0.75</td><td class="n">1 and 1 of 10</td><td>not claimed</td></tr>
+<tr><td>Clips: 10-second segments, 48 kHz stereo</td><td class="n">40 of 45</td><td>sampled</td></tr>
+<tr><td>Cross pairs from one track, and the false matches among them</td><td class="n">37 of 40, all 8</td><td>measured</td></tr>
+<tr><td>The highest score between two different tracks</td><td class="n">0.741</td><td>under 0.75</td></tr>
+<tr><td>Share of ones per bit: E, S, SE, NE</td><td class="n">0.379, 0.283, 0.316, 0.450</td><td>0.496 to 0.498 on photographs</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="result-speech">Speech: seven voices</h3>
+<p>Utterances of seven macOS voices reading eight fixed sentences, seed 0. No stranger came close. The cuts killed it: half an utterance holds few bits, and many misses were placed away from the truth.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Measure</th><th class="n">Result</th><th>Bar</th></tr></thead>
+<tbody>
+<tr><td>Self-match</td><td class="n">100%</td><td>100%</td></tr>
+<tr><td>A half-length cut at a random sample, matched with its offset</td><td class="n">30.8%</td><td>at least 60%, missed</td></tr>
+<tr><td>AAC at 64 kb/s, median score</td><td class="n">0.907</td><td>at least 0.75</td></tr>
+<tr><td>The best cut recall at any threshold</td><td class="n">69.2% at 0.64</td><td>80%, missed</td></tr>
+<tr><td>False matches at 0.75</td><td class="n">0.0%</td><td>at most 5%</td></tr>
+<tr><td>The cut moved to a tile boundary</td><td class="n">39 of 39</td><td>measured</td></tr>
+<tr><td>−6 dB; 16 bits; white noise at 30 dB</td><td class="n">39, 39 and 6 of 39</td><td>measured</td></tr>
+<tr><td>Speed 0.9 and 0.75</td><td class="n">0 and 0 of 10</td><td>not claimed</td></tr>
+<tr><td>Clips: utterances at 22.05 kHz, one under 8 s left out</td><td class="n">39 of 40</td><td>sampled</td></tr>
+<tr><td>Bits a half cut holds</td><td class="n">320 to 564</td><td>at least 256</td></tr>
+<tr><td>Misses placed more than a tile from the truth</td><td class="n">12 of 27</td><td>measured</td></tr>
+<tr><td>The highest stranger</td><td class="n">0.722</td><td>under 0.75</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="result-pair">A master and its MP3</h3>
+<p>Ten seconds of the owner's theme were signed from its AIFF master and matched three ways. The MP3 of the same seconds scored under an unrelated track. Its picture holds less floor than the master's, so the codec's noise fills the quiet passages the signature reads.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Matched against the master's signature</th><th class="n">Score</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>The master's own cut from 2 seconds in</td><td class="n">0.787</td><td>a match, found at 2.04 s</td></tr>
+<tr><td>The 128 kb/s MP3, the same seconds</td><td class="n">0.670</td><td>placed right, under 0.75</td></tr>
+<tr><td>Another of the owner's tracks</td><td class="n">0.686</td><td>no match</td></tr>
+<tr><td>Share of the picture at the floor: master, MP3</td><td class="n">0.469, 0.368</td><td>measured</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="phases">Finding the time phases</h2>
+<p>The owner's next idea was the study of this phase. Slice a clip into short sections, tile each section's picture, and compare the residuals against the whole clip. Find the time step and time phase that recur. The features of a generated sound would be temporal, the step of its synthesis. The focus is speech, and music is held as observation.</p>
+<p>The instrument reads the watermark's own grid at all 32 time phases and interleaves them. The fragility becomes a trace dense in time. Beside it sits the residual's slope per picture column, finer than a tile. Sections of half a second to two seconds are compared with the whole trace at every offset, and peaks that recur at one spacing are a recurrence. The traces' spectra are read for lines that stand above a running baseline and carry harmonics. A line no lower line divides is a time step.</p>
+<div class="code" data-excerpt="Sources/VeilGardeAudio/Research/FragilityTrace.swift:FragilityTrace.measure(_:)"></div>
+<p>Eight hypothesis rows were written before any clip was measured. Their controls have a known answer: synthetic clips with a note grid and a click train every quarter second, noise, silence and tones, and the AAC codec's frame. The instrument was replaced twice on its own unit tests before the first run. A flat picture then made it gain a floor between the first and the second pass of the controls. Each change is in the study's rules file, dated.</p>
+<div class="code" data-excerpt="Sources/VeilGardeAudio/Research/PeriodicityScan.swift:PeriodicityScan.scan(_:lagMin:columnSeconds:columnSamples:probes:longestLagSeconds:smoothingSeconds:)"></div>
+<h3 id="phases-speech">On speech: no synthesis step, only prosody</h3>
+<p>The 56 utterances of seven macOS voices were traced at quarter hop, a column every 4 ms. No utterance shows a step between 8 and 20 ms. Every line the scan found is the rhythm of the words, and no utterance has a recurring section. Sixteen utterances were re-encoded as AAC and traced again, and the codec frame shows nothing before or after. The table has the counts.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Row</th><th class="n">Measured</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td>A synthesis step of 8 to 20 ms in the voices</td><td class="n">0 of 56</td><td>refuted</td></tr>
+<tr><td>Edges at 8 to 12 ms</td><td class="n">0 of 56</td><td>refuted</td></tr>
+<tr><td>The AAC frame in the re-encodes</td><td class="n">0 of 16</td><td>refuted</td></tr>
+<tr><td>An unconfirmed line between 5 and 20 ms</td><td class="n">1 of 56, at 8 ms</td><td>measured</td></tr>
+<tr><td>Lines above the bar, all prosodic</td><td class="n">211 to 1986 ms</td><td>measured</td></tr>
+</tbody>
+</table>
+</div>
+<p>So these voices leave no time step the residual can see at this resolution. Whether a neural voice would, and whether a microphone's recording looks different, are the next measurements. Neither was on this Mac this phase, so the study makes no claim about generated against recorded sound.</p>
+<h3 id="phases-controls">The controls</h3>
+<p>The click train's quarter-second grid is found under the music profile in every clip. Under speech its line stands far above the bar in every clip too. But the rule wants both the second and the third harmonic, the second is weak there, and one of five is confirmed. The softer note grid of the music-like clips is visible with its harmonics in four of five and confirmed in one. Noise and silence show nothing.</p>
+<p>A pure tone under the music profile shows two steps that are the warps' own pattern on a near-empty picture, which no recording showed. The tile-level trace never confirmed a step; the per-column residual is the instrument.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Control</th><th class="n">Measured</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td>Click train every 0.25 s, music</td><td class="n">5 of 5 at 21.5 frames</td><td>confirmed</td></tr>
+<tr><td>Click train every 0.25 s, speech</td><td class="n">the line at z 19 to 22 in 5 of 5, confirmed in 1</td><td>refuted as written</td></tr>
+<tr><td>The note grid of the music-like clips</td><td class="n">confirmed in 1 of 5; the line at z 3.6 to 6.8 in 3</td><td>refuted</td></tr>
+<tr><td>Noise and silence, both profiles</td><td class="n">0 steps in 12</td><td>confirmed</td></tr>
+<tr><td>A tone, music profile</td><td class="n">steps at 4.6 and 7.5 columns</td><td>refuted: the warps' floor pattern</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="phases-matcher">The matcher, read at every frame</h3>
+<p>The first chapter's misses were cuts that fell between the four grid phases. The first fallback named before the runs was a finer time-phase search. It was measured as an experiment with the kill criterion unchanged: the grid read at every frame, 32 phases, and then also at quarter-hop offsets of the cut.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Search, speech</th><th class="n">Cut found with its offset</th><th class="n">Cut score, median</th><th class="n">False matches at 0.75</th><th>Operating point</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td>4 phases, the first run</td><td class="n">30.8%</td><td class="n">0.712</td><td class="n">0%</td><td>80% recall not reached</td><td>killed</td></tr>
+<tr><td>32 phases, every frame</td><td class="n">100%, each on its exact column</td><td class="n">0.911</td><td class="n">5.1%, 2 of 39</td><td>0.86: recall 85%, no false match</td><td>passes</td></tr>
+<tr><td>32 phases and quarter hops, 20 clips</td><td class="n">100%</td><td class="n">0.974</td><td class="n">10%, 2 of 20</td><td>0.95: recall 90%, no false match</td><td>passes</td></tr>
+</tbody>
+</table>
+</div>
+<p>The prediction written before the run held: the cut rate rose past 75% and the false matches stayed at two of 39. The quarter hops raise the median cut score past the 0.05 rule set beforehand, so the sub-hop residual is real. The stranger gets four chances too, which is where its two false matches at 0.75 come from, and from 0.80 up there are none. The cost is 5 s a clip for 32 phases and 18 s with quarter hops, against 2 s today. Nothing shipped changed: the matcher reads four phases until the owner picks one of these as a proposal.</p>
+<h3 id="phases-music">Music, held</h3>
+<p>The beat is the per-column residual's dominant step in every 30-second segment of the three masters. It is 436 ms for two of them and 677 ms for the third, with a spread under half a frame. On ten excerpts at quarter hop no step fell under 20 ms, and the AAC frame showed in one. The 32-phase search was not run on music before the day closed.</p>
+
+<h2 id="speech">Speech protection: where it stands</h2>
+<p>On 2026-11-08 the owner made speech protection the focus and held music as observation. The day closed with the machinery in place to return to it. Nothing shipped changed: the finer searches are flags, and the matcher reads four phases until the owner picks a proposal.</p>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Piece</th><th>What it does</th><th>How it runs</th></tr></thead>
+<tbody>
+<tr><td>The speech profile</td><td>16 kHz, 1024-sample frames every 256, a picture of 16 tile rows; a tile is 512 ms by 500 Hz</td><td><code>--profile speech</code> on every audio command</td></tr>
+<tr><td>The acceptance</td><td>a half cut at a random sample, an AAC re-encode at 64 kb/s, a cross match, the image lane's kill criterion</td><td><code>veilgarde audio accept</code></td></tr>
+<tr><td>Experiment A</td><td>the grid read at every frame, 32 time phases</td><td><code>--phases 0,1,…,31</code></td></tr>
+<tr><td>Experiment B</td><td>the cut also tried at quarter-hop offsets, the best kept</td><td><code>--sub-hop 4</code></td></tr>
+<tr><td>The time-phase study</td><td>the fragility dense in time, sections against the whole, the time steps</td><td><code>veilgarde audio phases</code></td></tr>
+<tr><td>The corpus</td><td>seven macOS voices reading eight fixed sentences, 56 utterances</td><td><code>Scripts/audio-corpus.sh</code></td></tr>
+<tr><td>The record</td><td>rules fixed before each run, a judge that reads every row off the reports</td><td>rules.md and judge.py in &lt;work area&gt;/research/audio-phases-20261108/</td></tr>
+</tbody>
+</table>
+</div>
+<p>Read the passes narrowly. They are one synthetic corpus of clean voices, with no room, no microphone and no recorded human speech. They rest on 39 and 20 clips, so a false-match rate of 2 in 20 at 0.75 could sit anywhere from about 1% to 30%. A half cut of an utterance carries a few hundred bits. Noise, rooms, phone codecs and re-recording were not in the passing runs, and in the first chapter's run noise at 30 dB broke 33 of 39 utterances.</p>
+<p>The next measurements, in order, each with its rule written first:</p>
+<ol>
+<li>The owner chooses the proposal: 32 phases is cheap and passes; quarter hops are sharper and slower.</li>
+<li>Real speech: a command that records raw sound from the default input, and recorded voices reading the same sentences.</li>
+<li>A bigger, harder corpus: hundreds of clips from many speakers, so false matches are measured on more than 40 strangers.</li>
+<li>Speech's real transforms: noise first, then rooms, a speaker-to-microphone re-recording, telephone bandwidth and codecs, speed and pitch.</li>
+<li>More bits per second of speech: more rows in the picture, or several cuts pooled, measured as a proposal.</li>
+<li>The theory: a neural voice beside the classic ones and beside recorded speech, through the time-phase study.</li>
+</ol>
+<p>The research notes that direct this work are in <a href="code.html#Sources/VeilGardeAudio/README.md">Sources/VeilGardeAudio/README.md</a>.</p>
+
+<h2 id="cannot">What it cannot do yet</h2>
+<ul class="plain">
+<li>A cut that starts between hops is not a shifted picture. At four phases its score falls under 0.75 often enough to kill v1 under both profiles; at 32 phases every speech cut was found, and that search is a proposal, not the default.</li>
+<li>Neighbouring seconds of one track share their texture, so a music signature can pass for its neighbour's.</li>
+<li>An MP3 of a 24-bit master fills the master's quiet passages with codec noise, and the master's signature misses it.</li>
+<li>White noise at 30 dB and changes of speed break it, and it does not claim them.</li>
+</ul>
+
+<h2 id="sources">Where the numbers come from</h2>
+<div class="scroll">
+<table class="data">
+<thead><tr><th>Number</th><th>Source</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>The two profiles; −96 to 0 dBFS in 256 levels; the bars</td><td class="mono"><a href="code.html#Sources/VeilGardeAudio/Spectrogram/SpectrogramProfile.swift">SpectrogramProfile.swift</a> PIN; <a href="index.html#decision-139">ledger decision-139</a></td><td>Fixed before any measurement, 2026-11-08</td></tr>
+<tr><td>The kill criterion and the fallbacks</td><td class="mono"><a href="code.html#Sources/VeilGardeAudio/Acceptance/AudioAcceptance.swift">AudioAcceptance.swift</a> PIN; <a href="index.html#decision-142">ledger decision-142</a></td><td>Fixed before any measurement, 2026-11-08</td></tr>
+<tr><td>128.9 to 130.1 dB; 36.1 to 43.2 dB; 0.273 to 0.503 dB</td><td>The three pins, captured in <a href="index.html#command-123">ledger command-123</a> and held in <a href="index.html#command-124">command-124</a></td><td>2026-11-08</td></tr>
+<tr><td>Score 1 at a tile boundary; 0.680 at sample 211,031; 0.963 from the picture</td><td>Tests in AudioWatermarkTests, <a href="index.html#command-124">ledger command-124</a></td><td>2026-11-08</td></tr>
+<tr><td>Score 1 for the rebuilt track; the master and its MP3, 0.787, 0.670 and 0.686; floor shares 0.469 and 0.368</td><td><a href="index.html#command-126">Ledger command-126</a> and <a href="index.html#command-127">command-127</a>, <code>veilgarde audio</code> in release</td><td>2026-11-08</td></tr>
+<tr><td>The music table; 0.379, 0.283, 0.316 and 0.450</td><td><a href="index.html#command-129">Ledger command-129</a>; the report at &lt;work area&gt;/audio/accept_music_v1_n40.json</td><td>2026-11-08, 40 segments</td></tr>
+<tr><td>The speech table</td><td><a href="index.html#command-130">Ledger command-130</a>; the report at &lt;work area&gt;/audio/accept_speech_v1_n40.json</td><td>2026-11-08, 39 utterances</td></tr>
+<tr><td>0.496 to 0.498 for photographs</td><td><a href="08-watermark.html#result">Chapter 8</a>, ledger command-44</td><td>2026-10-19</td></tr>
+<tr><td>The time-phase rules and the rows</td><td><a href="index.html#decision-148">Ledger decision-148</a> and <a href="index.html#decision-151">decision-151</a>; rules.md in &lt;work area&gt;/research/audio-phases-20261108/</td><td>Fixed before the first run, 2026-11-08</td></tr>
+<tr><td>0 of 56; 0 of 56; 1 at 8 ms; 211 to 1986 ms; 400 ms in two</td><td><a href="index.html#command-139">Ledger command-139</a>; the reports under &lt;work area&gt;/research/audio-phases-20261108/s/</td><td>2026-11-08, 56 utterances at quarter hop</td></tr>
+<tr><td>0 of 16 for the AAC frame on speech</td><td><a href="index.html#command-140">Ledger command-140</a></td><td>2026-11-08</td></tr>
+<tr><td>The controls: 5 of 5, 1 of 5, 1 of 5, 0 in 12, the tone's two steps</td><td><a href="index.html#command-135">Ledger commands 135</a>, <a href="index.html#command-136">136</a> and <a href="index.html#command-138">138</a></td><td>2026-11-08</td></tr>
+<tr><td>The matcher table: 100%, 0.911, 2 of 39, 0.86; 0.974, 2 of 20, 0.95</td><td><a href="index.html#command-141">Ledger command-141</a> and <a href="index.html#command-142">command-142</a>; accept_speech_phases32_n40.json and accept_speech_phases32_subhop4_n20.json under &lt;work area&gt;/audio/</td><td>2026-11-08</td></tr>
+<tr><td>The beat at 436 and 677 ms</td><td><a href="index.html#command-137">Ledger command-137</a></td><td>2026-11-08, 14 segments</td></tr>
+<tr><td>Speech as the focus, music held; the day closed with the searches as flags</td><td><a href="index.html#decision-152">Ledger decision-152</a>; amendments 32 and 33</td><td>2026-11-08</td></tr>
+</tbody>
+</table>
+</div>
+
+<details class="engineers" id="engineers"><summary>For engineers: where each piece lives</summary><div class="inner">
+<ul class="plain">
+<li>Three trails walk it: <a href="code.html#trail-audio-residual-1">audio to the residual</a>, from a clip to the picture the round trip reads and its signature; <a href="code.html#trail-audio-matching-1">audio matching</a>, from a cut to its place in time and from the picture back to sound, with the acceptance as its last step; and <a href="code.html#trail-audio-phases-1">the time phases</a>, the fragility dense in time, its recurrences and its steps.</li>
+<li><code>veilgarde audio spectrogram</code>, <code>sign</code>, <code>match</code>, <code>verify</code>, <code>roundtrip</code>, <code>export</code>, <code>accept</code> and <code>phases</code> run it. <code>Scripts/audio-corpus.sh</code> renders the speech corpus. The examples' step 9 signs, matches and rebuilds one synthetic clip.</li>
+<li>Sound is read and converted in two files only, <code>Sources/VeilGardeAudio/Audio/AudioFiles.swift</code> and <code>AudioConverting.swift</code>; nothing under <code>Sources/VeilWatermark</code> changed, and the invariance run held all 105 image signatures.</li>
+</ul>
+</div></details>
+</main>
+</div>
+<script src="js/veilgarde.js"></script>
+<script src="data/index.js"></script>
+<script src="js/ask.js"></script>
+<script>VeilGarde.mount();</script>
+</body>
+</html>

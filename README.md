@@ -18,6 +18,8 @@ Three **revisions** read them. A small non-negative **combiner** anchors on the 
 
 **The watermark.** Every 32×32 tile of an image is perspective-warped through 16 fixed homographies and back. A camera sensor's mosaic and noise do not survive the round trip the way a generator's output does. Each tile's **fragility**, how much more of it the stronger warp loses, becomes four ordinal bits against its neighbours. The signature adds nothing to the pixels, and a crop or a re-encode is matched against it.
 
+**The watermark on sound.** A clip is drawn as its spectrogram, time left to right and pitch bottom to top, each pixel one band's loudness on a fixed dBFS scale, and the watermark signs that picture unchanged. Two profiles carry it, music at 44.1 kHz and speech at 16 kHz. The picture goes back to sound through the exact inverse transform, and nothing is written into the sound.
+
 | Subpackage | Holds |
 |---|---|
 | `VeilGardeCore` | the domain, with no MLX: the camera row, the XGBoost codec, heads and the combiner, bundles, the schema-v1 result, the feature store and its migration |
@@ -26,6 +28,7 @@ Three **revisions** read them. A small non-negative **combiner** anchors on the 
 | `VeilGardeTraining` | the trainers for the camera head, the heads and the combiner, declared as trainable members in a recipe DSL that mirrors the pipeline, and the backbone imports |
 | `VeilGardeFlywheel` | acquisition into a features-only store, candidates, the battery, promote and rollback |
 | `VeilWatermark` | the warp residual and a crop-robust signature read off each tile's fragility |
+| `VeilGardeAudio` | the watermark's second carrier: a clip's spectrogram is the picture the watermark signs, and the picture goes back to sound; its [README](Sources/VeilGardeAudio/README.md) directs the speech research |
 | `veilgarde` | the CLI over all of it |
 
 ## Detection as a declaration
@@ -100,6 +103,24 @@ DINOv2 and the capture measurement run on the GPU through MLX, by way of [Frigat
 - **iPhone originals:** 438 camera photos, all real.
 - **Residual head:** both DINOv2 readings, capture and the warp residual's statistics, 815 columns, 1,000 trees of depth 7. It did not ship, and its code left on 2026-10-21; its rows are the record.
 
+## The watermark on sound
+
+**The research is speech protection, and music is held as observation.** The work was closed for the day on 2026-11-08 with the machinery in place to return to it. [Sources/VeilGardeAudio/README.md](Sources/VeilGardeAudio/README.md) directs the research, and [the site's chapter 11](Docs/site/11-audio.html) has every number with its source.
+
+v1 on sound is a design under measurement, held to the image watermark's own kill criterion, fixed before each run. On 39 utterances of seven macOS voices:
+
+| Search | Cut found with its offset | False matches at 0.75 | Operating point | Verdict |
+|---|---|---|---|---|
+| 4 time phases, the shipped default | 30.8% | 0% | 80% recall not reached | killed |
+| 32 time phases, every frame | 100% | 2 of 39 | 0.86: recall 85%, no false match | passes, as an experiment |
+| 32 phases and quarter hops, 20 clips | 100% | 2 of 20 | 0.95: recall 90%, no false match | passes, as an experiment |
+
+The picture is faithful: every cut that starts on a tile boundary matches. Phase 1's misses were cuts landing between the four grid phases, and reading every frame removes them. The default has not changed; the owner picks the proposal.
+
+Read the passes narrowly. They come from one synthetic corpus of clean voices, with no room, no microphone and no recorded human speech, on 39 and 20 clips of a few hundred bits each. Noise was not in them, and in phase 1 white noise at 30 dB broke 33 of 39 utterances. The time-phase study found no synthesis step in these voices and no codec frame in their AAC re-encodes; the only time steps on speech are prosodic. Whether a recorded voice and a generated one differ in the residual is not measured yet.
+
+Music, held: under the music profile phase 1 was killed by false matches between neighbouring seconds of one track, and the beat is the dominant time step in every segment of three masters.
+
 ## The CLI at a glance
 
 ```sh
@@ -111,13 +132,17 @@ VEILGARDE_CONFIG=release Scripts/cli.sh train heads     # a candidate bundle und
 Scripts/cli.sh flywheel init && Scripts/cli.sh flywheel battery --gate full
 VEILGARDE_CONFIG=release Scripts/cli.sh research census  # every call of a bundle on the battery and 200 labelled images
 Scripts/cli.sh watermark sign photo.jpg > photo.vw1 && Scripts/cli.sh watermark match crop.jpg photo.vw1
+Scripts/cli.sh audio sign song.wav > song.vw1 && Scripts/cli.sh audio match cut.m4a song.vw1   # --profile speech for voices
+Scripts/cli.sh audio roundtrip song.wav --out back.wav  # the spectrogram back to sound, with its SNR
+Scripts/cli.sh audio accept --audio <speech folder> --profile speech --phases $(seq -s, 0 31) --out r.json   # the 32-phase experiment
+Scripts/cli.sh audio phases --audio <speech folder> --profile speech --sub-hop 4 --out <dir>   # the time-phase study
 ```
 
 `Scripts/cli.sh` builds `veilgarde`, installs `mlx.metallib` beside it, and finds Frigate. `Scripts/cli.sh <command> --help` lists a command's flags.
 
 ## Examples
 
-[Examples/](Examples/README.md) runs both regimes on this Mac in one program and exits 0 only when every checkpoint holds: one image's capture signature and DINOv2 embeddings, the camera head's row built by hand, every member of the stack and the combiner revision's arithmetic term by term, then each trainer in miniature, the flywheel's promote and rollback, and the watermark. [The site's chapter 9](Docs/site/09-examples.html) walks through it.
+[Examples/](Examples/README.md) runs both regimes on this Mac in one program and exits 0 only when every checkpoint holds: one image's capture signature and DINOv2 embeddings, the camera head's row built by hand, every member of the stack and the combiner revision's arithmetic term by term, then each trainer in miniature, the flywheel's promote and rollback, the watermark, and the watermark on a synthetic clip. [The site's chapter 9](Docs/site/09-examples.html) walks through it.
 
 ```sh
 Examples/run.sh
@@ -125,7 +150,7 @@ Examples/run.sh
 
 ## VeilGarde docsite
 
-A site that explains each layer and shows every file this build changed, verbatim, with each Swift declaration's calls and callers, and the run's ledger of commands, tests and decisions. Nine trails walk the code in the order it runs: how the camera head and the specialist stack are trained, detection stage by stage from Decode through Shared Signals, Stack and Revisions to Result, and how the watermark signs an image and matches a crop of it. A grid picks them, a row for each flow and a column for each kind. Double-click Scripts/site.command, or open [Docs/site/index.html](Docs/site/index.html); it is plain HTML with no build step. [Docs/site/README.md](Docs/site/README.md) says how it is rebuilt and checked.
+A site that explains each layer and shows every file this build changed, verbatim, with each Swift declaration's calls and callers, and the run's ledger of commands, tests and decisions. Twelve trails walk the code in the order it runs: how the camera head and the specialist stack are trained, detection stage by stage from Decode through Shared Signals, Stack and Revisions to Result, how the watermark signs an image and matches a crop of it, how a clip becomes the picture the warp residual reads and a cut of it is found again in time, and how the time-phase study reads a clip's fragility dense in time. A grid picks them, a row for each flow and a column for each kind. Double-click Scripts/site.command, or open [Docs/site/index.html](Docs/site/index.html); it is plain HTML with no build step. [Docs/site/README.md](Docs/site/README.md) says how it is rebuilt and checked.
 
 The site's chat asks Mistral about what you are reading. On a Mac that holds a Mistral key in its key store, `Scripts/site.command` hands the site that key; anyone else is asked for their own key in a dialog when the chat opens, and it stays in their browser.
 

@@ -1,6 +1,6 @@
 # VeilGarde's site
 
-The site is VeilGarde's docs and its two explorers in one folder of plain HTML. It shows every file the run changed, verbatim, before and after; each Swift declaration with what it calls and what calls it; nine trails, which tell each flow in the order the code runs; four ML trails, which tell each model as machine learning and how the models reach one verdict together; the run's ledger; and the chapters that explain each layer. Double-click `Scripts/site.command`, or open `Docs/site/index.html`. Nothing to install, no server, no network, except the ask orb's one call when a reader sends it a message.
+The site is VeilGarde's docs and its two explorers in one folder of plain HTML. It shows every file the run changed, verbatim, before and after; each Swift declaration with what it calls and what calls it; twelve trails, which tell each flow in the order the code runs; four ML trails, which tell each model as machine learning and how the models reach one verdict together; the run's ledger; and the chapters that explain each layer. Double-click `Scripts/site.command`, or open `Docs/site/index.html`. Nothing to install, no server, no network, except the ask orb's one call when a reader sends it a message.
 
 | Page | What it is |
 |---|---|
@@ -8,7 +8,7 @@ The site is VeilGarde's docs and its two explorers in one folder of plain HTML. 
 | `code.html` | the change explorer: the tree, the source with old, new and diff, the declaration's card, the trails, find |
 | `ml.html` | the ML explorer: the same engine walked by the ML trails, each step's primer, deeper line, live facts and code-trail twins, a depth control, and the orb reading the ML side |
 | `selfcheck.html` | every check the browser can make, run when the page opens |
-| `01-fusion.html` … `10-record.html` | the chapters: the two lanes and then the machinery, the camera head, the specialists, the stages and the result, the bundle, training, the flywheel, the warp residual, the watermark, the examples, and the record of the research |
+| `01-fusion.html` … `11-audio.html` | the chapters: the two lanes and then the machinery, the camera head, the specialists, the stages and the result, the bundle, training, the flywheel, the warp residual, the watermark, the examples, the record of the research, and the watermark on sound |
 
 ## Rebuilding and checking
 
@@ -70,7 +70,7 @@ A cite is one of: `ledger#<id>`; `PIN` or `WHAT`, the entry's own file's header,
 
 A note is one or two plain sentences: what the declaration does, then why it is built this way. The build warns when an entry has no call to or from the entry before it and is not called by an earlier entry, unless it says `"link": "none"` because the hand-off is through data. A declaration takes one place on a trail and may sit on several trails, anchored differently on each.
 
-There are nine trails. Training: the camera head (CT), the specialist heads and the combiner (ST). Detection, five stages that hand off to each other: Decode (DE), the file to its pixels; Shared Signals (SG), the gate, the capture reading, both DINOv2 readings and the patch tokens; Stack (SK), the pipeline's declaration and every member, each with its own score; Revisions (RV), the combiner around its anchor, the frame seam and the preview tail; Result (RS). The Domain and Base trails left on 2026-10-21, when the screenshot gate and the camera head became members of the stack. The watermark: signing (WS) and matching (WM). The warp model's, the noiseprint's and the pruning study's trails live on the 2026-rnd branch. To change one, edit `src/trails.json` where the code runs, keep `n` from 1, and rebuild. The overview's grid and stepper, the picture's lit layers and the explorer's grid, steps, badges and card follow the data.
+There are twelve trails. Training: the camera head (CT), the specialist heads and the combiner (ST). Detection, five stages that hand off to each other: Decode (DE), the file to its pixels; Shared Signals (SG), the gate, the capture reading, both DINOv2 readings and the patch tokens; Stack (SK), the pipeline's declaration and every member, each with its own score; Revisions (RV), the combiner around its anchor, the frame seam and the preview tail; Result (RS). The Domain and Base trails left on 2026-10-21, when the screenshot gate and the camera head became members of the stack. The watermark: signing (WS) and matching (WM). The watermark on sound, since 2026-11-08: audio to the residual (AR), the mapping that makes a clip a picture the warp round trip reads, and audio matching (AM), a cut found in time and the picture taken back to sound; and the time-phase study (AT), the fragility dense in time, its sections' recurrences and its time steps, in its own picker section. The warp model's, the noiseprint's and the pruning study's trails live on the 2026-rnd branch. To change one, edit `src/trails.json` where the code runs, keep `n` from 1, and rebuild. The overview's grid and stepper, the picture's lit layers and the explorer's grid, steps, badges and card follow the data.
 
 `src/trails.json`'s `picker` lays the trails out as one grid, read the same on the overview and in the explorer: sections of rows, each section `{title, kinds, rows}`, each row `{label, trails}` with one trail for each of the section's kinds, in their order. A row is a flow and a column a kind, so a flow's training and its inference sit side by side, and every cell is as wide as the cells above it. The build fails when the picker misses a trail, holds one twice, or puts one in another kind's column. The arrow keys move between cells.
 
@@ -100,7 +100,7 @@ A chapter is `NN-<slug>.html`, listed in `VeilGarde.pages` in `js/veilgarde.js`,
   <a class="skip" href="#main">Skip to the chapter</a>
   <div class="shell"><nav class="side" aria-label="Chapters"></nav>
   <main class="page" id="main">
-    <header class="top">…menu, chapter N of 10, a link…</header>
+    <header class="top">…menu, chapter N of 11, a link…</header>
     <h1 id="ch-<slug>">The question</h1>
     <p class="lede"><em>On what the chapter is about, in one line.</em></p>
     <p>Prose…</p>

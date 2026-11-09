@@ -4,11 +4,12 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: The manifest and the sources to the package's rules, as text over Package.swift,
-//        Sources/, Tests/ and Examples/: exactly four products; the layer table (which target
+//        Sources/, Tests/ and Examples/: exactly five products; the layer table (which target
 //        may depend on which); MLX only through Frigate, each Frigate module imported only by a
 //        target that lists its product; Core on Foundation and Crypto alone; nothing imports
-//        MLXLLM, MLXLMCommon, AppKit or UIKit; nothing re-declares a Frigate function; no type is
-//        named like a module; Bundle.module in one file; every Swift file opens with its name, its
+//        MLXLLM, MLXLMCommon or UIKit, AppKit only in the image decoder and AVFoundation only in
+//        the audio carrier's two doors; nothing re-declares a Frigate function; no type is named
+//        like a module; Bundle.module in one file; every Swift file opens with its name, its
 //        target, its license and its WHAT; every script, manifest and site script names GPL-3.0.
 //
 
@@ -90,6 +91,8 @@ private let systemModules: Set<String> = [
     "Foundation", "Dispatch", "Darwin", "CoreGraphics", "ImageIO", "UniformTypeIdentifiers", "CoreFoundation", "os", "AppKit",
     // Apple's Accelerate (CPU BLAS for the linear solvers), not Frigate's MLX-backed MLXAccelerate.
     "Accelerate",
+    // Apple's AVFoundation: the audio carrier's two doors, AudioFiles and AudioConverting (noForbiddenImports names them).
+    "AVFoundation",
 ]
 
 private func imports(in body: String) -> [String] {
@@ -112,18 +115,20 @@ struct PackageLayeringTests {
         "VeilGardeTraining": ["VeilGardeLens"],
         "VeilGardeFlywheel": ["VeilGardeTraining", "VeilGardeInference"],
         "VeilWatermark": ["VeilGardeLens"],
-        "VeilGarde": ["VeilGardeInference", "VeilGardeTraining", "VeilGardeFlywheel", "VeilWatermark"],
+        "VeilGardeAudio": ["VeilWatermark"],
+        "VeilGarde": ["VeilGardeInference", "VeilGardeTraining", "VeilGardeFlywheel", "VeilWatermark", "VeilGardeAudio"],
         "VeilGardeCLI": ["VeilGarde"],
     ]
 
-    @Test("four products: VeilGarde, VeilGardeInference, VeilWatermark and the veilgarde executable")
+    @Test("five products: VeilGarde, VeilGardeInference, VeilWatermark, VeilGardeAudio and the veilgarde executable")
     func products() throws {
         let manifest = try text("Package.swift")
         #expect(manifest.contains(".library(name: \"VeilGarde\""))
         #expect(manifest.contains(".library(name: \"VeilGardeInference\""))
         #expect(manifest.contains(".library(name: \"VeilWatermark\""))
+        #expect(manifest.contains(".library(name: \"VeilGardeAudio\""))
         #expect(manifest.contains(".executable(name: \"veilgarde\""))
-        #expect(manifest.components(separatedBy: ".library(name:").count == 4)
+        #expect(manifest.components(separatedBy: ".library(name:").count == 5)
         #expect(manifest.components(separatedBy: ".executable(name:").count == 2)
     }
 
@@ -185,7 +190,7 @@ struct PackageLayeringTests {
         }
     }
 
-    @Test("nothing imports MLXLLM, MLXLMCommon, UIKit or SwiftUI, and AppKit only to decode images")
+    @Test("nothing imports MLXLLM, MLXLMCommon, UIKit or SwiftUI; AppKit only to decode images, AVFoundation only to read and write audio")
     func noForbiddenImports() throws {
         for file in swiftFiles(under: "Sources") + swiftFiles(under: "Examples/Sources") {
             let names = Set(imports(in: try String(contentsOf: file, encoding: .utf8)))
@@ -195,6 +200,11 @@ struct PackageLayeringTests {
             // NSImage is the decoder every shipped artifact was computed through (ImageDecoding's PIN).
             if names.contains("AppKit") {
                 #expect(file.path.hasSuffix("Sources/VeilGardeLens/Image/ImageDecoding.swift"), "\(file.lastPathComponent) imports AppKit")
+            }
+            // Audio is read, written and converted through two doors (AudioFiles' PIN); nothing else sees AVFoundation.
+            if names.contains("AVFoundation") || names.contains("AVFAudio") {
+                #expect(file.path.hasSuffix("Sources/VeilGardeAudio/Audio/AudioFiles.swift") || file.path.hasSuffix("Sources/VeilGardeAudio/Audio/AudioConverting.swift"),
+                        "\(file.lastPathComponent) imports AVFoundation")
             }
         }
     }

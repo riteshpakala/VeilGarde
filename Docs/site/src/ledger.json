@@ -143,6 +143,31 @@
       "id": "amendment-28",
       "date": "2026-10-21",
       "text": "1) Can we update \"Playground\" To be \"Examples\" and then update the README accordingly as well 2) Update The detection accuracy sections with a disclaimer saying things are in progress of updating, the dataset, the training regime, the golden anchors, to optimize towards a push in increasing generation accuracy up to 80% in the coming weeks. 3) Create the commits in git and I'll push"
+    },
+    {
+      "id": "amendment-29",
+      "date": "2026-11-08",
+      "text": "In @Sources/VeilWatermark/ it's time to add the audio variation of our watermarking system this involves also building an audio variant of our warp based residual reconstruction   to apply to audio samples. It should be relatively the same via using a perspective warp transform that is used with audio spectrums. Either we convert the audio into an audio spectrogram image to be used in the same pipeline. Let's start with that first, for audio it converts the audio into a spectogram first then reuses our image pipelines for watermark encoding then converting the spectrogram back into audio we should be testing that the audio quality and output doesn't change while a watermark is detectable. It is also to test the robustness of our watermarking paradigm being cross-domain supporting the initial provision patent's importance Create a new subpackage called VeilGardeAudio that handles the spectrogram conversion then import VeilWatermark into it for testing."
+    },
+    {
+      "id": "amendment-30",
+      "date": "2026-11-08",
+      "text": "add a site docs for audio with its own code trail for how the mapping on the reconstruction residual fit for audio in our process"
+    },
+    {
+      "id": "amendment-31",
+      "date": "2026-11-08",
+      "text": "put these findings plainly into a doc as a phase 1 for the audio watermark route in Docs/ Now let's plan the time-phase discovery, that is crucial for sinusodial sounds with spectrographic representations, the time-phases of generative features that need to be found. Similar to concept around visual works and the denoising step and reconstruction survivng the symmetry and generative media tends to push via the fundamental understanding of prediction over training. The time-phase and the regional sections of an audio clip. Basically if we were to slice a 30s audio clip into 1-2s subsections, tile them into a grid and then compare the residuals against the tile as a whole to find time phases that are similar in their score where we are finding audio features to look for that fit the reconstruction philosophy rather than the pure comptuational photography features being used on the photo side. the idea is finding the target time phase and target time step that are suspicious, this can also be where post processing can bleed into noise, but the idea again is creating an audio watermark directly from hardware from the source where there is no post processing in an editor yet"
+    },
+    {
+      "id": "amendment-32",
+      "date": "2026-11-08",
+      "text": "lets primarily focus on speech we can hold observations on music but the focus for phase 2 tests should be speech protection"
+    },
+    {
+      "id": "amendment-33",
+      "date": "2026-11-08",
+      "text": "let's close this early, document that in the README, commit and push our findings for today with the machinery in place to return to it tomorrow. In VeilGardeAudio create a README.md with the phase 1 and phase 2 findings to direct research for speech protection only for now. update the site docs with the speech machinery as well in its own section prior to or just commit and push again after"
     }
   ],
   "answers": [
@@ -371,6 +396,41 @@
       "question_id": "question-25",
       "question": "Where should the screenshot member's score come from when the gate does not fire: an inactive row with no score, or always scored?",
       "answer": "doesn't make sense in the new format. the screenshot is considered a specialist in the stack"
+    },
+    {
+      "id": "answer-36",
+      "date": "2026-11-08",
+      "question_id": "question-26",
+      "question": "The watermark is passive: it adds nothing to the pixels and reads a signature off the image's own warp fragility, so for audio the encode step is signing the spectrogram picture and the sound is never altered. Where should the audio sign and match entry points live?",
+      "answer": "The audio/sign/match technically should still be VeilWatermark.sign its based on visuals, let's have it in VeilGardeAudio for testing, but the theory is a generative audio sample's spectrogram should surface the same grounded findings we see in generated imagery the spectrogram revealing patterns of generative features that are exposable via warping around a similar PRNU signal that adheres to audio principles specifically in a visual format. The goal is finding that proper medium where spectrogram is the visual"
+    },
+    {
+      "id": "answer-37",
+      "date": "2026-11-08",
+      "question_id": "question-27",
+      "question": "Which FFT should the spectrogram, the short-time transform and its inverse, use? Frigate offers rfft and irfft through MLX but no short-time transform, and nothing in the family handles audio yet.",
+      "answer": "Frigate's MLX rfft/irfft on the GPU"
+    },
+    {
+      "id": "answer-38",
+      "date": "2026-11-08",
+      "question_id": "question-28",
+      "question": "No audio set is on the T9. The audio twin of the watermark's acceptance needs clips: what should its first run measure?",
+      "answer": "ship the tool now using audio samples you can find, using a trimmed version of [the owner's track] as a sample test"
+    },
+    {
+      "id": "answer-39",
+      "date": "2026-11-08",
+      "question_id": "question-29",
+      "question": "The spectrogram's analysis settings are a rule fixed before any number is measured. Which geometry: 22.05 kHz, 16 kHz, 44.1 kHz, or each clip's native rate?",
+      "answer": "2, 1 for music (24-44.1) and 1 for speech (16khz), 2 settings for the watermark we can merge in the future for a cohesive after enough research"
+    },
+    {
+      "id": "answer-40",
+      "date": "2026-11-08",
+      "question_id": "question-33",
+      "question": "How should the hardware recordings the study compares against be made?",
+      "answer": "Skip hardware clips this phase"
     }
   ],
   "base": {
@@ -1370,6 +1430,118 @@
       "rejected": "keeping the name Playground",
       "reason": "amendment-28",
       "file": "Examples/Package.swift"
+    },
+    {
+      "id": "decision-137",
+      "chose": "The watermark on sound is its own target and product, VeilGardeAudio, over VeilWatermark: a clip becomes its spectrogram picture, and the picture is signed by Watermark.sign and matched by the watermark's matcher unchanged. Nothing under Sources/VeilWatermark or Sources/VeilGardeLens changes",
+      "rejected": "audio inside VeilWatermark, or a signature of its own for sound",
+      "reason": "amendment-29 and answer-36: signing stays the watermark's, which reads pictures; the invariance run holds the image lane to its baseline",
+      "file": "Package.swift"
+    },
+    {
+      "id": "decision-138",
+      "chose": "The transform runs on Frigate's MLX rfft and irfft on the GPU, 4096 frames a call; the framing, the window, the overlap-add and every metric run on the CPU in Double",
+      "rejected": "Accelerate's vDSP on the CPU, a second numeric stack beside MLX",
+      "reason": "answer-37",
+      "file": "Sources/VeilGardeAudio/Spectrogram/Spectrogram.swift"
+    },
+    {
+      "id": "decision-139",
+      "chose": "Two profiles, fixed before any number: music at 44.1 kHz mono, 2048-sample frames every 512, bins 1 to 1024, 32 tile rows; speech at 16 kHz, 1024 every 256, bins 1 to 512, 16 tile rows. Both under a periodic Hann with half a frame of zeros at each end, magnitudes in dBFS against a full-scale sine's peak bin, −96 to 0 dBFS as 256 grey levels, the highest bin in the top row, drawn as 8-bit device RGB with R = G = B. The round-trip bars: the exact path at 90 dB SNR, 1e-4 and 1e-3 dB; the picture's path at 30 dB and 0.2 dB",
+      "rejected": "one profile for both; a mel picture, which has no exact inverse; levels relative to each clip's peak, which a cut would move",
+      "reason": "answer-39; a cut's picture must equal its source's, and the lens must read the bytes as they are",
+      "file": "Sources/VeilGardeAudio/Spectrogram/SpectrogramProfile.swift"
+    },
+    {
+      "id": "decision-140",
+      "chose": "AVFoundation is imported in two files only: AudioFiles.swift, which reads and writes, and AudioConverting.swift, which resamples, changes speed and runs the AAC round trip. PackageLayeringTests holds it as it holds AppKit to the image decoder",
+      "rejected": "AVFoundation wherever a file needs it",
+      "reason": "every clip is read one way, so a change to the reader is one file",
+      "file": "Sources/VeilGardeAudio/Audio/AudioFiles.swift"
+    },
+    {
+      "id": "decision-141",
+      "chose": "A clip is matched by reading its picture's grid at 0, 8, 16 and 24 frames along time with the frequency phase 0, through the watermark's public NativePlane and Watermark.match; the thresholds stay the watermark's, 0.75 over 256 bits; a signature's tile rows name its profile",
+      "rejected": "the sixteen two-axis phases; any change to MatchOptions or the matcher",
+      "reason": "a cut keeps every frequency row; the match defaults are the owner's",
+      "file": "Sources/VeilGardeAudio/Watermark/AudioWatermark.swift"
+    },
+    {
+      "id": "decision-142",
+      "chose": "The audio acceptance mirrors the image lane's, its kill criterion fixed before any run: a half-duration cut at a random sample matched with its offset within one tile in at least 60% of clips; the AAC re-encode's median score at least 0.75, at 128 kb/s for music and 64 for speech, or the highest rate the encoder offers below that at the clip's rate; some threshold with 80% cut recall at no more than 5% cross-clip false matches; speed changes of 0.9 and 0.75 on every fourth clip measured and not claimed; a tile-aligned cut, −6 dB, 16 bits and noise at 30 dB measured and not gated. The fallbacks named before the run: a sub-hop phase search, the hop halved, the floor at −80 dB, the image lane's own",
+      "rejected": "a criterion written after the first numbers",
+      "reason": "rules are fixed before numbers",
+      "file": "Sources/VeilGardeAudio/Acceptance/AudioAcceptance.swift"
+    },
+    {
+      "id": "decision-143",
+      "chose": "The first corpus is what this Mac holds: the owner's three AIFF masters in consecutive 10 s segments for music, and 56 utterances of seven macOS voices for speech, rendered by Scripts/audio-corpus.sh into the work area. The test fixtures are 8 s of the owner's track from 30 s and 12 s of the Samantha voice",
+      "rejected": "waiting for a corpus; a downloaded set",
+      "reason": "answer-38; no audio set is on the T9, and fetched media is never written to disk",
+      "file": "Scripts/audio-corpus.sh"
+    },
+    {
+      "id": "decision-144",
+      "chose": "The PNG writer lives in the audio carrier, SpectrogramImage.pngData, through ImageIO",
+      "rejected": "a png case in ImageCodec.Format",
+      "reason": "ImageCodec is the lossy recompression a platform applies at a quality, and the Lens keeps a zero diff",
+      "file": "Sources/VeilGardeAudio/Spectrogram/SpectrogramImage.swift"
+    },
+    {
+      "id": "decision-145",
+      "chose": "The site gets the ninth layer, a chapter on sound, 11-audio.html, and two code trails: audio to the residual, AR, the mapping that makes a clip a picture the warp round trip reads, and audio matching, AM, a cut found in time and the picture taken back to sound. The chapter is written after the runs, so its numbers name their commands",
+      "rejected": "a chapter before the numbers; the audio steps folded into the watermark's trails",
+      "reason": "amendment-30",
+      "file": "Docs/site/11-audio.html"
+    },
+    {
+      "id": "decision-146",
+      "chose": "The audio pins are captured on purpose with VEILGARDE_AUDIO_PIN=1 and held with exact equality after. A bar of the plan's that missed on its first run stays as written and is held as a known issue with its measured value, so a pass flags itself",
+      "rejected": "re-pinning on any run; moving a bar after seeing its number",
+      "reason": "rules are fixed before numbers, and a failure is reported as a failure",
+      "file": "Tests/VeilGardeAudioTests/Fixture.swift"
+    },
+    {
+      "id": "decision-147",
+      "chose": "The examples run the watermark on sound as step 9 on a seeded synthetic clip, and verify moves to step 10: the self-match at score 1 and the exact round trip over 90 dB are checkpoints; a cut, the AAC re-encode and the picture's path are reported",
+      "rejected": "waiting for a corpus",
+      "reason": "the claim, sound to picture to sound and signed, needs no corpus to be shown end to end",
+      "file": "Examples/Sources/VeilGardeExamples/main.swift"
+    },
+    {
+      "id": "decision-148",
+      "chose": "The time-phase study's rules, fixed before any run: the fragility trace T, the watermark's grid read at all 32 time phases and interleaved; the per-column residual E from the same GPU pass; quarter-hop traces by dropping a fraction of a hop; sections of 0.5, 1, 1.5 and 2 s compared by Pearson correlation with the exclusion zone, a peak at z ≥ 4 by MAD, a recurrence as three peaks sharing a spacing; the periodicity scan on the pooled power spectrum with a 4 s moving average removed, lines at z ≥ 4 over a running-median baseline confirmed by their harmonics at z ≥ 2, a fundamental being a confirmed line with none at half or a third of its frequency; eight hypothesis rows P1, P2, N1, B1, S1, S2, M1, M2 with their confirmed and refuted conditions; no generated-versus-recorded claim without recorded sound",
+      "rejected": "rules written after the first trace is seen",
+      "reason": "amendment-31; rules are fixed before numbers. Amended before the first run: the scan first read the autocorrelation with a robust z against the lags, and its unit test on a planted sinusoid failed, since a periodic series' autocorrelation is itself periodic and its spread swamps the peak; the spectrum passes the test on a planted pulse train and finds nothing on seeded noise. No clip had been measured",
+      "file": "Sources/VeilGardeAudio/Research/TimePhaseStudy.swift"
+    },
+    {
+      "id": "decision-149",
+      "chose": "The study's instruments live in Sources/VeilGardeAudio/Research and run as `veilgarde audio phases`; the watermark's own WarpTables, WarpResidual and constants are called through their public surface and nothing in VeilWatermark changes; T is the primary trace because it is what the signature reads, E the instrument for anything under a tile",
+      "rejected": "a Research folder in the CLI, which cannot import MLX; a change to the residual",
+      "reason": "the layering table and the image lane's invariance",
+      "file": "Sources/VeilGardeAudio/Research/FragilityTrace.swift"
+    },
+    {
+      "id": "decision-150",
+      "chose": "The matcher's finer time-phase search, every frame instead of every eighth, is measured as a dated experiment beside the study, both acceptances re-run with --phases 0…31 and the kill criterion unchanged, with its prediction written first; a quarter-hop search on 20 speech clips as an optional second experiment. Whatever passes is a proposal; no default moves",
+      "rejected": "changing MatchOptions or the acceptance's phases",
+      "reason": "answer to the owner's choice on 2026-11-08; no default changes without the owner's say",
+      "file": "Sources/VeilGardeCLI/Commands/Audio.swift"
+    },
+    {
+      "id": "decision-151",
+      "chose": "The time-phase study's first chain runs to its end on one instrument, and every row is judged on it as the rules say. Two things seen on its controls become a labelled second pass of the controls afterwards: a row whose spread is under one part in ten thousand of its level is flat, since a stationary tone's constant picture read its arithmetic's ripple as steps of 53 and 87 ms (N1 refuted on that clip); and a click train every quarter second joins the synthetic kinds as a sharper positive control beside the music-like clip, whose note grid the scan saw at z 3.6 to 6.8 but confirmed in one clip of five (P1 refuted). The corpora's numbers stay the first instrument's: its one known defect concerns constant rows, which no recording has",
+      "rejected": "rebuilding the instrument while the chain ran, which would have mixed two instruments in one record; moving the z bar after seeing the controls",
+      "reason": "rules are fixed before numbers, and a failure is reported as a failure",
+      "file": "Sources/VeilGardeAudio/Research/PeriodicityScan.swift"
+    },
+    {
+      "id": "decision-152",
+      "chose": "The day is closed with the speech results as the record: the 32-phase and quarter-hop searches stay experiments behind flags, the default stays four phases, and the research is directed at speech protection alone by Sources/VeilGardeAudio/README.md, which names what the passes cover, what they do not, and the next measurements in order; music is held as observation",
+      "rejected": "making the finer search the default on 59 clips of one synthetic corpus; running the music acceptance before closing",
+      "reason": "amendments 32 and 33; no default changes without the owner's say",
+      "file": "Sources/VeilGardeAudio/README.md"
     }
   ],
   "commands": [
@@ -2792,6 +2964,276 @@
         "data: 2.44 MB of 3 MB",
         "check: ok, every page's self-check passed in Chrome; prose: 0 problems, 16 warnings"
       ]
+    },
+    {
+      "id": "command-123",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "VEILGARDE_MLX_TESTS=1 VEILGARDE_AUDIO_PIN=1 Scripts/test.sh --filter VeilGardeAudioTests, the first run that measured, capturing the three pins on purpose",
+      "exit": 1,
+      "lines": [
+        "two earlier attempts stopped at the build: a try inside an expectation, and a code signature left half-written in three test bundles",
+        "34 tests in 11 suites, 6 issues; pinned: the synthetic clip 32×32 tiles, 3,906 bits, exact 129.1 dB, picture 43.1 dB; 8 s of the owner's track 32×21 tiles, 2,531 bits, 128.9 and 36.1 dB; 12 s of the Samantha voice 16×23 tiles, 1,357 bits, 130.1 and 43.2 dB",
+        "missed: the picture path's log-spectral deviation 0.503, 0.273 and 0.359 dB over the 0.2 dB bar; a cut at sample 211,031, 87 samples past a hop, placed 4 columns from the truth at 0.680",
+        "two faults of the code: the AAC rate read off the file's size gave 184.7 kb/s, where the stream ran at 126.5 because AVAudioFile pads the container; 64 kb/s is not offered for 16 kHz mono, which offers 12 to 48",
+        "measured on the music-like clip: the exact round trip 0.9997, the picture's 0.963, −6 dB 0.840, 16 bits 0.987, AAC 128 kb/s 0.834, noise at 30 dB 0.676"
+      ]
+    },
+    {
+      "id": "command-124",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "VEILGARDE_MLX_TESTS=1 Scripts/test.sh --filter VeilGardeAudioTests, holding the pins, after the AAC rate was read off the stream and the highest offered rate stood in for one not offered",
+      "exit": 0,
+      "lines": [
+        "34 tests in 11 suites passed with 4 known issues: the three deviations and the off-grid cut, held as written",
+        "every pin held exactly: the FR vectors, the content ids and the pictures' bytes",
+        "the four synthetic speech clips ran end to end: cut 4 of 4, AAC 48 kb/s median 0.860, not killed; the AAC re-encode of the music-like clip scored 0.8333, against 0.8338 in the run before"
+      ]
+    },
+    {
+      "id": "command-125",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "VEILGARDE_MLX_TESTS=0 Scripts/test.sh --filter \"PackageLayeringTests|CommandTreeTests|RetiredCommandTests\"",
+      "exit": 0,
+      "lines": [
+        "Package layering: 10 tests passed, with nine targets, five products and AVFoundation in two doors",
+        "Command tree and retired commands: 5 tests passed, with eight audio invocations"
+      ]
+    },
+    {
+      "id": "command-126",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "veilgarde audio spectrogram, roundtrip, sign and match on the two fixtures, release",
+      "exit": 0,
+      "lines": [
+        "the track: a music picture of 690×1024 px, 21×32 tiles, 2,531 bits, floor share 0.379; the voice: a speech picture of 751×512 px, 23×16 tiles, 1,357 bits, floor share 0.212",
+        "roundtrip on the track: exact 128.9 dB, max error 6.4e-7, deviation 0.0002 dB; from the picture 36.1 dB, 1.8e-2, 0.273 dB",
+        "the exact reconstruction matched the track's signature with score 1.0000 over 2,531 bits at offset 0"
+      ]
+    },
+    {
+      "id": "command-127",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "veilgarde audio export, sign, match and verify on the owner's theme: 30 to 40 s of the AIFF master signed, matched by the master's cut from 32 s, by the 128 kb/s MP3 over the same seconds and from 32 s, and by another of the owner's tracks",
+      "exit": 1,
+      "lines": [
+        "the master's own cut from 32 s: match, 0.787 over 1,781 bits, found at 2.043 s",
+        "the MP3 over 30 to 40 s: no match, 0.670 over 3,156 bits at offset 0; the MP3 from 32 s: no match, 0.709 at 0.279 s",
+        "another track from 30 s: no match, 0.686; verify exits 1 on the MP3 cut and on the stranger",
+        "floor shares: the master's picture 0.469, the MP3's 0.368"
+      ]
+    },
+    {
+      "id": "command-128",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "Scripts/audio-corpus.sh --out <work area>/audio/corpus",
+      "exit": 0,
+      "lines": [
+        "56 utterances: Samantha, Daniel, Fred, Karen, Moira, Rishi and Tessa, eight sentences each, 22.05 kHz mono, in 68 s",
+        "7.9 to 10.6 s long, mean 9.2 s; one under the speech profile's 8 s admission"
+      ]
+    },
+    {
+      "id": "command-129",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "VEILGARDE_CONFIG=release Scripts/cli.sh audio accept --audio <the three AIFF masters> --profile music --segment 10 --n 40 --seed 0 --out <work area>/audio/accept_music_v1_n40.json",
+      "exit": 0,
+      "lines": [
+        "40 segments of 45, 48 kHz stereo, in 4 min 5 s; self-match 100%; the cut matched with its offset 72.5%; AAC 128 kb/s median 0.894, all 40 matched, every decode aligned",
+        "false matches at 0.75: 20.0%, median cross score 0.724, highest 0.804; at the best threshold, 0.74, recall 82.5% with 35.0% false matches",
+        "v1 audio KILLED: at 80% cut recall the fewest false matches are 35.0%, over 5%",
+        "37 of the 40 cross pairs are neighbouring segments of one track and hold all 8 false matches; the 3 pairs across tracks scored at most 0.741",
+        "the cut moved to a tile boundary 40 of 40; −6 dB 40 of 40, median 0.931; 16 bits 40 of 40, 0.997; noise at 30 dB 0 of 40, 0.672; speed 0.9 and 0.75, 1 of 10 each",
+        "round trips: exact median 129.8 dB; from the picture median 39.3 dB, 7 under 30 dB, the lowest 18.0; bit balance 0.379, 0.283, 0.316, 0.450"
+      ]
+    },
+    {
+      "id": "command-130",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "VEILGARDE_CONFIG=release Scripts/cli.sh audio accept --audio <work area>/audio/corpus/speech --profile speech --segment 0 --n 40 --seed 0 --out <work area>/audio/accept_speech_v1_n40.json",
+      "exit": 0,
+      "lines": [
+        "40 utterances sampled, one skipped at 7.9 s, 39 measured in 1 min 32 s; self-match 100%; the cut matched with its offset 30.8%; AAC 64 kb/s median 0.907, all 39 matched, every decode aligned",
+        "no false match, median cross score 0.674, highest 0.722; the best recall at any threshold 69.2%, at 0.64",
+        "v1 audio KILLED: the cut matched with its offset in 31% of clips, under 60%; no threshold reaches 80% cut recall",
+        "a half cut holds 320 to 564 bits; of 27 misses, 15 were placed within a tile and 12 further",
+        "the cut moved to a tile boundary 39 of 39; −6 dB 39 of 39; 16 bits 39 of 39; noise at 30 dB 6 of 39; speed 0 of 10 each",
+        "round trips: exact median 130.0 dB; from the picture median 43.4 dB, the lowest 34.9; bit balance 0.512, 0.412, 0.459, 0.560"
+      ]
+    },
+    {
+      "id": "command-131",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "VEILGARDE_CONFIG=release Scripts/cli.sh watermark invariance --images <work area>/battery/images --baseline <work area>/watermark/invariance-baseline-20261020.json --out <work area>/watermark/invariance-audio-20261108.json, after the audio carrier was added",
+      "exit": 0,
+      "lines": [
+        "git diff empty under Sources/VeilWatermark and Sources/VeilGardeLens",
+        "signed 105 images, 0 skipped, in 802.6 s, beside another session's test run on the GPU from its fifth minute",
+        "invariant: all 105 signatures equal the baseline"
+      ]
+    },
+    {
+      "id": "command-132",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "Examples/run.sh, release, with the watermark on sound as step 9",
+      "exit": 0,
+      "lines": [
+        "14 of 14 checkpoints hold; steps 0 to 8 printed the numbers of 2026-10-21: 930 bits, a crop at 0.789 over 379 bits, a JPEG at 0.894",
+        "step 9: a 12 s music-like clip, seed 23, drawn as 1034×1024 px, 32×32 tiles, 3,906 bits; self-match 1.000; the exact path back at 128.9 dB SNR; the picture's at 42.2 dB, 0.441 dB deviation",
+        "reported: a half-length cut from 4.222 s not matched, 0.679 over 1,781 bits, placed at 4.272 s; AAC 128 kb/s matched at 0.837"
+      ]
+    },
+    {
+      "id": "command-133",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "Docs/site/src/build.sh, after the ninth layer, the chapter 11-audio.html, the trails AR and AM and the ledger's phase 20",
+      "exit": 0,
+      "lines": [
+        "11 trails, 149 entries over 51 steps, every anchor found; 4 ML trails, 57 entries, every anchor, fact, twin and cite found",
+        "data: 2.76 MB of 3 MB",
+        "check: ok, 15 pages in Chrome, light, dark, 390 px and storage blocked, every self-check passed, 11-audio.html 10 of 10; prose: 0 problems, 19 warnings"
+      ]
+    },
+    {
+      "id": "command-134",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "VEILGARDE_MLX_TESTS=1 Scripts/test.sh --filter VeilGardeAudioTests, with the research folder, the trace tests and the periodicity tests",
+      "exit": 0,
+      "lines": [
+        "41 tests in 13 suites passed with the 4 known issues of phase 1; every pin held",
+        "the trace's tile-boundary columns equal the signature's grid exactly; a stationary tone gives one fragility at every phase; the quarter-hop trace carries the frame trace in its phase-0 columns",
+        "before this run the periodicity scan was replaced twice on its own unit tests: a robust z on the autocorrelation read a planted sinusoid at z about 1, and a 5% harmonic tolerance confirmed lines on seeded noise; the spectrum on log power with a running-median baseline, a 1% tolerance and every integer harmonic excluded passes a planted pulse train and finds nothing on noise"
+      ]
+    },
+    {
+      "id": "command-135",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "VEILGARDE_CONFIG=release Scripts/cli.sh audio phases --synthetic musicLike --count 5 --out <study>/p-music; the first chain, 14:10 to 14:13",
+      "exit": 0,
+      "lines": [
+        "P1 refuted: a confirmed E fundamental within 5% of 21.5 frames in 1 of 5; the note grid's line at z 3.63, absent, 6.83, absent and 5.49 per clip, with its harmonics at 125 and 83 ms visible in 4",
+        "P2 refuted: T confirmed nothing in 5 of 5; T's band starts at 32 frames and its box filter flattens the grid",
+        "the clip whose line stood at z 6.8 sat 3.6% off the true period, so its harmonics fell outside the 1% tolerance; named as the first instrument fix for a later run, not applied"
+      ]
+    },
+    {
+      "id": "command-136",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "audio phases --synthetic whiteNoise|silence|tone under both profiles, --out <study>/n-*; the first chain",
+      "exit": 0,
+      "lines": [
+        "N1 refuted on one clip of 14: white noise and silence showed nothing under either profile; the music-profile tone showed confirmed fundamentals at 4.6 and 7.5 columns, 53 and 87 ms",
+        "the tone's picture is constant along time, and the scan read the arithmetic's own ripple on a near-constant row as structure; the flatness test gained a floor of one part in ten thousand for the second pass (decision-151)",
+        "the same periods returned on the tone in the second pass and beside the true grid on the click trains: the warps leave a floor pattern at 4.6 to 4.8 and 7.5 columns on a near-empty picture, which no recording shows"
+      ]
+    },
+    {
+      "id": "command-137",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "audio phases --audio <the three masters> --segment 30 --out <study>/m; the first chain, 14 segments of 30 s at frame resolution, 67 s a segment",
+      "exit": 0,
+      "lines": [
+        "M1 confirmed, held as a music observation: E's dominant step is the beat in every segment, 436 ms in 7 of 7 of burning and 2 of 2 of rao's path, 677 ms in 5 of 5 of rao's theme, MAD at most 0.4 frames",
+        "T found no step in any segment; 13 of 14 segments show a section recurrence at some length, a returning phrase"
+      ]
+    },
+    {
+      "id": "command-138",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "audio phases --synthetic tone and --synthetic clicks --count 5 under both profiles, --out <study>/c2-*; the second pass of the controls on the fixed instrument",
+      "exit": 0,
+      "lines": [
+        "C2 under music confirmed: the click train's 0.25 s grid a confirmed fundamental within 5% in 5 of 5, beside the floor pattern at 4.8 and 6.1 columns",
+        "C2 under speech refuted as written: the 15.6-frame line stands at z 19 to 22 in 5 of 5 but is confirmed in 1, since its second harmonic reads z 2.6 to 3.0 or under while its third reads 12 to 14, and the rule wants both; the third harmonic is then called a fundamental",
+        "N1' refuted: the music-profile tone keeps its 4.6 and 7.5 column steps under the flatness floor, the floor pattern above"
+      ]
+    },
+    {
+      "id": "command-139",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "audio phases --audio <corpus>/speech --profile speech --sub-hop 4 --out <study>/s; 56 utterances at quarter hop, 31 s each, 15:25 to 15:55",
+      "exit": 0,
+      "lines": [
+        "S1 refuted: an E fundamental of 8 to 20 ms in 0 of 56; S2 refuted: at 8 to 12 ms in 0 of 56",
+        "one utterance of 56 has an unconfirmed line at 8 ms; every other line at z 4 or more is prosodic, 211 to 1986 ms; E's dominant step exists in 2 utterances, 400 and 407 ms; no section recurrence in any",
+        "these voices leave no time step the scan can see at quarter hop; whether a neural voice would is not measured"
+      ]
+    },
+    {
+      "id": "command-140",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "audio phases --audio <16 utterances> --profile speech --sub-hop 4 --aac --out <study>/s-aac; daniel and fred, 15:55 to 16:10",
+      "exit": 0,
+      "lines": [
+        "B1s refuted: the AAC frame, 11.6 quarter steps at 22.05 kHz, found in 0 of 16; z at the codec lag 0.0 to 3.5 in the originals and −0.3 to 2.8 in the re-encodes; AAC at 64 kb/s",
+        "no E step under 2 s on any of the 16 re-encodes either"
+      ]
+    },
+    {
+      "id": "command-141",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "VEILGARDE_CONFIG=release Scripts/cli.sh audio accept --audio <corpus>/speech --profile speech --segment 0 --n 40 --seed 0 --phases 0,1,…,31 --out <work area>/audio/accept_speech_phases32_n40.json; experiment A on speech",
+      "exit": 0,
+      "lines": [
+        "39 utterances in 202 s, 5 s a clip against 2 with four phases; self-match 100%; the cut matched with its offset 100%, every cut placed on its exact column, median score 0.911 against 0.712; AAC median 0.907",
+        "cross-clip false matches at 0.75: 5.1%, 2 of 39, moira_6 at 0.758 and tessa_3 at 0.753, median cross 0.711 against 0.674; at 0.80 recall 95% with no false match; operating point 0.86, recall 85%, false 0%",
+        "v1 audio passes its acceptance on speech with 32 time phases; the prediction fixed before the run held: cut rate over 75%, cross at most 2 of 39",
+        "no default moved: the shipped matcher still reads four phases"
+      ]
+    },
+    {
+      "id": "command-142",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "audio accept … --profile speech --n 20 --seed 0 --phases 0,1,…,31 --sub-hop 4 --out <work area>/audio/accept_speech_phases32_subhop4_n20.json; experiment B on speech",
+      "exit": 0,
+      "lines": [
+        "20 utterances in 353 s, 18 s a clip; the cut matched with its offset 100%, median score 0.974, 0.063 over experiment A's 0.911 on the same 20 clips' rule of 0.05, so the hop step matters; the winning quarter 0 in 7, 1 in 5, 2 in 2, 3 in 6",
+        "cross false matches at 0.75: 10%, 2 of 20, since a stranger gets four chances too, moira_3 at 0.785 and samantha_2 at 0.751; from 0.80 up none; recall 100% at 0.75 to 0.90, 90% at 0.95; operating point 0.95, recall 90%, false 0%",
+        "passes the criterion; the owner's call which search becomes a proposal"
+      ]
+    },
+    {
+      "id": "command-143",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "audio phases --audio <the three masters> --segment 30 --excerpt 10 --sub-hop 4 --aac --out <study>/mq, the held music observations; stopped at 10 of 14 excerpts when the owner closed the day, and the 32-phase acceptance on music not run",
+      "exit": 0,
+      "lines": [
+        "B1 refuted on what ran: the AAC frame at 7.35 quarter steps found in 1 of 10 excerpts; z at the codec lag 0.6 to 2.7 in the originals but one, and 1.0 to 4.8 in the re-encodes",
+        "M2 confirmed on what ran: no step under 20 ms in 10 of 10 excerpts",
+        "E's dominant step 436 ms in 6 excerpts, 679 ms in rao's theme, 219 and 98 ms in two, none in one; 147 s an excerpt"
+      ]
+    },
+    {
+      "id": "command-144",
+      "phase": 20,
+      "date": "2026-11-08",
+      "cmd": "Docs/site/src/build.sh, after the time-phase section, the speech protection section, trail AT and the ledger's closing entries",
+      "exit": 0,
+      "lines": [
+        "12 trails, 165 entries over 56 steps, every anchor found; 4 ML trails, 57 entries, every anchor, fact, twin and cite found",
+        "data: 2.91 MB of 3 MB, near the cap",
+        "check: ok, 15 pages in Chrome, light, dark, 390 px and storage blocked, every self-check passed, 11-audio.html 12 of 12"
+      ]
     }
   ],
   "assumptions": [
@@ -2826,6 +3268,10 @@
     {
       "id": "assumption-8",
       "text": "The noiseprint's held-out test of the shipped net is contaminated: the shipped net's split came from a glob order, so some of VeilGarde's held-out images may have trained it; its numbers there read high by however many did"
+    },
+    {
+      "id": "assumption-9",
+      "text": "AVAudioConverter, AVAudioFile and the say voices give the same samples on one Mac and one macOS release; across releases they may move, which the pins on the two fixture files would show and the synthetic pin would not. The AAC encoder is not held to that: the same clip's re-encode scored 0.8338 and 0.8333 in two runs on 2026-11-08"
     }
   ],
   "questions": [
@@ -2928,6 +3374,38 @@
     {
       "id": "question-25",
       "text": "Where should the screenshot member's score come from when the gate does not fire: an inactive row with no score, or always scored?"
+    },
+    {
+      "id": "question-26",
+      "text": "The watermark is passive: it adds nothing to the pixels and reads a signature off the image's own warp fragility, so for audio the encode step is signing the spectrogram picture and the sound is never altered. Where should the audio sign and match entry points live?"
+    },
+    {
+      "id": "question-27",
+      "text": "Which FFT should the spectrogram, the short-time transform and its inverse, use? Frigate offers rfft and irfft through MLX but no short-time transform, and nothing in the family handles audio yet."
+    },
+    {
+      "id": "question-28",
+      "text": "No audio set is on the T9. The audio twin of the watermark's acceptance needs clips: what should its first run measure?"
+    },
+    {
+      "id": "question-29",
+      "text": "The spectrogram's analysis settings are a rule fixed before any number is measured. Which geometry: 22.05 kHz, 16 kHz, 44.1 kHz, or each clip's native rate?"
+    },
+    {
+      "id": "question-30",
+      "text": "v1 on sound failed its acceptance under both profiles on 2026-11-08, by the cut and by false matches between neighbouring seconds of one track. Which fallback named before the run is measured first: a phase search at quarter hops, the hop halved, or the floor at −80 dB?"
+    },
+    {
+      "id": "question-31",
+      "text": "The theory behind the audio carrier needs generated sound: which generators, or which corpus of generated and recorded clips, should the residual's trace on sound be measured on?"
+    },
+    {
+      "id": "question-32",
+      "text": "The speech fixture is an Apple voice rendered by say and kept in the repo beside 8 s of the owner's track: keep both, or replace the voice with a synthetic signal?"
+    },
+    {
+      "id": "question-33",
+      "text": "The time-phase study compares generated sound against sound straight from hardware, and nothing on this Mac records audio. Should a `veilgarde audio record` command, raw PCM from the default input through AVAudioEngine in one of the two doors, be built, and who records the corpus? Deferred by the owner on 2026-11-08; the study's first run has no recorded side."
     }
   ],
   "tests": [
@@ -3230,6 +3708,26 @@
       "failed": 0,
       "skipped": 0,
       "note": "the schema-v1 goldens with the verdicts pinned by value, a pipeline declared in place, the v1 combiner on the 19 pair-free reference tuples, the store's migration, the recipes as trainable members"
+    },
+    {
+      "id": "test-31",
+      "phase": 20,
+      "date": "2026-11-08",
+      "suite": "all targets (Scripts/test.sh, the GPU suites included), the audio carrier added",
+      "passed": 169,
+      "failed": 0,
+      "skipped": 0,
+      "note": "Core 48, Lens 4, Inference 8, Training 31, Flywheel 23, Watermark 16, Audio 34 with 4 known issues held as written, CLI 5; the route goldens and the watermark's pins unchanged"
+    },
+    {
+      "id": "test-32",
+      "phase": 20,
+      "date": "2026-11-08",
+      "suite": "all targets (Scripts/test.sh, the GPU suites included), with the time-phase study and the quarter-hop cut search",
+      "passed": 176,
+      "failed": 0,
+      "skipped": 0,
+      "note": "Core 48, Lens 4, Inference 8, Training 31, Flywheel 23, Watermark 16, Audio 41 with the 4 known issues of phase 1 held as written, CLI 5; the audio pins and the watermark's pins unchanged; the audio suites shared the GPU with another session's model probe"
     }
   ],
   "request_note": "Verbatim but for the research projects' names and the paths on the owner's Mac, which the owner asked to leave out of the project (amendment-4, item 1, and amendment-6); each bracket stands for a name or a path."

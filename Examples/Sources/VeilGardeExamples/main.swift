@@ -8,9 +8,11 @@
 //        camera head's 393-column row and its P(AI), then every member of the stack and the
 //        revisions, the combiner's arithmetic printed term by term. Then the training regime in
 //        miniature (step 6: a recipe, its plan, the engine, a candidate bundle), the flywheel loop
-//        (step 7: a live bundle, a battery, a promote and its rollback), and the other lane, the
+//        (step 7: a live bundle, a battery, a promote and its rollback), the other lane, the
 //        watermark (step 8: a signature read off the warp residual, matched by a crop and a
-//        re-encode). Every step that has a golden checks itself against it.
+//        re-encode), and the watermark on sound (step 9: a clip's spectrogram signed, matched by a
+//        cut and an AAC re-encode, and taken back to sound). Every step that has a golden checks
+//        itself against it.
 //  IN:   The DINOv2 weights in the work area or VEILGARDE_WEIGHTS; final_mixed under
 //        VEILGARDE_DATASETS for the iPhone sample (optional). Run by Examples/run.sh.
 //  OUT:  One numbered block per step; Examples/.work for the training steps. Exit 0 only when
@@ -239,8 +241,35 @@ func run() throws {
         Show.line("(reported, not asserted: whether v1 holds on real crops is `veilgarde watermark accept`'s question)")
     }
 
-    // 9. Every checkpoint.
-    Show.step(9, "verify", "\(checks.all.filter(\.1).count) of \(checks.all.count) checkpoints hold")
+    // 9. The watermark on sound: a clip's spectrogram is the picture the watermark signs.
+    let tune = SyntheticClips.musicLike(seed: 23, seconds: 12, sampleRate: 44_100)
+    let profile = SpectrogramProfile.music
+    let picture = try AudioWatermark.picture(tune, profile: profile)
+    let heard = try AudioWatermark.sign(picture)
+    Show.step(9, "audio", "a 12 s music-like clip drawn as its spectrogram: \(picture.width)×\(picture.height) px, \(heard.cols)×\(heard.rows) tiles, \(heard.measuredBits) bits, cid \(heard.cid.prefix(16))")
+    Show.line("44.1 kHz mono, 2048-sample frames every 512 under a periodic Hann; each pixel one bin's magnitude in dBFS, −96 to 0 as 256 grey levels")
+    Show.line("the picture is signed by the watermark unchanged, the same warps and bits as step 8; nothing is written into the sound")
+    let itself = try AudioWatermark.match(tune, against: heard, options: MatchOptions(phases: [0]))
+    checks.record("the clip matches its own signature at offset 0 with score \(Show.f(Float(itself.result.score), 3))",
+                  itself.matched && itself.result.score == 1 && itself.result.offsetX == 0 && itself.result.offsetY == 0)
+    let signal = try AnalysisSignal(tune, profile: profile)
+    let exact = AudioRoundTrip.exact(signal)
+    checks.record(String(format: "the picture's transform goes back to sound at %.1f dB SNR, over the 90 dB bar", exact.metrics.snrDB), exact.metrics.snrDB >= 90)
+    let viaPicture = AudioRoundTrip.throughImage(signal)
+    Show.line(String(format: "from the 8-bit picture alone, the phase kept: %.1f dB SNR, %.3f dB log-spectral deviation", viaPicture.metrics.snrDB, viaPicture.metrics.logSpectralDeviationDB))
+    var audioRNG = SplitMix64(seed: 29)
+    let half = tune.frames / 2
+    let start = audioRNG.index(tune.frames - half)
+    let cutMatch = try AudioWatermark.match(AudioTransforms.cut(tune, startSample: start, length: half), against: heard)
+    Show.line(String(format: "a half-length cut from %.3f s: %@, score %.3f over %d bits (z %.1f), found at %.3f s", Double(start) / tune.sampleRate,
+                     cutMatch.matched ? "matched" : "not matched", cutMatch.result.score, cutMatch.result.bitsCompared, cutMatch.result.zScore, cutMatch.seconds))
+    let aac = try AudioConverting.aacRoundTrip(tune, kilobitsPerSecond: profile.aacKilobitsPerSecond)
+    let aacMatch = try AudioWatermark.match(aac.clip, against: heard, options: MatchOptions(phases: [0]))
+    Show.line(String(format: "re-encoded as AAC %d kb/s: %@, score %.3f", aac.usedKilobitsPerSecond, aacMatch.matched ? "matched" : "not matched", aacMatch.result.score))
+    Show.line("(reported, not asserted: whether v1 holds on real clips is `veilgarde audio accept`'s question)")
+
+    // 10. Every checkpoint.
+    Show.step(10, "verify", "\(checks.all.filter(\.1).count) of \(checks.all.count) checkpoints hold")
 }
 
 do {

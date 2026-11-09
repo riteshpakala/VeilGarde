@@ -29,7 +29,7 @@
       name: "code", page: "code.html", storage: "explorer:", overviewSteps: true, depth: false, unit: "function",
       pickerLabel: "The trails through the code", lead: "The reader is on the change explorer, looking at ", told: "told in the order it runs",
       mapTrails: "The trails through the code, each in the order it runs:", extraTools: [],
-      expect: ["camera-training", "specialist-training", "decode", "shared-signals", "stack", "revisions", "result", "watermark-signing", "watermark-matching"],
+      expect: ["camera-training", "specialist-training", "decode", "shared-signals", "stack", "revisions", "result", "watermark-signing", "watermark-matching", "audio-residual", "audio-matching", "audio-phases"],
       voice: {
         reading: ["You can read the whole change. The map below lists every file and every trail, and your tools read any declaration, file or line of text.",
                   "Start from what the reader has selected. When a question reaches past it, read what you need before you answer, and name what you read. " +
@@ -1384,8 +1384,8 @@
     bad = idx.edges.filter(function (e) { return !m.scopes[e[0]] || !m.scopes[e[1]] || !(e[2] >= 0 && e[2] <= 2) || !(e[3] >= 1); });
     check("every call edge joins two declarations, with a tier and a line", !bad.length, V.fmt.int(idx.edges.length) + " edges");
     var trails = m.trails, pages = V.pages.map(function (p) { return p.file; }), code = m.sets.code, P = policy();
-    check("nine trails: the camera head and the specialist stack trained, detection in five stages from decode to result, and the watermark signed and matched, each with a mark of its own and its steps numbered from 1",
-          code.trails.length === 9 && SETS.code.expect.every(function (id) { return code.trailById[id]; }) &&
+    check("twelve trails: the camera head and the specialist stack trained, detection in five stages from decode to result, the watermark signed and matched, the watermark on sound signed and matched, and the time-phase study, each with a mark of its own and its steps numbered from 1",
+          code.trails.length === 12 && SETS.code.expect.every(function (id) { return code.trailById[id]; }) &&
           code.trails.every(function (t, i) { return t.mark && code.trails.findIndex(function (u) { return u.mark === t.mark; }) === i; }) &&
           code.trails.every(function (t) { return t.steps.length >= 3 && t.steps.length <= 9 && t.steps.every(function (st, i) { return st.n === i + 1 && st.entries.length > 0; }); }),
           code.trails.map(function (t) { return t.mark + " " + t.steps.length; }).join(" · "));

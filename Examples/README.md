@@ -1,6 +1,6 @@
 # The VeilGarde examples
 
-One program, read top to bottom, that runs VeilGarde's two lanes on this Mac and checks itself against VeilGarde's own goldens:
+One program, read top to bottom, that runs VeilGarde's two lanes, and the watermark on sound, on this Mac and checks itself against VeilGarde's own goldens:
 
 0. **Metal and the bundle.** MLX's Metal library beside the binary; the shipped bundle verified against its manifest.
 1. **The images.** The two parity crops VeilGarde's goldens hold, and, when `final_mixed` is under `VEILGARDE_DATASETS` (or the work area's `datasets/`), six iPhone originals and six generated images from it, every k-th by name.
@@ -11,7 +11,8 @@ One program, read top to bottom, that runs VeilGarde's two lanes on this Mac and
 6. **Training, in miniature.** A `TrainingRecipe` written in Swift (a warm start on the shipped camera head, the human head, the combiner), its plan, and the engine's run into a candidate bundle in `Examples/.work/candidates/examples`, on a seeded sample of the work area's feature store, three columns a row. Without the store, seeded synthetic rows stand in, and the step says so.
 7. **The flywheel.** The regime alone, in `Examples/.work`: the shipped bundle copied as the live bundle, a regression battery (every image keeps the call the shipped detector gives it, as HARD groups), a frozen weight and a retired slot refused, the human head from step 6 promoted behind its admission gate and the battery, the promote log, and a rollback.
 8. **The watermark.** The first parity crop signed by its own fragility pattern (four ordinal bits a tile, sectioned 4×4), matched against itself, then a half-area crop at a seeded random offset found by the phase search, and a JPEG q75 re-encode; the crop and the re-encode are reported, not asserted.
-9. **Verify.** Every checkpoint; the exit code is 0 only when all hold.
+9. **Audio.** A seeded 12 s music-like clip drawn as its spectrogram under the music profile, 44.1 kHz mono, 2048-sample frames every 512, each pixel a bin's magnitude in dBFS as one of 256 grey levels; the picture signed by the watermark unchanged and matched against itself; the transform taken back to sound; then a half-length cut at a seeded sample, an AAC 128 kb/s re-encode and the sound rebuilt from the 8-bit picture alone, reported, not asserted.
+10. **Verify.** Every checkpoint; the exit code is 0 only when all hold.
 
 ## Run
 
@@ -33,7 +34,9 @@ The first build compiles Frigate's MLX and takes minutes. From Xcode, open `Exam
 - Promote refuses a frozen weight and a retired slot.
 - The frozen weights never move, and after the promote and its rollback the live bundle is byte for byte what it was.
 - The watermarked image matches its own signature at offset (0, 0) with score 1.
+- The clip's picture matches its own signature at offset 0 with score 1.
+- The clip's transform goes back to sound at 90 dB SNR or better.
 
-On 2026-10-21 every one of the 12 checkpoints held. It writes nothing outside `Examples/.work` (gitignored), and only from step 6 on. Run the candidate it trains with
+On 2026-11-08, with the audio step added, every one of the 14 checkpoints held; on 2026-10-21 all 12 of the steps before it had. It writes nothing outside `Examples/.work` (gitignored), and only from step 6 on. Run the candidate it trains with
 `Scripts/cli.sh route <image> --bundle Examples/.work/candidates/examples`, and look at its flywheel with
 `Scripts/cli.sh flywheel status --work-area Examples/.work`.

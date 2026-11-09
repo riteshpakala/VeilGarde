@@ -24,7 +24,7 @@ struct VeilGardeCommand: AsyncParsableCommand {
         discussion: "Start with `veilgarde doctor`. Every command writes its result to stdout; add --json where offered.",
         version: VeilGardeVersion.string,
         subcommands: [DoctorCommand.self, RouteCommand.self, BatchCommand.self, FeaturesCommand.self,
-                      TrainCommand.self, StoreCommand.self, FlywheelCommand.self, ResearchCommand.self, WatermarkCommand.self, WeightsCommand.self, BundleCommand.self, ParityCommand.self]
+                      TrainCommand.self, StoreCommand.self, FlywheelCommand.self, ResearchCommand.self, WatermarkCommand.self, AudioCommand.self, WeightsCommand.self, BundleCommand.self, ParityCommand.self]
     )
 
     func run() async throws {
