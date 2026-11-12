@@ -41,7 +41,9 @@ LENS = (556, 618)    # the sixteen warps, on the signature's lane
 REACH = 40           # the warps' half-height about the signature's lane, short of the verdict's
 WORDS_END = 1040     # the stage words stop here; a short line runs on to each lane's mark at 1102
 
-# The mark's ink, the mosaic, the subtitle and the legend start at x 66.
+# The mark's ink, the mosaic, the subtitle and the legend start at x 66. The mark is rao.nyc's rr-mark.png,
+# 986 × 802 with its shadow, its ink (alpha ≥ 128) at 26,14 to 945,761: drawn 51.9 wide at 64.6, 62.6, its ink
+# is 39.3 px tall from 66, 63.3. The phase 1 audio plate draws it the same, 18 px higher.
 # The title's and the subtitle's first ink sit on EDGE: an italic first glyph overhangs, or sits in, by its own
 # amount, so the page measures it with the font and places each line by it.
 EDGE = 66
@@ -156,8 +158,8 @@ def hero(browser, golden, signature):
 html, body {{ margin: 0; width: 1200px; height: 630px; overflow: hidden; }}
 body {{ position: relative; font-family: "Playfair", Georgia, serif; font-style: italic;
        background: radial-gradient(ellipse 90% 100% at 22% 20%, #20201c 0%, #191917 45%, #121211 100%); }}
-.mark {{ position: absolute; left: 57.5px; top: 52px; width: 72px; }}
-.caption {{ position: absolute; left: 143.5px; top: 72px; letter-spacing: .3em; font-size: 16.5px; color: #8b8a84; font-variant-numeric: lining-nums; }}
+.mark {{ position: absolute; left: 64.6px; top: 62.6px; width: 51.9px; }}
+.caption {{ position: absolute; left: 138.8px; top: 72px; letter-spacing: .3em; font-size: 16.5px; color: #8b8a84; font-variant-numeric: lining-nums; }}
 .title {{ position: absolute; left: 34px; top: 132px; padding-left: 40px; font-size: 168px; line-height: 1; font-weight: 500; letter-spacing: -.005em;
          background: linear-gradient(100deg, #8d9097 0%, #c8cad0 35%, #f2f3f6 58%, #b6b9c1 100%);
          -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 30px; }}

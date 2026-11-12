@@ -106,8 +106,8 @@ def plate(browser, fixtures):
 html, body {{ margin: 0; width: 1200px; height: 630px; overflow: hidden; }}
 body {{ position: relative; font-family: "Playfair", Georgia, serif; font-style: italic;
        background: radial-gradient(ellipse 90% 100% at 22% 20%, #20201c 0%, #191917 45%, #121211 100%); }}
-.mark {{ position: absolute; left: 57.5px; top: 34px; width: 72px; }}
-.caption {{ position: absolute; left: 143.5px; top: 54px; letter-spacing: .3em; font-size: 16.5px; color: #8b8a84; font-variant-numeric: lining-nums; }}
+.mark {{ position: absolute; left: 64.6px; top: 44.6px; width: 51.9px; }}
+.caption {{ position: absolute; left: 138.8px; top: 54px; letter-spacing: .3em; font-size: 16.5px; color: #8b8a84; font-variant-numeric: lining-nums; }}
 .title {{ position: absolute; left: 66px; top: 100px; padding-bottom: 24px; font-size: 54px; line-height: 1; font-weight: 500; letter-spacing: -.005em;
          background: linear-gradient(100deg, #8d9097 0%, #c8cad0 35%, #f2f3f6 58%, #b6b9c1 100%);
          -webkit-background-clip: text; background-clip: text; color: transparent; }}
