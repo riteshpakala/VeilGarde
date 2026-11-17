@@ -31,7 +31,9 @@
 //                       Candidates/, Battery/, Promote/                          (Swift 5 mode)
 //   VeilWatermark       the crop-robust signature on the warp residual: Residual/ (the warp
 //                       round trip and the fragility rate), Signature/, Sections/, Match/,
-//                       Acceptance/                            (MLX through Frigate, Swift 5 mode)
+//                       Acceptance/; and the pixel mark: Mark/ (the payload, the embedder, the
+//                       blind reader, ImageMark), Store/ (the signature store), Render/ (PNG, the
+//                       digests and overlays)                  (MLX through Frigate, Swift 5 mode)
 //   VeilGardeAudio      the watermark's second carrier: Audio/ (the clip, and the two AVFoundation
 //                       doors that read, write and convert it), Spectrogram/ (the two profiles, the
 //                       STFT and the 8-bit picture the lens reads unchanged), Watermark/ (a clip

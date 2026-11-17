@@ -7,7 +7,8 @@
 //        pattern. `sign` prints it (vw1 text, or JSON); `match` finds where an image (a crop, a
 //        re-encode) sits on a signature; `verify` is match with the verdict as the exit code;
 //        `accept` runs v1's acceptance on final_mixed and evaluates its kill criterion;
-//        `invariance` signs a set of images and, against a baseline, fails on any change.
+//        `invariance` signs a set of images and, against a baseline, fails on any change. The pixel
+//        mark's commands (embed, detect, render, records) live in WatermarkMark.swift.
 //  PIN:  Native resolution, one MLX workload. `accept` and `invariance` write only their reports.
 //
 
@@ -19,7 +20,7 @@ struct WatermarkCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "watermark", abstract: "Sign an image by its warp fragility pattern, and find a crop or a re-encode of it again.",
         discussion: "v1 is a design under measurement: run `watermark accept` before relying on it.",
-        subcommands: [Sign.self, Match.self, Verify.self, Accept.self, Invariance.self])
+        subcommands: [Sign.self, Match.self, Verify.self, Accept.self, Invariance.self, Embed.self, Detect.self, Render.self, Records.self])
 
     static func signature(_ text: String) throws -> WatermarkSignature {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

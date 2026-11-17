@@ -18,6 +18,8 @@ Three **revisions** read them. A small non-negative **combiner** anchors on the 
 
 **The watermark.** Every 32×32 tile of an image is perspective-warped through 16 fixed homographies and back. A camera sensor's mosaic and noise do not survive the round trip the way a generator's output does. Each tile's **fragility**, how much more of it the stronger warp loses, becomes four ordinal bits against its neighbours. The signature adds nothing to the pixels, and a crop or a re-encode is matched against it.
 
+**The pixel mark.** The signature adds nothing; the mark (vgm1) does. A keyed 64-bit id and its CRC are written into the tiles' fragility itself: each tile's luma moves by at most three levels, the same on red, green and blue, until its fragility sits above or below its neighbours' as the id's code says. It is read blind, with nothing but the key, from the image or a crop of it, and the signature of the marked image says whose it is and where the crop sits. It is under measurement: an acceptance run, held to bars fixed before it runs, decides whether it stays.
+
 **The watermark on sound.** A clip is drawn as its spectrogram, time left to right and pitch bottom to top, each pixel one band's loudness on a fixed dBFS scale, and the watermark signs that picture unchanged. Two profiles carry it, music at 44.1 kHz and speech at 16 kHz. The picture goes back to sound through the exact inverse transform, and nothing is written into the sound.
 
 | Subpackage | Holds |
@@ -27,7 +29,7 @@ Three **revisions** read them. A small non-negative **combiner** anchors on the 
 | `VeilGardeInference` | the detector as one pipeline: the shared signals, the stack's members, the revisions, the result |
 | `VeilGardeTraining` | the trainers for the camera head, the heads and the combiner, declared as trainable members in a recipe DSL that mirrors the pipeline, and the backbone imports |
 | `VeilGardeFlywheel` | acquisition into a features-only store, candidates, the battery, promote and rollback |
-| `VeilWatermark` | the warp residual and a crop-robust signature read off each tile's fragility |
+| `VeilWatermark` | the warp residual, a crop-robust signature read off each tile's fragility, and the pixel mark: an id written into that fragility, read blind, its records kept in a signature store |
 | `VeilGardeAudio` | the watermark's second carrier: a clip's spectrogram is the picture the watermark signs, and the picture goes back to sound; its [README](Sources/VeilGardeAudio/README.md) directs the speech research |
 | `veilgarde` | the CLI over all of it |
 
@@ -132,6 +134,8 @@ VEILGARDE_CONFIG=release Scripts/cli.sh train heads     # a candidate bundle und
 Scripts/cli.sh flywheel init && Scripts/cli.sh flywheel battery --gate full
 VEILGARDE_CONFIG=release Scripts/cli.sh research census  # every call of a bundle on the battery and 200 labelled images
 Scripts/cli.sh watermark sign photo.jpg > photo.vw1 && Scripts/cli.sh watermark match crop.jpg photo.vw1
+Scripts/cli.sh watermark embed photo.jpg --out marked.png --label "Ana" --store <folder>   # the pixel mark, its record kept
+Scripts/cli.sh watermark detect crop.jpg --store <folder> --overlay o.png --digest d.png  # marked, whose, and where
 Scripts/cli.sh audio sign song.wav > song.vw1 && Scripts/cli.sh audio match cut.m4a song.vw1   # --profile speech for voices
 Scripts/cli.sh audio roundtrip song.wav --out back.wav  # the spectrogram back to sound, with its SNR
 Scripts/cli.sh audio accept --audio <speech folder> --profile speech --phases $(seq -s, 0 31) --out r.json   # the 32-phase experiment
@@ -153,6 +157,34 @@ Examples/run.sh
 A site that explains each layer and shows every file this build changed, verbatim, with each Swift declaration's calls and callers, and the run's ledger of commands, tests and decisions. Twelve trails walk the code in the order it runs: how the camera head and the specialist stack are trained, detection stage by stage from Decode through Shared Signals, Stack and Revisions to Result, how the watermark signs an image and matches a crop of it, how a clip becomes the picture the warp residual reads and a cut of it is found again in time, and how the time-phase study reads a clip's fragility dense in time. A grid picks them, a row for each flow and a column for each kind. Double-click Scripts/site.command, or open [Docs/site/index.html](Docs/site/index.html); it is plain HTML with no build step. [Docs/site/README.md](Docs/site/README.md) says how it is rebuilt and checked.
 
 The site's chat asks Mistral about what you are reading. On a Mac that holds a Mistral key in its key store, `Scripts/site.command` hands the site that key; anyone else is asked for their own key in a dialog when the chat opens, and it stays in their browser.
+
+## Embedding VeilGarde
+
+An app or an agent takes the watermark by URL and calls `ImageMark`; nothing of VeilGarde is copied into it.
+
+```swift
+.package(url: "https://github.com/riteshpakala/VeilGarde", branch: "main"),
+.product(name: "VeilWatermark", package: "VeilGarde"),
+```
+
+```swift
+import VeilWatermark
+
+let store = try SignatureStore(directory: folder)            // a folder the app chooses; VeilGarde picks none
+let marked = try ImageMark.embed(contentsOf: photo, label: "Ana", store: store, progress: { print($0.line) })
+try marked.png.write(to: out)                                 // marked.record: the id, the signature, the report
+let found = try ImageMark.detect(contentsOf: crop, store: store)
+print(found.summary)                                          // marked · id … · recorded as “Ana” · z … · passive …
+let pictures = (try ImageMark.digest(found), try ImageMark.overlay(found, queryContentsOf: crop))
+```
+
+- **macOS 26 on Apple silicon.** `VeilWatermark` takes MLX from [Frigate](https://github.com/rao-studios/Frigate) and not its LLM stack: a package embedding it builds MLX, not MLXLLM, Tokenizers or Hub.
+- **One Frigate per graph, by URL.** Inside another package VeilGarde takes Frigate from GitHub, so a consumer must not add Frigate by path. Export `GIT_LFS_SKIP_SMUDGE=1` while resolving: Frigate's LFS fixtures break SwiftPM checkouts.
+- **`mlx.metallib` beside the executable.** `swift build` compiles no Metal; without the library the first GPU call dies. Frigate's `scripts/build-metallib.sh <debug|release> --package <your package>` writes it into your `.build`; ship it next to your binary.
+- **One MLX workload at a time.** Every embed and detect holds a lock in its process; `ImageMark.configure(lockFile:)` adds an flock, so processes sharing a GPU queue. Embedding takes minutes for a large photo: progress arrives per optimiser step, and a `CancelFlag` (or cancelling the async form's task) stops it between steps.
+- **The store is a folder of files.** `store.json` names its format; `records/<hh>/<id>.json` holds one record, `by-png/<hh>/<sha256>` the id of a PNG the store made. Writes are atomic and safe across processes; back it up by copying the folder. A record keeps the key's fingerprint, never the key.
+- **The mark is under measurement.** Its defaults are tuned on a seeded sample and then measured by an acceptance run against bars fixed before it runs; until then, nothing here is a claim about robustness. It does not survive resizing. What is known: it lives on the tiles' exact edges, so a reading searches a crop's pixel phase (about a hundred reads, seconds on a large crop) and an uncropped image reads at once; at that phase about one tile in five reads wrong, so an image needs about 1 MP (four periods of 480 × 512 px) to carry it, and a smaller one is refused.
+- **GPL-3.0-only.** A program that links VeilWatermark is a combined work under the GPL.
 
 ## Requirements and tests
 
