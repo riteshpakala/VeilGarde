@@ -65,7 +65,9 @@ enum MarkOverlay {
         canvas.text(BitmapFont.fitted(d.verdict.words.uppercased(), pixels: canvas.width - 160, scale: 3), x: 16, y: 12, scale: 3, MarkDigest.color(of: d.verdict))
         var parts: [String] = []
         if let id = d.reading.id { parts.append("ID \(id.hex)") } else if let record = d.record { parts.append("ID \(record.id.hex) (PASSIVE)") }
-        parts.append(String(format: "Z %.1f", d.reading.pilotZ))
+        // The pilots' z only beside an id that read: with none, it is the best of a search (`ImageMark.summary`).
+        if d.reading.id != nil { parts.append(String(format: "Z %.1f", d.reading.pilotZ)) }
+        if d.reading.id == nil, d.record == nil { parts.append("\(d.reading.tiles) TILES · NO ID PASSES ITS CHECK") }
         if let m = d.match { parts.append(String(format: "PASSIVE %.2f", m.score)) }
         if map != nil { parts.append("TINT \(shown == .passive ? "PASSIVE" : "MARK")") }
         canvas.text(BitmapFont.fitted(parts.joined(separator: " · "), pixels: canvas.width - 160, scale: 2), x: 16, y: 42, scale: 2, P.text)

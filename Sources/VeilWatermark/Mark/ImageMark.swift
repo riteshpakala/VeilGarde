@@ -382,8 +382,10 @@ public enum ImageMark {
             let exactly = d.exactBytes ? " · the exact PNG it made" : ""
             return "Passive match · no mark read, but the content matches\(who.isEmpty ? " a stored image" : who)\(id)" + (passive.map { " · \($0)\(at)" } ?? "") + exactly
         case .none:
+            // Never the pilots' z: with no id read it is the best of a search over phases and offsets, which clears 3 on
+            // a picture with no mark often enough to read as evidence of one. The id's check is what refuses it.
             let small = d.reading.tiles < MarkDecoder.minimumTiles ? " (below the \(MarkDecoder.minimumTiles) tiles a reading needs)" : ""
-            return "No mark · pilot z \(z) over \(d.reading.tiles) tiles\(small)"
+            return "No mark · no id passes its check over \(d.reading.tiles) tiles\(small)"
         }
     }
 

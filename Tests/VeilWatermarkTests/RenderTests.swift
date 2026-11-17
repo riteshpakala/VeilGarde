@@ -75,7 +75,7 @@ struct RenderTests {
     @Test("verdict summaries say what happened")
     func summaries() {
         #expect(Self.detection(.marked).summary == "Marked · id 0123456789abcdef · recorded as “Ana” · z 7.2 · passive 0.96")
-        #expect(Self.detection(.none).summary == "No mark · pilot z 0.5 over 999 tiles")
+        #expect(Self.detection(.none).summary == "No mark · no id passes its check over 999 tiles", "never the pilots' z without an id")
         #expect(Self.detection(.unknownID).summary.hasPrefix("Unknown id · 0123456789abcdef is not in this store"))
         #expect(Self.detection(.contentMismatch).summary.hasPrefix("Content mismatch · id 0123456789abcdef is recorded for another image (passive 0.52)"))
         #expect(Self.detection(.passiveMatch).summary.contains("recorded as “Ana”"))
