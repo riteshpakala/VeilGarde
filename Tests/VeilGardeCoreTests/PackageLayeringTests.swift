@@ -190,6 +190,15 @@ struct PackageLayeringTests {
         }
     }
 
+    @Test("the Lens and VeilWatermark list no Frigate umbrella: a package embedding the watermark builds no LLM stack")
+    func watermarkSkipsTheUmbrella() throws {
+        let targets = try manifestTargets()
+        for name in ["VeilGardeLens", "VeilWatermark"] {
+            let target = try #require(targets.first { $0.name == name })
+            #expect(!target.products.contains("Frigate"), "\(name) lists the Frigate umbrella")
+        }
+    }
+
     @Test("nothing imports MLXLLM, MLXLMCommon, UIKit or SwiftUI; AppKit only to decode images, AVFoundation only to read and write audio")
     func noForbiddenImports() throws {
         for file in swiftFiles(under: "Sources") + swiftFiles(under: "Examples/Sources") {

@@ -1,12 +1,14 @@
 //
 //  TreeModelCache.swift
-//  VeilGardeLens
+//  VeilGardeInference
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: Frigate's XGBoostTreeModel, the evaluator the detector scores the camera head with, parsed
 //        once per file and shared.
-//  PIN:  The only file in the Lens that imports the Frigate umbrella, for FrigateBoost's evaluator;
-//        Core's GBDTModel agrees with it bit for bit on the shipped camera head (ScorerTests).
+//  PIN:  The only library file that imports the Frigate umbrella, for FrigateBoost's evaluator, so the
+//        umbrella (and the LLM stack it brings) sits in VeilGardeInference, not in the Lens that
+//        VeilWatermark's consumers build (moved 2026-11-17). Core's GBDTModel agrees with it bit for bit
+//        on the shipped camera head (EvaluatorTests).
 //
 
 import Foundation

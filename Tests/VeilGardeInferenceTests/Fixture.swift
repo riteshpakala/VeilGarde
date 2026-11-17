@@ -17,6 +17,9 @@ enum Fixture {
         return url.deletingLastPathComponent()
     }()
 
+    /// A shipped bundle resource by name.
+    static func resource(_ name: String) -> URL { repoRoot.appendingPathComponent("Sources/VeilGardeInference/Resources/\(name)") }
+
     static func crop(_ name: String) -> URL { repoRoot.appendingPathComponent("Tests/VeilGardeInferenceTests/Fixtures/crops/\(name)") }
 
     /// The parity fixtures too large for the repo (dino_parity.safetensors is 1.8 MB), in the work

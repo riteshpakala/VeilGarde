@@ -17,11 +17,12 @@
 //                       (members' outputs, revisions' records, the schema-v1 JSON, the verdict
 //                       law, route batches), Store/ (the features-only store, its migration)
 //   VeilGardeLens       the extractors, in the order a pixel travels: Image/, Capture/,
-//                       Semantic/ (DINOv2, CLIP vision), Scoring/
-//                                                          (MLX through Frigate, Swift 5 mode)
+//                       Semantic/ (DINOv2, CLIP vision), Scoring/ (the weights' locator)
+//                                  (MLX through Frigate's MLX products, never its umbrella; Swift 5)
 //   VeilGardeInference  the detector as one pipeline, Decode → Shared Signals → Stack → Revisions
 //                       → Result: Config/, Route/ (the signals, the Detector), Stack/ (the
-//                       pipeline, the members), Revisions/, Bundle/ (the shipped artifacts)
+//                       pipeline, the members), Revisions/, Bundle/ (the shipped artifacts, and
+//                       FrigateBoost's evaluator through the Frigate umbrella)
 //                                                                     (Swift 5 mode, resources)
 //   VeilGardeTraining   the trainers: Data/, Extract/, Boost/ (a native GBDT), Linear/, Camera/,
 //                       Heads/, Combiner/, Backbone/ (DINOv2 and CLIP imports), Recipe/ (the
@@ -42,7 +43,8 @@
 // Invariants PackageLayeringTests holds: exactly these five products; MLX only through Frigate
 // (no mlx-swift URL here, and every MLX or Frigate import sits in a target that lists that
 // product); Core imports Foundation and Crypto only; Training never imports Inference or the
-// Flywheel; VeilWatermark imports Core, Lens and, for its residual, MLX and MLXAccelerate;
+// Flywheel; VeilWatermark imports Core, Lens and, for its residual, MLX and MLXAccelerate, and neither
+// it nor the Lens lists the Frigate umbrella (Inference alone does, for FrigateBoost);
 // VeilGardeAudio imports VeilWatermark and, for its STFT, MLX, and AVFoundation only in its two
 // doors; nothing under Sources/ imports MLXLLM, MLXLMCommon, AppKit (outside the image decoder) or
 // UIKit; no type is named like a module; every Swift file opens with a WHAT: header.
@@ -121,14 +123,17 @@ let package = Package(
                 .product(name: "MLXNN", package: "Frigate"),
                 .product(name: "MLXFFT", package: "Frigate"),
                 .product(name: "MLXAccelerate", package: "Frigate"),
-                // FrigateBoost's XGBoostTreeModel, the evaluator the fusion head is scored with.
-                .product(name: "Frigate", package: "Frigate"),
             ],
             swiftSettings: v5
         ),
         .target(
             name: "VeilGardeInference",
-            dependencies: ["VeilGardeLens"],
+            dependencies: [
+                "VeilGardeLens",
+                // FrigateBoost's XGBoostTreeModel, the evaluator the camera head is scored with: the one
+                // use of the Frigate umbrella, kept out of the Lens so VeilWatermark's graph stays small.
+                .product(name: "Frigate", package: "Frigate"),
+            ],
             // The shipped bundle: the shipped artifacts, by name, bound by manifest.json. Weights are
             // gitignored and resolved at run time (WeightLocator); copied into this folder they ship
             // inside the bundle.
@@ -208,7 +213,7 @@ let package = Package(
         .testTarget(name: "VeilGardeCoreTests", dependencies: ["VeilGardeCore"], exclude: ["Fixtures"]),
         .testTarget(name: "VeilGardeLensTests", dependencies: ["VeilGardeLens"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeInferenceTests", dependencies: ["VeilGardeInference"], exclude: ["Fixtures"], swiftSettings: v5),
-        .testTarget(name: "VeilGardeTrainingTests", dependencies: ["VeilGardeTraining"], exclude: ["Fixtures"], swiftSettings: v5),
+        .testTarget(name: "VeilGardeTrainingTests", dependencies: ["VeilGardeTraining", .product(name: "Frigate", package: "Frigate")], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeFlywheelTests", dependencies: ["VeilGardeFlywheel"], swiftSettings: v5),
         .testTarget(name: "VeilWatermarkTests", dependencies: ["VeilWatermark"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeAudioTests", dependencies: ["VeilGardeAudio"], exclude: ["Fixtures"], swiftSettings: v5),
