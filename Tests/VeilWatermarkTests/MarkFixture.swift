@@ -4,8 +4,9 @@
 //  SPDX-License-Identifier: GPL-3.0-only
 //
 //  WHAT: What the pixel mark's tests share: a record built from a seeded synthetic signature (no GPU),
-//        a report to put in it, soft tile levels laid by an id at a given period offset, and RGB bytes
-//        read back the way the lens reads them.
+//        a report to put in it, soft tile levels laid by an id at a given period offset, a 2048 × 1024
+//        image composed of the two parity crops (a reading needs about four periods folded, which one
+//        crop is far short of), and RGB bytes read back the way the lens reads them.
 //
 
 import CoreGraphics
@@ -36,6 +37,41 @@ enum MarkFixture {
         for r in 0..<rows {
             for c in 0..<cols { out[r * cols + c] = Float(levels[PayloadLayout.cell(row: r + offsetRow, col: c + offsetCol)]) }
         }
+        return out
+    }
+
+    /// A 2048 × 1024 image of the two parity crops, eight ways: as they are and mirrored on the top row, flipped and
+    /// turned half round below. A reading needs about four periods folded, so a crop of it still holds enough.
+    static func composite() throws -> CGImage {
+        let ben = try ImageDecoding.cgImage(contentsOf: Fixture.crop("crop_ben.png"))
+        let fox = try ImageDecoding.cgImage(contentsOf: Fixture.crop("crop_fox.png"))
+        guard let ctx = CGContext(data: nil, width: 2048, height: 1024, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { throw VeilGardeFailure.internalError("no context") }
+        ctx.interpolationQuality = .none
+        /// Draws `image` into the 512² cell (column, row from the top), scaled by (sx, sy) about the cell's centre.
+        func cell(_ image: CGImage, _ column: Int, _ row: Int, sx: CGFloat, sy: CGFloat) {
+            ctx.saveGState()
+            // CoreGraphics draws from the bottom-left: the top row sits at y 512.
+            ctx.translateBy(x: CGFloat(column * 512 + 256), y: CGFloat((1 - row) * 512 + 256))
+            ctx.scaleBy(x: sx, y: sy)
+            ctx.draw(image, in: CGRect(x: -256, y: -256, width: 512, height: 512))
+            ctx.restoreGState()
+        }
+        cell(ben, 0, 0, sx: 1, sy: 1)
+        cell(fox, 1, 0, sx: 1, sy: 1)
+        cell(ben, 2, 0, sx: -1, sy: 1)
+        cell(fox, 3, 0, sx: -1, sy: 1)
+        cell(fox, 0, 1, sx: 1, sy: -1)
+        cell(ben, 1, 1, sx: 1, sy: -1)
+        cell(fox, 2, 1, sx: -1, sy: -1)
+        cell(ben, 3, 1, sx: -1, sy: -1)
+        guard let image = ctx.makeImage() else { throw VeilGardeFailure.internalError("no image") }
+        return image
+    }
+
+    /// `image`'s pixels (x, y, w, h from the top-left) as a fresh image.
+    static func crop(_ image: CGImage, x: Int, y: Int, w: Int, h: Int) throws -> CGImage {
+        guard let out = ImageLoading.renderCrop(image, CGRect(x: x, y: y, width: w, height: h)) else { throw VeilGardeFailure.internalError("no crop") }
         return out
     }
 
