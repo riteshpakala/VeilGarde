@@ -15,6 +15,9 @@
 //        1 px off on both axes sees nothing either way, so the reader searches every phase instead.
 //        Margins of 0.35, 0.7 and 1.2 read alike too: the per-pixel bound, not the objective, is what
 //        holds the mark's strength.
+//  PIN:  SIGNED OFF (2026-11-17, decision-153). The owner took these defaults as they stand, before
+//        the probe ran, so integrations test against fixed knobs; the acceptance run and its bars stay
+//        open, and a default moves again only on the owner's word.
 //
 
 import Foundation

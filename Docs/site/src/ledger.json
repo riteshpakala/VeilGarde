@@ -1542,6 +1542,13 @@
       "rejected": "making the finer search the default on 59 clips of one synthetic corpus; running the music acceptance before closing",
       "reason": "amendments 32 and 33; no default changes without the owner's say",
       "file": "Sources/VeilGardeAudio/README.md"
+    },
+    {
+      "id": "decision-153",
+      "chose": "The owner signs off MarkSettings.default as it stands (bound 3, no smoothing, the shift term off, 20 steps, margin 0.35, two repair rounds of six) on 2026-11-17, without the probe, so integrations (VeilAgent in Craft) test against fixed defaults",
+      "rejected": "holding the defaults until the bound × smoothing × shift probe has run",
+      "reason": "the owner's word, 2026-11-17: iterate VeilGarde directly through Craft's Rebuild; the probe may still move a default later, and the acceptance run and its K1–K8 bars stay open, so the mark is still under measurement",
+      "file": "Sources/VeilWatermark/Mark/MarkSettings.swift"
     }
   ],
   "commands": [
