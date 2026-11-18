@@ -167,6 +167,62 @@ extension WatermarkMLXSuites {
             let r = try Watermark.match(jpeg, against: try Watermark.sign(cg), options: MatchOptions(phases: [0]))
             #expect(r.offsetX == 0 && r.offsetY == 0 && r.score > 0.75, "JPEG 0.75 scored \(r.score)")
         }
+
+        /*
+        [WR] ROBUSTNESS: Class I Resizing
+         
+        Why this makes signatures resizing-robust:
+
+        The warp path between anchor pixels scales with the image because both the anchors and their displacements are proportional to the tile dimension. When an image is scaled 1.5×, its tiles become larger, its anchors move farther apart, and each corner's displacement grows by the same factor.
+         
+         The fragility pattern — the per-tile rate computed from the (WR) warp residual — therefore remains geometrically consistent across scales.
+        */
+        
+        /// ROBUSTNESS: Class I Resizing
+        @Test("signatures are resizing-robust: a scaled image's signature matches when aligned by phase")
+        func resizingRobustness() throws {
+            let cg = try ImageDecoding.cgImage(contentsOf: Self.image)
+            let originalSig = try Watermark.sign(cg)
+            
+            // Scale the image to 1.5× and 0.75×, sign each, and verify they match the original when aligned by phase.
+            let scaled15 = ImageLoading.scale(cg, width: cg.width * 3 / 2, height: cg.height * 3 / 2)!
+            let scaled075 = ImageLoading.scale(cg, width: cg.width * 3 / 4, height: cg.height * 3 / 4)!
+            
+            let sig15 = try Watermark.sign(scaled15)
+            let sig075 = try Watermark.sign(scaled075)
+            
+            // The signatures should have different grid dimensions due to scaled tile sizes.
+            #expect(sig15.rows != originalSig.rows || sig15.cols != originalSig.cols, "scaled image has different grid")
+            #expect(sig075.rows != originalSig.rows || sig075.cols != originalSig.cols, "downscaled image has different grid")
+            
+            // Match each scaled signature against the original using phase alignment.
+            let match15 = try Watermark.match(scaled15, against: originalSig, options: MatchOptions(phases: [0, 1, 2, 3]))
+            #expect(match15.matched || match15.score > 0.6, "scaled 1.5× should match with score \(match15.score)")
+            
+            let match075 = try Watermark.match(scaled075, against: originalSig, options: MatchOptions(phases: [0, 1, 2, 3]))
+            #expect(match075.matched || match075.score > 0.6, "scaled 0.75× should match with score \(match075.score)")
+        }
+
+        /// ROBUSTNESS: Class I Resizing
+        @Test("TileCodeGrid ordinal comparison works correctly on scaled grids")
+        func tileCodesOnScaledGrids() {
+            // Verify that TileCodeGrid produces consistent ordinal bits regardless of grid size.
+            let smallGrid = randomCodes(rows: 8, cols: 8, seed: 42)
+            let largeGrid = randomCodes(rows: 32, cols: 32, seed: 42)
+            
+            // Both should have measured bits proportional to their size (roughly 3/4 of max due to edge masking).
+            let smallMaxBits = 8 * 8 * 4
+            let largeMaxBits = 32 * 32 * 4
+            #expect(Double(smallGrid.measuredBits) > Double(smallMaxBits) * 0.6 && smallGrid.measuredBits < smallMaxBits)
+            #expect(Double(largeGrid.measuredBits) > Double(largeMaxBits) * 0.6 && largeGrid.measuredBits < largeMaxBits)
+            
+            // Verify Sectioning.pack/unpack handles variable grid dimensions correctly.
+            let (smallCodes, smallMasks) = Sectioning.pack(smallGrid)
+            #expect(Sectioning.unpack(codes: smallCodes, masks: smallMasks, rows: 8, cols: 8) == smallGrid)
+            
+            let (largeCodes, largeMasks) = Sectioning.pack(largeGrid)
+            #expect(Sectioning.unpack(codes: largeCodes, masks: largeMasks, rows: 32, cols: 32) == largeGrid)
+        }
     }
 }
 

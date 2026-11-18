@@ -12,6 +12,9 @@
 //
 
 public enum WarpConstants {
+    /// ROBUSTNESS: Class I Resizing
+    /// The base tile size in pixels. For resizing robustness, actual tiles are scaled to keep
+    /// roughly 16×16 tiles per image: tileSizeFor(width:height:) returns the tile dimension.
     public static let tileSize = 32
     public static let trials = 16
     public static let highPassKernel = 9
@@ -23,4 +26,14 @@ public enum WarpConstants {
     public static let highStrength: Float = 0.05
     static let lowStrengthD: Double = 0.025
     static let highStrengthD: Double = 0.05
+    
+    /// ROBUSTNESS: Class I Resizing
+    /// The tile dimension for an image of the given size, scaled to keep ~16 tiles per dimension.
+    public static func tileSizeFor(width w: Int, height h: Int) -> Int {
+        let targetTiles = 16
+        let tileW = max(1, (w + targetTiles - 1) / targetTiles)
+        let tileH = max(1, (h + targetTiles - 1) / targetTiles)
+        // Use the larger of the two to keep tiles roughly square; cast to Int.
+        return max(tileW, tileH)
+    }
 }

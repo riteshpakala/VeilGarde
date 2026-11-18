@@ -47,4 +47,14 @@ public enum ImageLoading {
         ctx.draw(image, in: CGRect(x: -rect.minX, y: -dy, width: CGFloat(image.width), height: CGFloat(image.height)))
         return ctx.makeImage()
     }
+
+    /// Scale `cg` to the given pixel dimensions using CoreGraphics' high-quality interpolation.
+    public static func scale(_ cg: CGImage, width: Int, height: Int) -> CGImage? {
+        guard width > 0, height > 0,
+              let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.interpolationQuality = .high
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
+        return ctx.makeImage()
+    }
 }

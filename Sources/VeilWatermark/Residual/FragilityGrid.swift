@@ -52,11 +52,16 @@ public struct NativePlane {
     }
 
     /// The fragility rate of every full tile from (originX, originY).
+    /// ROBUSTNESS: Class I Resizing
+    /// Tile dimensions are scaled to keep ~16 tiles per image dimension.
+    /// The warp path between anchor pixels scales with the image, preserving
+    /// the same geometric relationship.
     public func fragility(originX: Int = 0, originY: Int = 0, quantizeLikeCV2: Bool = true) -> FragilityGrid {
-        let ts = WarpConstants.tileSize
+        let ts = WarpConstants.tileSizeFor(width: width, height: height)
         let rows = max(0, (height - originY) / ts), cols = max(0, (width - originX) / ts)
         guard rows > 0, cols > 0 else { return FragilityGrid(rows: rows, cols: cols, values: [], originX: originX, originY: originY) }
-        let tables = WarpTables.shared(quantizeLikeCV2: quantizeLikeCV2)
+        let lowTables = WarpTables.build(tileWidth: ts, tileHeight: ts, scale: WarpConstants.lowStrengthD, quantizeLikeCV2: quantizeLikeCV2)
+        let highTables = WarpTables.build(tileWidth: ts, tileHeight: ts, scale: WarpConstants.highStrengthD, quantizeLikeCV2: quantizeLikeCV2)
         let region = array[originY..<(originY + rows * ts), originX..<(originX + cols * ts), 0...]
         let tiles = region.reshaped([rows, ts, cols, ts, 3]).transposed(0, 2, 1, 3, 4).reshaped([rows * cols, ts * ts, 3])
         var out = [Float]()
@@ -65,8 +70,8 @@ public struct NativePlane {
         while a < rows * cols {
             let b = min(a + WarpConstants.evalTileBudget, rows * cols)
             let chunk = tiles[a..<b]
-            let low = WarpResidual.batch(chunk, forward: tables.lowForward, back: tables.lowBack)
-            let high = WarpResidual.batch(chunk, forward: tables.highForward, back: tables.highBack)
+            let low = WarpResidual.batch(chunk, forward: lowTables.fwd, back: lowTables.back)
+            let high = WarpResidual.batch(chunk, forward: highTables.fwd, back: highTables.back)
             let fr = WarpResidual.fragility(low: low, high: high)
             MLX.eval(fr)
             out += fr.asArray(Float.self)

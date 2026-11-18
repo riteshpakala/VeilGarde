@@ -28,14 +28,16 @@ public struct WarpTables {
 
     public init(quantizeLikeCV2: Bool) {
         self.quantizeLikeCV2 = quantizeLikeCV2
-        (lowForward, lowBack) = Self.build(scale: WarpConstants.lowStrengthD, quantizeLikeCV2: quantizeLikeCV2)
-        (highForward, highBack) = Self.build(scale: WarpConstants.highStrengthD, quantizeLikeCV2: quantizeLikeCV2)
+        // Default to the base tileSize for backwards compatibility; callers can override via build(tileWidth:tileHeight:...).
+        (lowForward, lowBack) = Self.build(tileWidth: WarpConstants.tileSize, tileHeight: WarpConstants.tileSize, scale: WarpConstants.lowStrengthD, quantizeLikeCV2: quantizeLikeCV2)
+        (highForward, highBack) = Self.build(tileWidth: WarpConstants.tileSize, tileHeight: WarpConstants.tileSize, scale: WarpConstants.highStrengthD, quantizeLikeCV2: quantizeLikeCV2)
     }
 
     /// The (forward, inverse) tap tables for the 16 trials at strength `s`.
-    static func build(scale s: Double, quantizeLikeCV2: Bool) -> (fwd: WarpTapTable, back: WarpTapTable) {
-        let ts = WarpConstants.tileSize
+    static func build(tileWidth w: Int, tileHeight h: Int, scale s: Double, quantizeLikeCV2: Bool) -> (fwd: WarpTapTable, back: WarpTapTable) {
+        let ts = max(w, h)
         let t = Float(ts)
+        // Anchor corners are at the tile's actual dimensions, so they scale with the image.
         let srcCorners: [[Float]] = [[0, 0], [t, 0], [t, t], [0, t]]
         var fwdMats = [[Double]]()
         var backMats = [[Double]]()

@@ -152,7 +152,7 @@ public enum TileFeatures {
         MLX.eval(featAll)
         return TileFeatureRows(tileRows: TR, tileCols: TC, values: featAll.asArray(Float.self))
     }
-
+    
     // MARK: Seams (SH, SV, SH_S, SV_S)
 
     /// How a tile's residual edge strip differs from its neighbour's facing strip, in mean and in
