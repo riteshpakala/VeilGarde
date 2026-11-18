@@ -53,11 +53,10 @@ public struct NativePlane {
 
     /// The fragility rate of every full tile from (originX, originY).
     /// ROBUSTNESS: Class I Resizing
-    /// Tile dimensions are scaled to keep ~16 tiles per image dimension.
-    /// The warp path between anchor pixels scales with the image, preserving
-    /// the same geometric relationship.
+    /// Tile dimensions are fixed at 32 px; the warp tables scale with the image
+    /// through their strength parameter, preserving geometric relationships.
     public func fragility(originX: Int = 0, originY: Int = 0, quantizeLikeCV2: Bool = true) -> FragilityGrid {
-        let ts = WarpConstants.tileSizeFor(width: width, height: height)
+        let ts = WarpConstants.tileSize
         let rows = max(0, (height - originY) / ts), cols = max(0, (width - originX) / ts)
         guard rows > 0, cols > 0 else { return FragilityGrid(rows: rows, cols: cols, values: [], originX: originX, originY: originY) }
         let lowTables = WarpTables.build(tileWidth: ts, tileHeight: ts, scale: WarpConstants.lowStrengthD, quantizeLikeCV2: quantizeLikeCV2)
