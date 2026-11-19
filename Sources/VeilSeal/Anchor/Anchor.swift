@@ -46,12 +46,22 @@ public struct AnchorReading: Sendable {
     }
 
     /// One reading per measure, in order: the anchors, their squares and their residual found once, each measure's codes on them.
-    public static func read(_ cg: CGImage, key: SealKey, measures: [any NeighbourhoodMeasure], count: Int, residual: Bool) throws -> [AnchorReading] {
+    /// `selection` other than strength reads the warp residual of twice `count` candidates and keeps `count` of them by it.
+    public static func read(_ cg: CGImage, key: SealKey, measures: [any NeighbourhoodMeasure], count: Int, residual: Bool,
+                            selection: AnchorSelection = .strength) throws -> [AnchorReading] {
         let image = try SealImage(cg)
         let space = ScaleSpace(image)
-        let found = AnchorFinder.find(space, count: count)
-        let squares = CanonicalPatch.cut(found, from: space)
-        let warp = residual ? AnchorResidual.read(squares, count: found.count, key: key) : nil
+        var found = AnchorFinder.find(space, count: selection == .strength ? count : 2 * count)
+        var squares = CanonicalPatch.cut(found, from: space)
+        var warp = residual || selection != .strength ? AnchorResidual.read(squares, count: found.count, key: key) : nil
+        if selection != .strength, let w = warp, found.count > count {
+            let ranked = selection.rank(found, fragility: w.fragility)
+            let kept = AnchorFinder.spread(ranked.map { found[$0] }, count: count, width: image.width, height: image.height).map { ranked[$0] }
+            let side = CanonicalPatch.side * CanonicalPatch.side * 3
+            found = kept.map { found[$0] }
+            squares = kept.flatMap { squares[($0 * side)..<(($0 + 1) * side)] }
+            warp = AnchorResidualRead(fragility: kept.map { w.fragility[$0] }, bits: kept.map { w.bits[$0] })
+        }
         let k = Float(image.toOriginal)
         return measures.map { measure in
             let codes = measure.codes(squares)
@@ -61,6 +71,29 @@ public struct AnchorReading: Sendable {
             }
             return AnchorReading(anchors: anchors, width: image.originalWidth, height: image.originalHeight,
                                  workingWidth: image.width, workingHeight: image.height, toOriginal: image.toOriginal)
+        }
+    }
+}
+
+/// How a reading keeps its anchors among the candidates: by strength alone, by strength with the warp's fragility
+/// breaking near-ties (responses within 10% of each other), or by fragility among the strongest twice as many.
+public enum AnchorSelection: String, Codable, Sendable, CaseIterable {
+    case strength, tieBreak, fragile
+
+    /// Candidate indices, best first.
+    func rank(_ found: [FoundAnchor], fragility: [Float]) -> [Int] {
+        let band: (Int) -> Int = { Int(floor(log(max(1e-9, found[$0].response)) / log(1.1))) }
+        switch self {
+        case .strength:
+            return Array(found.indices)
+        case .tieBreak:
+            return found.indices.sorted {
+                let a = band($0), b = band($1)
+                if a != b { return a > b }
+                return fragility[$0] != fragility[$1] ? fragility[$0] > fragility[$1] : $0 < $1
+            }
+        case .fragile:
+            return found.indices.sorted { fragility[$0] != fragility[$1] ? fragility[$0] > fragility[$1] : $0 < $1 }
         }
     }
 }

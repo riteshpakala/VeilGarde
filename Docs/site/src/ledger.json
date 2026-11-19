@@ -1570,6 +1570,13 @@
       "rejected": "HSL as the default (it ties on what is found, but holds 5-24% fewer inliers under region layers, gradients and grayscale, and 13% fewer at the recapture's tenth percentile); StructurePattern (a stranger reached 12 inliers); CensusPattern (a stranger reached 8; weaker under grayscale); pointer bits pinned by measured flip rate (the pairs are drawn from each person's key, so an index measured on the default key means nothing on another); dropping the hop requirement (no stranger retraced a hop, but the null holds no hard negatives yet)",
       "reason": "seed 1, 186 sealed and 91 never sealed, 28 changes each: found rates for the four measures tie within a picture (Class I 98.8-99.2%), the measures differ only in inliers held; phase's strangers reached at most 6 inliers (hsl 7, census 8, structure 12). With phase, the spread starts and the small-picture draw: Class I 99.6%, combined 98.9%, filters 100%, recapture 98.9%, 0 false matches, misses 45 -> 11; crops had held up to 106 inliers with no path inside them, and a 227 x 339 picture held 14 anchors at its own size",
       "file": "Sources/VeilSeal/Seal/BurgundySeal.swift"
+    },
+    {
+      "id": "decision-157",
+      "chose": "How anchors are kept: by strength alone, the warp's fragility choosing none of them; and a picture with fewer strong extrema than the cap keeps them all and fills the rest with weak ones, contrast between 0.01 and 0.03 (a picture with enough reads exactly as before). `seal accept --selection` and `--weak-contrast` keep the variants measured",
+      "rejected": "the plan's fragility tie-break (within 1 inlier of strength on every change: only the anchors in the one band at the cut can swap, and a picture with fewer candidates than the cap, 47% of the sample and every weak one, keeps them all whatever the order); fragility first (2-3% more inliers on resizes, 5-8% fewer under crops, blur, region layers, gradients and recapture, about 11x slower); a weak floor of 0.015 (8 misses against 9, but 7-20% fewer inliers in the weakest tenth)",
+      "reason": "seed 1, 186 sealed and 91 never sealed: under the three selections the tenth percentile of inliers was identical on every change (what limits the weak tail is how many anchors a picture holds, not which); with the weak floor at 0.01 that tenth percentile went 137 -> 240 at 0.5x, 159 -> 335 at 0.75x, 49 -> 96 for a quarter crop, 96 -> 182 combined, 145 -> 289 recapture, 139 -> 327 blur; misses 11 -> 9, a stranger's best unchanged at 6; Class I 99.7%, combined 99.5%, filters 100%, recapture 98.9%",
+      "file": "Sources/VeilSeal/Anchor/AnchorFinder.swift"
     }
   ],
   "commands": [

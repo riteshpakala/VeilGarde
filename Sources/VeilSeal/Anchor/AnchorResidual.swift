@@ -39,9 +39,14 @@ public enum AnchorResidual {
         return out
     }
 
+    /// One MLX workload at a time, whichever thread asks.
+    static let gate = NSLock()
+
     /// FR and residual bits for `count` squares (count × 3072 floats, 0–255).
     public static func read(_ squares: [Float], count: Int, key: SealKey) -> AnchorResidualRead {
         guard count > 0 else { return AnchorResidualRead(fragility: [], bits: []) }
+        gate.lock()
+        defer { gate.unlock() }
         let ts = WarpConstants.tileSize
         let tables = WarpTables.shared(quantizeLikeCV2: true)
         let all = MLXArray(squares, [count, ts * ts, 3])

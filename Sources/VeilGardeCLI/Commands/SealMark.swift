@@ -224,6 +224,8 @@ extension SealCommand {
         @Option(help: "Seeds whose samples are left out, comma-separated.") var excluding: String = ""
         @Option(help: "Changes to run, comma-separated (default: all).") var changes: String?
         @Option(help: "The neighbourhood measure: hsl, structure, phase or census.") var measure: String = BurgundySeal.defaultMeasure
+        @Option(help: "How anchors are kept: strength, tieBreak (fragility breaks near-ties) or fragile (GPU).") var selection: String = "strength"
+        @Option(help: "The weak contrast floor that fills a picture short of strong anchors (default: the seal's).") var weakContrast: Float?
         @Option(help: "Found when inliers reach this.") var inliers: Int = SealSearch.foundInliers
         @Option(help: "Found when retraced hops reach this.") var hops: Int = SealSearch.foundHops
         @Option(help: "final_mixed's folder (default: final_mixed under VEILGARDE_DATASETS, else the work area's datasets/).") var dataset: String?
@@ -252,6 +254,9 @@ extension SealCommand {
                 settings.foundInliers = inliers
                 settings.foundHops = hops
                 settings.measure = measure
+                guard let chosen = AnchorSelection(rawValue: selection) else { throw VeilGardeFailure.usage("no selection \(selection)") }
+                settings.selection = chosen
+                if let weakContrast { settings.weakContrast = weakContrast }
                 if let changes {
                     settings.changes = try changes.split(separator: ",").map {
                         guard let c = SealChange(rawValue: $0.trimmingCharacters(in: .whitespaces)) else { throw VeilGardeFailure.usage("no change \($0)") }

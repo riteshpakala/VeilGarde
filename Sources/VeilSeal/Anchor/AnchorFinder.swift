@@ -11,11 +11,15 @@
 //        ratio is below edge (10). Orientation: 36-bin histogram of gradients within 4.5σ, weighted by
 //        a Gaussian of 1.5σ, smoothed [1 4 6 4 1]; every peak ≥ 0.8 of the highest is its own anchor
 //        (parabola-interpolated). Kept: the strongest `count` by |D(x̂)|, at most 2·count/64 in any cell
-//        of an 8×8 grid on the first pass, the rest filled by strength; ties by place, scale, angle.
+//        of an 8×8 grid on the first pass, the rest filled by strength; ties by place, scale, angle. A
+//        picture with fewer strong extrema than `count` keeps them all and fills the rest with weak ones
+//        (contrast between weakContrast and contrast, from starts above half of weakContrast/s), spread
+//        the same way; a picture with enough reads exactly as without the weak floor.
 //        Angles are atan2(dy, dx) with y pointing down, the convention every canonical patch uses.
 //  ROBUSTNESS: Class I · Crop, Resizing, Compression; Class II · Photo of a photo — scale-space
 //        extrema and their orientation follow a similarity; the contrast floor and the edge test drop
-//        the extrema a re-encode moves; the grid spreads anchors so a crop of any part keeps some.
+//        the extrema a re-encode moves; the grid spreads anchors so a crop of any part keeps some; the
+//        weak floor gives a flat or small picture enough anchors that a halved or cropped copy keeps some.
 //
 
 import Foundation
@@ -40,10 +44,17 @@ enum AnchorFinder {
     static let bins = 36
     static let peakRatio: Float = 0.8
 
+    /// The weak floor: below `contrast`, extrema down to this fill a picture that holds fewer than `count`
+    /// strong ones (decision-157: 0.01 nearly doubled the weakest tenth's inliers under resizes, crops, blur and
+    /// recapture, with no stranger nearer). Equal to `contrast`, nothing weak is kept. Process-wide, set once.
+    nonisolated(unsafe) static var weakContrast: Float = 0.01
+
     static func find(_ space: ScaleSpace, count: Int) -> [FoundAnchor] {
-        var found: [FoundAnchor] = []
+        var strong: [FoundAnchor] = [], weak: [FoundAnchor] = []
         let s = ScaleSpace.layers
         let threshold = 0.5 * contrast / Float(s)
+        let floor = min(contrast, weakContrast)
+        let low = 0.5 * floor / Float(s)
         for o in 0..<space.dogs.count {
             let dog = space.dogs[o]
             let w = dog[0].width, h = dog[0].height
@@ -57,14 +68,19 @@ enum AnchorFinder {
                                 for x in border..<(w - border) {
                                     let c = y * w + x
                                     let v = cur[c]
-                                    guard abs(v) > threshold else { continue }
-                                    if isExtremum(v, c, offsets, cur, prev, next),
-                                       let refined = refine(dog, octave: o, layer: i, x: x, y: y) {
-                                        for angle in orientations(space.gaussians[o][refined.layer], refined) {
-                                            var a = refined.anchor
-                                            a.angle = angle
-                                            found.append(a)
-                                        }
+                                    guard abs(v) > low else { continue }
+                                    guard isExtremum(v, c, offsets, cur, prev, next),
+                                          let refined = refine(dog, octave: o, layer: i, x: x, y: y, floor: floor) else { continue }
+                                    // Strong: exactly the rule without a weak floor. Weak: below the contrast floor.
+                                    // A weak start that settles on a strong value is dropped, so a picture with enough
+                                    // strong extrema reads exactly as it would without the weak floor.
+                                    let reaches = refined.anchor.response * Float(s) >= contrast
+                                    let isStrong = abs(v) > threshold && reaches
+                                    guard isStrong || !reaches else { continue }
+                                    for angle in orientations(space.gaussians[o][refined.layer], refined) {
+                                        var a = refined.anchor
+                                        a.angle = angle
+                                        if isStrong { strong.append(a) } else { weak.append(a) }
                                     }
                                 }
                             }
@@ -73,7 +89,10 @@ enum AnchorFinder {
                 }
             }
         }
-        return select(found, count: count, width: space.dogs[0][0].width, height: space.dogs[0][0].height)
+        let width = space.dogs[0][0].width, height = space.dogs[0][0].height
+        guard strong.count < count, !weak.isEmpty else { return select(strong, count: count, width: width, height: height) }
+        return select(strong, count: strong.count, width: width, height: height)
+            + select(weak, count: count - strong.count, width: width, height: height)
     }
 
     @inline(__always)
@@ -100,7 +119,7 @@ enum AnchorFinder {
     }
 
     /// The quadratic fit around (x, y) in DoG layer `layer`; nil when it wanders off, is too faint or is an edge.
-    static func refine(_ dog: [Plane], octave: Int, layer: Int, x: Int, y: Int) -> Refined? {
+    static func refine(_ dog: [Plane], octave: Int, layer: Int, x: Int, y: Int, floor: Float = contrast) -> Refined? {
         let s = ScaleSpace.layers
         var x = x, y = y, i = layer
         var offset = (Float(0), Float(0), Float(0))
@@ -134,7 +153,7 @@ enum AnchorFinder {
         }
         guard settled else { return nil }
         let value = dog[i].at(x, y) + 0.5 * (gradient.0 * offset.0 + gradient.1 * offset.1 + gradient.2 * offset.2)
-        guard abs(value) * Float(s) >= contrast else { return nil }
+        guard abs(value) * Float(s) >= floor else { return nil }
         let trace = hxx + hyy, det = hxx * hyy - hxy * hxy
         guard det > 0, trace * trace * edge < (edge + 1) * (edge + 1) * det else { return nil }
         let scale = Float(1 << octave)
@@ -197,11 +216,17 @@ enum AnchorFinder {
             if $0.sigma != $1.sigma { return $0.sigma < $1.sigma }
             return $0.angle < $1.angle
         }
-        guard ranked.count > count else { return ranked }
+        return spread(ranked, count: count, width: width, height: height).map { ranked[$0] }
+    }
+
+    /// Indices of the first `count` of `ranked`, at most 2·count/64 in any cell of an 8×8 grid on a first
+    /// pass, the rest filled in rank order.
+    static func spread(_ ranked: [FoundAnchor], count: Int, width: Int, height: Int) -> [Int] {
+        guard ranked.count > count else { return Array(ranked.indices) }
         let cells = 8, cap = max(1, 2 * count / (cells * cells))
         var used = [Int](repeating: 0, count: cells * cells)
         var taken = [Bool](repeating: false, count: ranked.count)
-        var out: [FoundAnchor] = []
+        var out: [Int] = []
         out.reserveCapacity(count)
         for (n, a) in ranked.enumerated() where out.count < count {
             let cx = min(cells - 1, Int(a.x) * cells / max(1, width)), cy = min(cells - 1, Int(a.y) * cells / max(1, height))
@@ -209,9 +234,9 @@ enum AnchorFinder {
             guard used[cell] < cap else { continue }
             used[cell] += 1
             taken[n] = true
-            out.append(a)
+            out.append(n)
         }
-        for (n, a) in ranked.enumerated() where out.count < count && !taken[n] { out.append(a) }
+        for n in ranked.indices where out.count < count && !taken[n] { out.append(n) }
         return out
     }
 

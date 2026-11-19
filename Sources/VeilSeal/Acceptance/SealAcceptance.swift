@@ -36,6 +36,10 @@ public struct SealAcceptanceSettings: Codable, Sendable {
     public var foundHops = SealSearch.foundHops
     /// The neighbourhood measure the seals are read with (NeighbourhoodMeasures).
     public var measure = BurgundySeal.defaultMeasure
+    /// How anchors are kept (strength, or the warp's fragility: that reads the residual on the GPU, one picture at a time).
+    public var selection = AnchorSelection.strength
+    /// AnchorFinder's weak floor for the run (equal to its contrast: no weak anchors).
+    public var weakContrast: Float = AnchorFinder.weakContrast
 
     public init() {}
 }
@@ -148,6 +152,7 @@ public enum SealAcceptance {
             throw VeilGardeFailure.usage("no measure \(settings.measure): \(NeighbourhoodMeasures.names.joined(separator: ", "))")
         }
         let lock = NSLock()
+        AnchorFinder.weakContrast = settings.weakContrast
 
         // Seal every picture, in parallel.
         var records = [SealRecord?](repeating: nil, count: sealed.count)
@@ -155,7 +160,8 @@ public enum SealAcceptance {
         DispatchQueue.concurrentPerform(iterations: sealed.count) { i in
             do {
                 let p = try picture(sealed[i].url, longSide: settings.longSide)
-                let reading = try AnchorReading.read(try p.cgImage(), key: key, measure: measure, count: AnchorReading.sealCount, residual: false)
+                let reading = try AnchorReading.read(try p.cgImage(), key: key, measures: [measure], count: AnchorReading.sealCount, residual: false,
+                                                     selection: settings.selection)[0]
                 let facts = SealImageFacts(width: p.width, height: p.height, sha256: ContentHash.sha256Hex(Data(p.rgb)), name: sealed[i].url.lastPathComponent)
                 let r = try SealRecord(id: nil, label: "\(i)", keyFingerprint: key.fingerprint, measure: measure.name, image: facts,
                                        anchors: reading.anchors, paths: PathWalker.walk(reading.anchors, pointerBits: measure.pointerBits), interlace: nil)
@@ -194,7 +200,8 @@ public enum SealAcceptance {
                 let t0 = Date()
                 guard let copy = try? change.apply(p, seed: seed(settings.seed, picture: job.picture, change: change)),
                       let cg = try? copy.cgImage(),
-                      let reading = try? AnchorReading.read(cg, key: key, measure: measure, count: AnchorReading.searchCount, residual: false)
+                      let reading = try? AnchorReading.read(cg, key: key, measures: [measure], count: AnchorReading.searchCount, residual: false,
+                                                       selection: settings.selection)[0]
                 else { continue }
                 var own: SealScore?
                 var others: [SealScore] = []
