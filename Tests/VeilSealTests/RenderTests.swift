@@ -3,10 +3,9 @@
 //  VeilSealTests
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The pictures a mark is shown with, on the CPU: a record's digest is 640 × 800 and the same
-//        pixels every time (pinned by digest), a detection's digest draws for every verdict, an overlay
-//        scales a large image to 1,600 px under its header and keeps a small one whole on a 640-px canvas,
-//        and the bitmap font's glyphs are five by seven.
+//  WHAT: The words and pictures a seal is shown with, on the CPU: each verdict's summary; the wax (burgundy
+//        at its centre, clear at its corners, the same pixels twice, a rim of its id's own) and its ghost; the
+//        detection graphic and the digest at the layout's size; the bitmap font's glyphs (five by seven).
 //
 
 import CoreGraphics
@@ -16,69 +15,79 @@ import VeilGardeCore
 import VeilGardeLens
 @testable import VeilSeal
 
-@Suite("Mark pictures")
+@Suite("Seal pictures")
 struct RenderTests {
     static func pixels(_ png: Data) throws -> (width: Int, height: Int, sha: String) {
         let image = try ImageDecoding.cgImage(data: png)
         return (image.width, image.height, ContentHash.sha256Hex(Data(try MarkFixture.bytes(image))))
     }
 
-    static func detection(_ verdict: SealVerdict) -> SealDetection {
+    static func detection(_ verdict: SealVerdict, interlaced: SealID? = nil) -> SealDetection {
         let record = MarkFixture.record()
-        let found = verdict == .marked || verdict == .contentMismatch || verdict == .unknownID
-        let message = PayloadCode.message(id: MarkFixture.id, key: .default)
-        let soft = PayloadCode.encode(message).enumerated().map { i, bit -> Float in (bit == 1 ? 1 : -1) * Float(1 + i % 5) }
-        let reading = MarkReading(id: found ? MarkFixture.id : nil, pilotZ: found ? 7.25 : 0.5, pilotAgreement: 0.9, pilotBits: 900, phaseX: 5, phaseY: 11,
-                                  periodRow: 3, periodCol: 4, message: message, codedSoft: soft, codewordAgreement: found ? 0.97 : nil,
-                                  tiles: 999, reads: 32, seconds: 9.5)
-        let codes = record.signature.tileCodes
-        let match = verdict == .marked || verdict == .passiveMatch || verdict == .contentMismatch
-            ? MatchResult(offsetX: 2, offsetY: 3, phaseX: 5, phaseY: 11, score: verdict == .contentMismatch ? 0.52 : 0.96, bitsCompared: 640,
-                          zScore: 23, matched: verdict != .contentMismatch)
-            : nil
-        let agreement = match.map { _ in Matcher.agreement(crop: codes, stored: codes, dx: 0, dy: 0, originX: 5, originY: 11) }
-        let markMap = found ? TileMap(rows: 4, cols: 4, values: (0..<16).map { Float($0 % 3) - 1 }, weights: [Float](repeating: 1, count: 16), originX: 5, originY: 11) : nil
-        var d = SealDetection(verdict: verdict, reading: reading, record: verdict == .unknownID || verdict == .none ? nil : record, match: match,
-                              agreement: agreement, markMap: markMap, consistent: verdict == .marked ? true : nil, exactBytes: false,
-                              keyFingerprint: SealKey.default.fingerprint, width: 480, height: 400, seconds: 9.5, summary: "")
+        let match = SealMatch(id: record.id, label: "Ana", createdAt: record.createdAt, candidates: 300, inliers: 240, retraced: 80, possible: 91,
+                              coverage: 0.25, scale: 0.5, projective: false, residualAgreement: 0.8, transform: .identity, found: verdict == .sealed,
+                              anchors: [], trails: [], portion: [])
+        var d = SealDetection(verdict: verdict, match: verdict == .unknownSeal || verdict == .contentMismatch ? nil : match, interlaced: interlaced,
+                              width: 512, height: 512, anchors: 900, seals: 3, keyFingerprint: SealKey.default.fingerprint, seconds: 1, summary: "")
         d.summary = BurgundySeal.summary(d, haveStore: true)
         return d
     }
 
-    @Test("a record's digest is 640 × 800 and the pinned pixels")
-    func recordDigest() throws {
-        let png = try BurgundySeal.digest(MarkFixture.record())
-        let p = try Self.pixels(png)
-        #expect(p.width == 640 && p.height == 800)
-        #expect(p.sha == "f08a4b327a76158090bd247ab5685519d171600893e1f53308b1192b8ec31e59")
-        #expect(try BurgundySeal.digest(MarkFixture.record()) == png, "drawn twice, the same bytes")
-    }
-
-    @Test("a detection's digest draws for every verdict", arguments: SealVerdict.allCases)
-    func detectionDigest(verdict: SealVerdict) throws {
-        let p = try Self.pixels(try BurgundySeal.digest(Self.detection(verdict)))
-        #expect(p.width == 640 && p.height == 800)
-    }
-
-    @Test("an overlay: a large image scaled to 1,600 px under a 64-px header; a small one whole on a 640-px canvas")
-    func overlay() throws {
-        let large = try PNGEncoding.png(rgb: [UInt8](repeating: 128, count: 3200 * 1000 * 3), width: 3200, height: 1000)
-        let big = try Self.pixels(try BurgundySeal.overlay(Self.detection(.marked), query: try ImageDecoding.cgImage(data: large)))
-        #expect(big.width == 1600 && big.height == 64 + 500 + 8)
-        let small = try PNGEncoding.png(rgb: [UInt8](repeating: 90, count: 480 * 400 * 3), width: 480, height: 400)
-        for layer in OverlayLayer.allCases {
-            let p = try Self.pixels(try BurgundySeal.overlay(Self.detection(.passiveMatch), query: try ImageDecoding.cgImage(data: small), layer: layer))
-            #expect(p.width == 640 && p.height == 64 + 400 + 8)
-        }
-    }
-
     @Test("verdict summaries say what happened")
     func summaries() {
-        #expect(Self.detection(.marked).summary == "Marked · id 0123456789abcdef · recorded as “Ana” · z 7.2 · passive 0.96")
-        #expect(Self.detection(.none).summary == "No mark · no id passes its check over 999 tiles", "never the pilots' z without an id")
-        #expect(Self.detection(.unknownID).summary.hasPrefix("Unknown id · 0123456789abcdef is not in this store"))
-        #expect(Self.detection(.contentMismatch).summary.hasPrefix("Content mismatch · id 0123456789abcdef is recorded for another image (passive 0.52)"))
-        #expect(Self.detection(.passiveMatch).summary.contains("recorded as “Ana”"))
+        let id = MarkFixture.record().id.hex
+        #expect(Self.detection(.sealed).summary == "sealed: “Ana” (\(id)) — 240 anchors agree, 80 of 91 hops retraced, 25% of the original at 0.50×")
+        #expect(Self.detection(.none).summary.hasPrefix("no seal among 3: the nearest, “Ana”"))
+        #expect(Self.detection(.unknownSeal, interlaced: SealID(1)).summary.hasPrefix("unknown seal: the interlace names 0000000000000001"))
+        #expect(Self.detection(.contentMismatch, interlaced: SealID(1)).summary.hasPrefix("content mismatch: the interlace names 0000000000000001"))
+        #expect(Self.detection(.interlaceOnly, interlaced: SealID(1)).summary.contains("reads only in part"))
+    }
+
+    static func rgba(_ image: CGImage) -> [UInt8] {
+        var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        bytes.withUnsafeMutableBytes { buffer in
+            let ctx = CGContext(data: buffer.baseAddress, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            ctx?.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        }
+        return bytes
+    }
+
+    @Test("the wax: burgundy at the centre, clear at the corners, the same pixels twice, its rim its id's own; the ghost is faint")
+    func wax() throws {
+        let a = try WaxSeal.image(id: SealID(0xabc), size: 200), b = try WaxSeal.image(id: SealID(0xabc), size: 200)
+        #expect(a.width == 200 && a.height == 200)
+        let pa = Self.rgba(a)
+        #expect(pa == Self.rgba(b))
+        #expect(pa != Self.rgba(try WaxSeal.image(id: SealID(0xdef), size: 200)), "another id, another rim")
+        let centre = (100 * 200 + 100) * 4
+        #expect(pa[centre + 3] == 255 && Int(pa[centre]) > Int(pa[centre + 1]) + 30 && Int(pa[centre]) > Int(pa[centre + 2]) + 20, "burgundy")
+        #expect(pa[3] == 0 && pa[(200 * 200 - 1) * 4 + 3] == 0, "the corners are clear")
+        let ghost = Self.rgba(try WaxSeal.ghost(size: 200))
+        #expect(stride(from: 3, to: ghost.count, by: 4).allSatisfy { ghost[$0] <= 141 }, "never more than 55% opaque")
+        #expect(RRMarkMask.bits.count == RRMarkMask.width * RRMarkMask.height && RRMarkMask.bits.contains(true) && RRMarkMask.bits.contains(false))
+    }
+
+    @Test("the detection graphic draws for every verdict, with and without the picture, at the layout's size", arguments: SealVerdict.allCases)
+    func detectionGraphic(verdict: SealVerdict) throws {
+        let d = Self.detection(verdict, interlaced: verdict == .sealed ? nil : SealID(1))
+        let layout = SealGraphic.layout(width: d.width, height: d.height)
+        for picture in [nil, try MarkFixture.stranger(seed: 1)] {
+            let png = try BurgundySeal.graphic(d, picture: picture)
+            let (w, h, _) = try Self.pixels(png)
+            #expect(w == layout.width && h == layout.height)
+        }
+        #expect(layout.pictureW == 520 && layout.pictureH == 520, "a small picture drawn at a 520-px side")
+        #expect(SealGraphic.layout(width: 4000, height: 3000).pictureW == 1000, "a large one fitted to 1000 × 760")
+    }
+
+    @Test("a seal's digest draws with and without its picture")
+    func sealDigest() throws {
+        let record = MarkFixture.record()
+        for picture in [nil, try MarkFixture.stranger(seed: 2)] {
+            let (w, h, _) = try Self.pixels(try BurgundySeal.digest(record, picture: picture))
+            #expect(w == SealGraphic.layout(width: 512, height: 512).width && h == SealGraphic.layout(width: 512, height: 512).height)
+        }
     }
 
     @Test("the font: seven rows of five bits a glyph, lowercase drawn as uppercase, typographic quotes and dashes as typewriter ones, the rest as ?")

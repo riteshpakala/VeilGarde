@@ -23,11 +23,18 @@ enum MarkFixture {
                     droppedPairs: 12, verified: verified, pilotZ: 7.5, codewordAgreement: 0.97, seconds: 61)
     }
 
-    static func record(id: SealID = id, label: String? = "Ana", seed: UInt64 = 7, sha: String? = nil) -> SealRecord {
-        let signature = GridSignature(grid: randomCodes(rows: 16, cols: 16, seed: seed))
-        return SealRecord(id: id, label: label, keyFingerprint: SealKey.default.fingerprint, signature: signature,
-                               pngSHA256: sha ?? ContentHash.sha256Hex("png \(id.hex) \(seed)"), width: 512, height: 512, sourceName: "ana.jpg",
-                               createdAt: Date(timeIntervalSince1970: 1_795_000_000), settings: .default, report: report())
+    /// A burgundy/1 seal of `count` seeded synthetic anchors walked into paths; its id is its cid's unless given.
+    static func record(id: SealID? = nil, label: String? = "Ana", seed: UInt64 = 7, count: Int = 40) -> SealRecord {
+        var rng = SplitMix64(seed: seed)
+        let anchors = (0..<count).map { _ in
+            Anchor(x: Float(rng.unit() * 500), y: Float(rng.unit() * 500), scale: Float(2 + rng.unit() * 6), angle: Float(rng.unit() * 6.28),
+                   response: Float(rng.unit()), code: Code256(rng.next(), rng.next(), rng.next(), rng.next()), fragility: Float(rng.unit()),
+                   residual: UInt32(truncatingIfNeeded: rng.next()) & 0xFF_FFFF)
+        }
+        let paths = PathWalker.walk(anchors, pointerBits: HSLPattern(key: .default).pointerBits)
+        return try! SealRecord(id: id, label: label, createdAt: Date(timeIntervalSince1970: 1_795_000_000), keyFingerprint: SealKey.default.fingerprint,
+                               measure: "hsl", image: SealImageFacts(width: 512, height: 512, sha256: "png \(seed)", name: "ana.jpg"),
+                               anchors: anchors, paths: paths, interlace: nil)
     }
 
     /// Soft levels (±1) on a rows × cols grid whose tile (0, 0) carries period cell (offsetRow, offsetCol).
@@ -65,6 +72,28 @@ enum MarkFixture {
         cell(ben, 1, 1, sx: 1, sy: -1)
         cell(fox, 2, 1, sx: -1, sy: -1)
         cell(ben, 3, 1, sx: -1, sy: -1)
+        guard let image = ctx.makeImage() else { throw VeilGardeFailure.internalError("no image") }
+        return image
+    }
+
+    /// A picture no seal was made from: seeded ellipses, bars and speckle on a graded ground, 640 × 480.
+    static func stranger(seed: UInt64) throws -> CGImage {
+        var rng = SplitMix64(seed: seed &* 0x9E37_79B9)
+        let w = 640, h = 480
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { throw VeilGardeFailure.internalError("no context") }
+        func colour() -> CGColor { CGColor(red: rng.unit(), green: rng.unit(), blue: rng.unit(), alpha: 0.55 + 0.45 * rng.unit()) }
+        ctx.setFillColor(colour())
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        for _ in 0..<90 {
+            ctx.setFillColor(colour())
+            let r = CGRect(x: rng.unit() * Double(w), y: rng.unit() * Double(h), width: 8 + rng.unit() * 120, height: 8 + rng.unit() * 120)
+            if rng.unit() < 0.5 { ctx.fillEllipse(in: r) } else { ctx.fill(r) }
+        }
+        for _ in 0..<1500 {
+            ctx.setFillColor(colour())
+            ctx.fill(CGRect(x: rng.unit() * Double(w), y: rng.unit() * Double(h), width: 2, height: 2))
+        }
         guard let image = ctx.makeImage() else { throw VeilGardeFailure.internalError("no image") }
         return image
     }

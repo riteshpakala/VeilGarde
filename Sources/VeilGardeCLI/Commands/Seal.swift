@@ -20,7 +20,7 @@ struct SealCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "seal", abstract: "The Burgundy Seal: seal a picture, and find it again in a crop, a resize, a re-encode or an edit.",
         discussion: "The seal is a design under measurement: run its acceptance before relying on it.",
-        subcommands: [Grid.self, Invariance.self, Embed.self, Detect.self, Render.self, Records.self])
+        subcommands: [Make.self, Detect.self, Render.self, Records.self, ResizingTest.self, Grid.self, Invariance.self])
 
     /// The grid signature (vw1): sign, match, verify and its acceptance.
     struct Grid: ParsableCommand {

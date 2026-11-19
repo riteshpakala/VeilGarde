@@ -3,12 +3,14 @@
 //  VeilSeal
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: A passive, crop-robust signature read off an image's per-tile warp fragility pattern:
-//        sectioned tile codes that a crop of the same image reproduces, matched by offset and
-//        grid phase. The warp residual it reads is its own (Residual/); it re-exports the Lens for
-//        decoding and image handling. Beside it, the pixel mark (vgm1): an id written into the same
-//        fragility and read blind (Mark/, BurgundySeal its one door), the records a store keeps (Store/),
-//        and the pictures that show a mark (Render/).
+//  WHAT: The Burgundy Seal: "pixels may change, but neighbourhoods rarely do". A picture's anchors
+//        (Anchor/: scale-space extrema, their canonical squares, HSL patterns and the warp residual at
+//        each), the paths their patterns walk (Path/: walking, matching, consensus, retracing), and the
+//        signature a store keeps (Seal/: burgundy/1, SealStore, BurgundySeal its one door). Beside it,
+//        the grid signature (vw1: Residual/, Signature/, Sections/, Match/), the pixel mark (vgm1, Mark/)
+//        that interlaces a seal's id until the anchor interlace passes its bars, and the pictures that
+//        show a seal (Render/: the wax seal, the digest, the detection graphic). It re-exports the Lens
+//        for decoding and image handling.
 //
 
 @_exported import VeilGardeLens

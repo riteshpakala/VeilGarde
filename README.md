@@ -134,8 +134,10 @@ VEILGARDE_CONFIG=release Scripts/cli.sh train heads     # a candidate bundle und
 Scripts/cli.sh flywheel init && Scripts/cli.sh flywheel battery --gate full
 VEILGARDE_CONFIG=release Scripts/cli.sh research census  # every call of a bundle on the battery and 200 labelled images
 Scripts/cli.sh seal grid sign photo.jpg > photo.vw1 && Scripts/cli.sh seal grid match crop.jpg photo.vw1
-Scripts/cli.sh seal embed photo.jpg --out marked.png --label "Ana" --store <folder>   # the pixel mark, its record kept
-Scripts/cli.sh seal detect crop.jpg --store <folder> --overlay o.png --digest d.png  # marked, whose, and where
+Scripts/cli.sh seal make photo.jpg --label "Ana" --store <folder>        # the Burgundy Seal, kept in the store
+Scripts/cli.sh seal detect crop.jpg --store <folder>                      # sealed, whose, how much of it
+Scripts/cli.sh seal render detection crop.jpg --out d.png --store <folder>  # the paths walked across it, the wax seal
+Scripts/cli.sh seal resizing-test photo.jpg                               # sealed, then found at 50, 75, 150, 200 %
 Scripts/cli.sh audio sign song.wav > song.vw1 && Scripts/cli.sh audio match cut.m4a song.vw1   # --profile speech for voices
 Scripts/cli.sh audio roundtrip song.wav --out back.wav  # the spectrogram back to sound, with its SNR
 Scripts/cli.sh audio accept --audio <speech folder> --profile speech --phases $(seq -s, 0 31) --out r.json   # the 32-phase experiment
@@ -160,7 +162,7 @@ The site's chat asks Mistral about what you are reading. On a Mac that holds a M
 
 ## Embedding VeilGarde
 
-An app or an agent takes the watermark by URL and calls `BurgundySeal`; nothing of VeilGarde is copied into it.
+An app or an agent takes the seal by URL and calls `BurgundySeal`; nothing of VeilGarde is copied into it.
 
 ```swift
 .package(url: "https://github.com/riteshpakala/VeilGarde", branch: "main"),
@@ -171,18 +173,19 @@ An app or an agent takes the watermark by URL and calls `BurgundySeal`; nothing 
 import VeilSeal
 
 let store = try SealStore(directory: folder)            // a folder the app chooses; VeilGarde picks none
-let marked = try BurgundySeal.embed(contentsOf: photo, label: "Ana", store: store, progress: { print($0.line) })
-try marked.png.write(to: out)                                 // marked.record: the id, the signature, the report
-let found = try BurgundySeal.detect(contentsOf: crop, store: store)
-print(found.summary)                                          // marked · id … · recorded as “Ana” · z … · passive …
-let pictures = (try BurgundySeal.digest(found), try BurgundySeal.overlay(found, queryContentsOf: crop))
+let key = try SealKey.loadOrCreate(at: folder.appendingPathComponent("seal.key"))
+let sealed = try BurgundySeal.seal(contentsOf: photo, label: "Ana", store: store, key: key)
+let found = try BurgundySeal.detect(contentsOf: crop, store: store, key: key)
+print(found.summary)                                    // sealed: “Ana” (…) — 247 anchors agree, 80 of 91 hops retraced, 25% of the original
+let pictures = (try BurgundySeal.digest(sealed.record, pictureAt: photo), try BurgundySeal.graphic(found, pictureAt: crop))
 ```
 
 - **macOS 26 on Apple silicon.** `VeilSeal` takes MLX from [Frigate](https://github.com/rao-studios/Frigate) and not its LLM stack: a package embedding it builds MLX, not MLXLLM, Tokenizers or Hub.
 - **One Frigate per graph, by URL.** Inside another package VeilGarde takes Frigate from GitHub, so a consumer must not add Frigate by path. Export `GIT_LFS_SKIP_SMUDGE=1` while resolving: Frigate's LFS fixtures break SwiftPM checkouts.
 - **`mlx.metallib` beside the executable.** `swift build` compiles no Metal; without the library the first GPU call dies. Frigate's `scripts/build-metallib.sh <debug|release> --package <your package>` writes it into your `.build`; ship it next to your binary.
-- **One MLX workload at a time.** Every embed and detect holds a lock in its process; `BurgundySeal.configure(lockFile:)` adds an flock, so processes sharing a GPU queue. Embedding takes minutes for a large photo: progress arrives per optimiser step, and a `CancelFlag` (or cancelling the async form's task) stops it between steps.
-- **The store is a folder of files.** `store.json` names its format; `records/<hh>/<id>.json` holds one record, `by-png/<hh>/<sha256>` the id of a PNG the store made. Writes are atomic and safe across processes; back it up by copying the folder. A record keeps the key's fingerprint, never the key.
+- **One MLX workload at a time.** Every seal and detect holds a lock in its process; `BurgundySeal.configure(lockFile:)` adds an flock, so processes sharing a GPU queue. A seal takes seconds; an interlaced one (`interlace: .signature`, vgm1 carrying the seal's id until the anchor interlace passes its bars) minutes for a large photo.
+- **The store is a folder of files.** `store.json` names its format; `seals/<hh>/<id>.json` holds one seal (burgundy/1). Writes are atomic and safe across processes; back it up by copying the folder. A seal keeps the key's fingerprint, never the key.
+- **The seal is under measurement.** Found so far on single photos: crops down to a quarter, resizes from 0.5× to 2×, JPEG q40, a 7° turn. Its thresholds (12 agreeing anchors, 3 retraced hops) are first-cut and are fixed by an acceptance run on final_mixed against bars recorded before it runs.
 - **The mark is under measurement.** Its defaults are tuned on a seeded sample and then measured by an acceptance run against bars fixed before it runs; until then, nothing here is a claim about robustness. It does not survive resizing. What is known: it lives on the tiles' exact edges, so a reading searches a crop's pixel phase (about a hundred reads, seconds on a large crop) and an uncropped image reads at once; at that phase about one tile in five reads wrong, so an image needs about 1 MP (four periods of 480 × 512 px) to carry it, and a smaller one is refused.
 - **GPL-3.0-only.** A program that links VeilSeal is a combined work under the GPL.
 
