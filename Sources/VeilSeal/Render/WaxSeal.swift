@@ -11,16 +11,17 @@
 //        flakes' torn edges and the brushing are seeded from the seal's id. `ghost` is the outline a
 //        picture that holds no seal is shown with.
 //  PIN:  Height = a thin rim r(θ) = R(0.86 + Σ waves + 0.45 Σ drips) climbing from its outer edge
-//        to a crest at its lip, 0.70R less the tongues melting inward (wide, so they round off), where
-//        it rolls 0.045R over onto a face sitting low; ahead of the lip the red is pushed up into a
-//        swell and a fainter ripple and marbled with teal veins drawn along the rim. Then two engraved
-//        rings (half smoothed over where the red was pushed), the RR mark (0.94R wide, 0.07R below the
-//        centre) pressed 0.32 deeper with its silhouette softened by two box blurs, and gold leaf
-//        raised 0.06 with a crinkle. R = 0.42 of the picture. Shading: diffuse between each surface's
-//        three tones (Style.lyon, sampled from a photograph of the arms on a Lyon facade); the mark's
-//        lit faces lean to platinum, streaked by value noise drawn along a stroke 20° off the
-//        horizontal; Blinn-Phong highlights (wax 40, mark 50, gold 24), a soft shadow down and right.
-//        Seeds: SplitMix64 of the id. Pure CPU, no CoreText, the same pixels every time.
+//        to a crest at its lip, 0.70R less the tongues melting inward (by the id, narrow ones that
+//        pinch in or wide ones that round off), where it rolls 0.045R over onto a face sitting low;
+//        ahead of the lip the red is pushed up into a swell and a fainter ripple and marbled with teal
+//        veins drawn along the rim. Then two engraved rings (half smoothed over where the red was
+//        pushed), the RR mark (0.94R wide, 0.07R below the centre) pressed 0.32 deeper with its
+//        silhouette softened by two box blurs, and gold leaf raised 0.06 with a crinkle. R = 0.42 of
+//        the picture. Shading: diffuse between each surface's three tones (Style.lyon, sampled from a
+//        photograph of the arms on a Lyon facade); the mark's lit faces lean to platinum, streaked by
+//        value noise drawn along a stroke 20° off the horizontal; Blinn-Phong highlights (wax 40,
+//        mark 50, gold 24), a soft shadow down and right. Seeds: SplitMix64 of the id. Pure CPU, no
+//        CoreText, the same pixels every time.
 //
 
 import CoreGraphics
@@ -102,8 +103,10 @@ enum WaxSeal {
             return R * r
         }
         // The rim's inner edge, where its lip rolls onto the face: tongues of wax melt inward.
+        // Each seal melts in one of two ways, by its id: narrow tongues that pinch in, or wide ones that round off.
+        let (sizes, widths): ((Float, Float), (Float, Float)) = pinched(id) ? ((0.025, 0.05), (0.06, 0.12)) : ((0.022, 0.042), (0.17, 0.20))
         let tongues: [(at: Float, size: Float, width: Float)] = (0..<(5 + Int(rng.unit() * 3))).map { _ in
-            (at: Float(rng.unit() * 2 * .pi), size: Float(0.022 + 0.042 * rng.unit()), width: Float(0.17 + 0.20 * rng.unit()))
+            (at: Float(rng.unit() * 2 * .pi), size: sizes.0 + sizes.1 * Float(rng.unit()), width: widths.0 + widths.1 * Float(rng.unit()))
         }
         func lip(_ theta: Float) -> Float {
             var r: Float = 0.70
@@ -302,6 +305,12 @@ enum WaxSeal {
             }
         }
         return try rgbaImage(bytes, s, s)
+    }
+
+    /// Whether `id`'s rim melts in with narrow, pinching tongues (else wide, rounded ones): half of all seals, by a hash of the id.
+    static func pinched(_ id: SealID) -> Bool {
+        var pick = SplitMix64(seed: id.value ^ 0x7096_E5ED_CE11_0003)
+        return pick.unit() < 0.5
     }
 
     /// A picture with no seal: a faint dashed outline where the seal would sit and the mark barely there.

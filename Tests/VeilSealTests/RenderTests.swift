@@ -60,6 +60,7 @@ struct RenderTests {
         let pa = Self.rgba(a)
         #expect(pa == Self.rgba(b))
         #expect(pa != Self.rgba(try WaxSeal.image(id: SealID(0xdef), size: 200)), "another id, another rim")
+        #expect(Set((1...32).map { WaxSeal.pinched(SealID($0)) }).count == 2, "seals melt in both ways")
         func at(_ x: Int, _ y: Int) -> (r: Int, g: Int, b: Int, a: Int) {
             let i = (y * 200 + x) * 4
             return (Int(pa[i]), Int(pa[i + 1]), Int(pa[i + 2]), Int(pa[i + 3]))
