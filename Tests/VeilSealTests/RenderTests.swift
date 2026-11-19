@@ -53,14 +53,15 @@ struct RenderTests {
         return bytes
     }
 
-    @Test("the wax: a teal rim, a burgundy face, gold above the mark, clear at the corners, the same pixels twice, its rim its id's own; the ghost is faint")
+    @Test("the wax: a teal rim, a burgundy face, gold above the mark, clear at the corners, the same pixels twice, two waxes by the id; the ghost is faint")
     func wax() throws {
         let a = try WaxSeal.image(id: SealID(0xabc), size: 200), b = try WaxSeal.image(id: SealID(0xabc), size: 200)
         #expect(a.width == 200 && a.height == 200)
         let pa = Self.rgba(a)
         #expect(pa == Self.rgba(b))
-        #expect(pa != Self.rgba(try WaxSeal.image(id: SealID(0xdef), size: 200)), "another id, another rim")
-        #expect(Set((1...32).map { WaxSeal.pinched(SealID($0)) }).count == 2, "seals melt in both ways")
+        let other = (UInt64(1)...64).first { WaxSeal.pinched(SealID($0)) != WaxSeal.pinched(SealID(0xabc)) }.map(SealID.init)
+        #expect(other != nil, "seals come in both waxes")
+        if let other { #expect(pa != Self.rgba(try WaxSeal.image(id: other, size: 200)), "the other wax, another rim") }
         func at(_ x: Int, _ y: Int) -> (r: Int, g: Int, b: Int, a: Int) {
             let i = (y * 200 + x) * 4
             return (Int(pa[i]), Int(pa[i + 1]), Int(pa[i + 2]), Int(pa[i + 3]))

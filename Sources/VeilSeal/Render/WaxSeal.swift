@@ -7,12 +7,11 @@
 //        teal wax (the shield's border) curling up and melting in over a burgundy stamp face (its
 //        field), the RR mark pressed into the face with a brushed-platinum sheen (its lion) and three
 //        gold flakes in a row above it (its chief's fleurs-de-lis) — drawn from a height field and lit
-//        from the upper left. Each seal's wax runs its own way: the rim's lobes, drips and tongues, the
-//        flakes' torn edges and the brushing are seeded from the seal's id. `ghost` is the outline a
-//        picture that holds no seal is shown with.
+//        from the upper left. Two waxes, one shape: a seal's id picks the one whose rim pinches in or
+//        the one whose rim rounds off. `ghost` is the outline a picture that holds no seal is shown with.
 //  PIN:  Height = a thin rim r(θ) = R(0.86 + Σ waves + 0.45 Σ drips) climbing from its outer edge
-//        to a crest at its lip, 0.70R less the tongues melting inward (by the id, narrow ones that
-//        pinch in or wide ones that round off), where it rolls 0.045R over onto a face sitting low;
+//        to a crest at its lip, 0.70R less the tongues melting inward (narrow ones that pinch in, or
+//        wide ones that round off), where it rolls 0.045R over onto a face sitting low;
 //        ahead of the lip the red is pushed up into a swell and a fainter ripple and marbled with teal
 //        veins drawn along the rim. Then two engraved rings (half smoothed over where the red was
 //        pushed), the RR mark (0.94R wide, 0.07R below the centre) pressed 0.32 deeper with its
@@ -20,7 +19,7 @@
 //        the picture. Shading: diffuse between each surface's three tones (Style.lyon, sampled from a
 //        photograph of the arms on a Lyon facade); the mark's lit faces lean to platinum, streaked by
 //        value noise drawn along a stroke 20° off the horizontal; Blinn-Phong highlights (wax 40,
-//        mark 50, gold 24), a soft shadow down and right. Seeds: SplitMix64 of the id. Pure CPU, no
+//        mark 50, gold 24), a soft shadow down and right. Seeds: SplitMix64 of `wax`. Pure CPU, no
 //        CoreText, the same pixels every time.
 //
 
@@ -80,7 +79,7 @@ enum WaxSeal {
     static func image(id: SealID, size: Int) throws -> CGImage {
         let style = Style.lyon
         let s = size, c = Float(s) / 2, R = Float(s) * 0.42
-        var rng = SplitMix64(seed: id.value ^ 0xB0E6_A4D1_5EA1_0001)
+        var rng = SplitMix64(seed: Self.wax ^ 0xB0E6_A4D1_5EA1_0001)
         let base: [(Float, Float)] = [(3, 0.022), (5, 0.016), (7, 0.010), (11, 0.006)]
         let waves: [(k: Float, a: Float, phase: Float)] = base.map {
             (k: $0.0, a: $0.1 * Float(0.6 + 0.8 * rng.unit()), phase: Float(rng.unit() * 2 * .pi))
@@ -103,7 +102,7 @@ enum WaxSeal {
             return R * r
         }
         // The rim's inner edge, where its lip rolls onto the face: tongues of wax melt inward.
-        // Each seal melts in one of two ways, by its id: narrow tongues that pinch in, or wide ones that round off.
+        // One of two waxes, by the seal's id: narrow tongues that pinch in, or wide ones that round off.
         let (sizes, widths): ((Float, Float), (Float, Float)) = pinched(id) ? ((0.025, 0.05), (0.06, 0.12)) : ((0.022, 0.042), (0.17, 0.20))
         let tongues: [(at: Float, size: Float, width: Float)] = (0..<(5 + Int(rng.unit() * 3))).map { _ in
             (at: Float(rng.unit() * 2 * .pi), size: sizes.0 + sizes.1 * Float(rng.unit()), width: widths.0 + widths.1 * Float(rng.unit()))
@@ -127,7 +126,7 @@ enum WaxSeal {
         }
 
         // The flakes: torn leaf, each edge its id's own.
-        var leaf = SplitMix64(seed: id.value ^ 0x601D_F1A4_E5EA_1002)
+        var leaf = SplitMix64(seed: Self.wax ^ 0x601D_F1A4_E5EA_1002)
         let flakes = style.flakes.map { f -> (x: Float, y: Float, size: Float, turn: Float, tears: [(Float, Float, Float)]) in
             let tears: [(Float, Float, Float)] = [(3, 0.17), (5, 0.11), (7, 0.07), (17, 0.035)].map {
                 ($0.0, $0.1 * Float(0.6 + 0.8 * leaf.unit()), Float(leaf.unit() * 2 * .pi))
@@ -166,7 +165,7 @@ enum WaxSeal {
         let fine = max(0.6, Float(s) / 700)
         func brushed(_ x: Float, _ y: Float) -> Float {
             let u = x * along.0 + y * along.1, v = -x * along.1 + y * along.0
-            return 0.65 * noise(u / (30 * fine), v / fine, id.value) + 0.35 * noise(u / (70 * fine), v / (3 * fine), ~id.value)
+            return 0.65 * noise(u / (30 * fine), v / fine, Self.wax) + 0.35 * noise(u / (70 * fine), v / (3 * fine), ~Self.wax)
         }
 
         var height = [Float](repeating: 0, count: s * s)
@@ -177,7 +176,7 @@ enum WaxSeal {
         var hollow = [Float](repeating: 0, count: s * s)
         var veins = [Float](repeating: 0, count: s * s)
         let face = 0.70 * R
-        var grainSeed = SplitMix64(seed: id.value)
+        var grainSeed = SplitMix64(seed: Self.wax)
         let grain = (0..<(64 * 64)).map { _ in Float(grainSeed.unit()) }
         func grainAt(_ x: Float, _ y: Float, _ spacing: Float) -> Float {
             let u = x / spacing, v = y / spacing
@@ -218,7 +217,7 @@ enum WaxSeal {
                     // Streaks run along the rim; two samples a turn apart, crossfaded, close the seam at θ = ±π.
                     func marbleAt(_ t: Float) -> Float {
                         let along = t * R / fine, across = rho / fine
-                        return 0.7 * noise(along / 26, across / 3.2, id.value ^ 0x7EA1) + 0.3 * noise(along / 9, across / 1.4, id.value ^ 0x7EA2)
+                        return 0.7 * noise(along / 26, across / 3.2, Self.wax ^ 0x7EA1) + 0.3 * noise(along / 9, across / 1.4, Self.wax ^ 0x7EA2)
                     }
                     let w = (theta + .pi) / (2 * .pi)
                     let marble = w * marbleAt(theta) + (1 - w) * marbleAt(theta + 2 * .pi)
@@ -307,7 +306,12 @@ enum WaxSeal {
         return try rgbaImage(bytes, s, s)
     }
 
-    /// Whether `id`'s rim melts in with narrow, pinching tongues (else wide, rounded ones): half of all seals, by a hash of the id.
+    /// Every seal is drawn from the one wax the design was chosen on (its lobes, drips, tongues, flakes, brushing and
+    /// grain); the two waxes differ only in how the rim melts in.
+    static let wax: UInt64 = 0x9DC0_BEE2_F8B4_635C
+
+    /// Whether `id`'s seal is the wax whose rim melts in with narrow, pinching tongues (else wide, rounded ones): half of
+    /// all seals, by a hash of the id.
     static func pinched(_ id: SealID) -> Bool {
         var pick = SplitMix64(seed: id.value ^ 0x7096_E5ED_CE11_0003)
         return pick.unit() < 0.5
