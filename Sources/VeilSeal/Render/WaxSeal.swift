@@ -3,14 +3,19 @@
 //  VeilSeal
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The Burgundy Seal itself: a letter seal of melted burgundy wax with the RR mark pressed into
-//        it, drawn from a height field and lit from the upper left. Each seal's wax runs its own way:
-//        the rim's lobes and drips are seeded from the seal's id. `ghost` is the outline a picture
-//        that holds no seal is shown with.
+//  WHAT: The Burgundy Seal itself: a letter seal in the colours of the arms of Lyon — melted teal wax
+//        (the shield's border) around a burgundy stamp face (its field), the RR mark pressed into the
+//        face with a brushed-platinum sheen (its lion) and three gold flakes in a row above it (its
+//        chief's fleurs-de-lis) — drawn from a height field and lit from the upper left. Each seal's wax
+//        runs its own way: the rim's lobes and drips, the flakes' torn edges and the brushing are seeded
+//        from the seal's id. `ghost` is the outline a picture that holds no seal is shown with.
 //  PIN:  Height = a dome rising 0.18R in from a rim r(θ) = R(1 + Σ waves + Σ drips), a stamp face
-//        pressed 0.55 inside 0.70R with the wax pushed up into a ridge at its edge, two engraved rings
-//        and the RR mark raised 0.32 (its silhouette softened by two box blurs). Shading: diffuse
-//        between #3E0710, #6E1222 and #9B2338, Blinn-Phong highlights (exponent 40), a soft shadow down
+//        pressed 0.55 inside 0.70R with the wax pushed up into a ridge at its edge, two engraved rings,
+//        the RR mark (0.94R wide, 0.07R below the centre) pressed 0.32 deeper with its silhouette
+//        softened by two box blurs, and gold leaf raised 0.06 with a crinkle. Shading: diffuse between
+//        each surface's three tones (Style.lyon, sampled from a photograph of the arms on a Lyon
+//        facade); the mark's lit faces lean to platinum, streaked by value noise drawn along a stroke
+//        20° off the horizontal; Blinn-Phong highlights (wax 40, mark 50, gold 24), a soft shadow down
 //        and right. Seeds: SplitMix64 of the id. Pure CPU, no CoreText, the same pixels every time.
 //
 
@@ -32,6 +37,35 @@ enum WaxSeal {
     static let burgundy = Colour.hex(0x9B2338)
     static let gleam = Colour(r: 1, g: 0.84, b: 0.86)
 
+    /// Three tones a surface is shaded between (in shadow, lit, in full light) and the tint of its highlight.
+    struct Tones {
+        var shadow: Colour, lit: Colour, full: Colour, gleam: Colour
+    }
+
+    /// One gold flake pressed into the face: where (in R from the centre, y down), how big (in R), turned how far.
+    struct Flake {
+        var x: Float, y: Float, size: Float, turn: Float
+    }
+
+    /// The seal's colourway, after the arms of Lyon: the melted rim, the stamp face, the mark and the flakes.
+    struct Style {
+        var rim: Tones
+        var face: Tones
+        var mark: Tones
+        /// A brushed metal whose light the mark's highlights catch, if any.
+        var sheen: Tones?
+        var gold: Tones
+        var flakes: [Flake]
+        /// The mark's width in R, and how far below the centre it sits.
+        var markWidth: Float
+        var markDrop: Float
+    }
+
+    static let burgundyFace = Tones(shadow: deep, lit: wine, full: burgundy, gleam: gleam)
+    static let lyonTeal = Tones(shadow: .hex(0x0F2C33), lit: .hex(0x275B6C), full: .hex(0x4F8592), gleam: Colour(r: 0.86, g: 1, b: 0.98))
+    static let platinum = Tones(shadow: .hex(0x3E4249), lit: .hex(0xA0A4AA), full: .hex(0xEEF0EE), gleam: Colour(r: 1, g: 1, b: 1))
+    static let gold = Tones(shadow: .hex(0x5A4119), lit: .hex(0xA8822F), full: .hex(0xE6C25E), gleam: Colour(r: 1, g: 0.95, b: 0.78))
+
     @inline(__always) static func smoothstep(_ a: Float, _ b: Float, _ x: Float) -> Float {
         let t = min(1, max(0, (x - a) / (b - a)))
         return t * t * (3 - 2 * t)
@@ -39,6 +73,7 @@ enum WaxSeal {
 
     /// The seal for `id`, `size` px square, with alpha.
     static func image(id: SealID, size: Int) throws -> CGImage {
+        let style = Style.lyon
         let s = size, c = Float(s) / 2, R = Float(s) * 0.38
         var rng = SplitMix64(seed: id.value ^ 0xB0E6_A4D1_5EA1_0001)
         let base: [(Float, Float)] = [(3, 0.022), (5, 0.016), (7, 0.010), (11, 0.006)]
@@ -63,10 +98,10 @@ enum WaxSeal {
         }
 
         // The RR mark, softened, fitted to 1.04R wide at the centre.
-        let markW = 1.04 * R, markH = markW * Float(RRMarkMask.height) / Float(RRMarkMask.width)
+        let markW = style.markWidth * R, markH = markW * Float(RRMarkMask.height) / Float(RRMarkMask.width)
         let soft = softenedMark()
         func mark(_ x: Float, _ y: Float) -> Float {
-            let u = (x - (c - markW / 2)) / markW * Float(RRMarkMask.width), v = (y - (c - markH / 2 + 0.02 * R)) / markH * Float(RRMarkMask.height)
+            let u = (x - (c - markW / 2)) / markW * Float(RRMarkMask.width), v = (y - (c - markH / 2 + style.markDrop * R)) / markH * Float(RRMarkMask.height)
             guard u >= 0, v >= 0, u < Float(RRMarkMask.width - 1), v < Float(RRMarkMask.height - 1) else { return 0 }
             let x0 = Int(u), y0 = Int(v), ax = u - Float(x0), ay = v - Float(y0), w = RRMarkMask.width
             let top = soft[y0 * w + x0] * (1 - ax) + soft[y0 * w + x0 + 1] * ax
@@ -74,8 +109,53 @@ enum WaxSeal {
             return top * (1 - ay) + bottom * ay
         }
 
+        // The flakes: torn leaf, each edge its id's own.
+        var leaf = SplitMix64(seed: id.value ^ 0x601D_F1A4_E5EA_1002)
+        let flakes = style.flakes.map { f -> (x: Float, y: Float, size: Float, turn: Float, tears: [(Float, Float, Float)]) in
+            let tears: [(Float, Float, Float)] = [(3, 0.17), (5, 0.11), (7, 0.07), (17, 0.035)].map {
+                ($0.0, $0.1 * Float(0.6 + 0.8 * leaf.unit()), Float(leaf.unit() * 2 * .pi))
+            }
+            let jitter = Float(leaf.unit() - 0.5) * 0.03
+            return (x: c + (f.x + jitter) * R, y: c + (f.y + jitter) * R, size: f.size * R * Float(0.9 + 0.2 * leaf.unit()),
+                    turn: f.turn + Float(leaf.unit() - 0.5), tears: tears)
+        }
+        func flake(_ x: Float, _ y: Float) -> Float {
+            var best: Float = 0
+            for f in flakes {
+                let dx = x - f.x, dy = y - f.y
+                guard abs(dx) < 2 * f.size, abs(dy) < 2 * f.size else { continue }
+                let u = (dx * cos(f.turn) + dy * sin(f.turn)) / 1.25, v = -dx * sin(f.turn) + dy * cos(f.turn)
+                let phi = atan2(v, u)
+                var edge: Float = 1
+                for t in f.tears { edge += t.1 * sin(t.0 * phi + t.2) }
+                best = max(best, min(1, max(0, f.size * edge - (u * u + v * v).squareRoot() + 0.5)))
+            }
+            return best
+        }
+
+        // Brushed metal: value noise stretched along a stroke 20° off the horizontal, two octaves.
+        func hash(_ i: Int, _ j: Int, _ salt: UInt64) -> Float {
+            var z = UInt64(bitPattern: Int64(i)) &* 0x9E37_79B9_7F4A_7C15 ^ UInt64(bitPattern: Int64(j)) &* 0xC2B2_AE3D_27D4_EB4F ^ salt
+            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+            return Float((z ^ (z >> 31)) >> 40) / Float(1 << 24)
+        }
+        func noise(_ u: Float, _ v: Float, _ salt: UInt64) -> Float {
+            let i = Int(u.rounded(.down)), j = Int(v.rounded(.down)), a = u - Float(i), b = v - Float(j)
+            let top = hash(i, j, salt) * (1 - a) + hash(i + 1, j, salt) * a, bottom = hash(i, j + 1, salt) * (1 - a) + hash(i + 1, j + 1, salt) * a
+            return top * (1 - b) + bottom * b
+        }
+        let along = (cos(Float(-0.35)), sin(Float(-0.35)))
+        let fine = max(0.6, Float(s) / 700)
+        func brushed(_ x: Float, _ y: Float) -> Float {
+            let u = x * along.0 + y * along.1, v = -x * along.1 + y * along.0
+            return 0.65 * noise(u / (30 * fine), v / fine, id.value) + 0.35 * noise(u / (70 * fine), v / (3 * fine), ~id.value)
+        }
+
         var height = [Float](repeating: 0, count: s * s)
         var coverage = [Float](repeating: 0, count: s * s)
+        var metal = [Float](repeating: 0, count: s * s)
+        var leafGold = [Float](repeating: 0, count: s * s)
         let face = 0.70 * R
         var noise = SplitMix64(seed: id.value)
         let grain = (0..<(64 * 64)).map { _ in Float(noise.unit()) }
@@ -101,8 +181,14 @@ enum WaxSeal {
                 h += 0.22 * exp(-ridge * ridge)
                 let ring1 = (rho - 0.62 * R) / (0.009 * R), ring2 = (rho - 0.585 * R) / (0.006 * R)
                 h += 0.10 * exp(-ring1 * ring1) + 0.07 * exp(-ring2 * ring2)
-                h += 0.32 * mark(Float(x) + 0.5, Float(y) + 0.5)
-                h += 0.025 * grainAt(Float(x), Float(y), 7) + 0.012 * grainAt(Float(x) + 31, Float(y) + 17, 2.5)
+                let m = mark(Float(x) + 0.5, Float(y) + 0.5)
+                h -= 0.32 * m
+                metal[i] = smoothstep(0.3, 0.7, m)
+                let g = flake(Float(x) + 0.5, Float(y) + 0.5)
+                leafGold[i] = g
+                // Wax grain, smoothed under the polished mark; gold leaf crinkles.
+                h += (1 - 0.7 * metal[i]) * (0.025 * grainAt(Float(x), Float(y), 7) + 0.012 * grainAt(Float(x) + 31, Float(y) + 17, 2.5))
+                h += g * (0.06 + 0.022 * grainAt(Float(x) + 11, Float(y) + 5, 3.5) + 0.012 * grainAt(Float(x) + 3, Float(y) + 29, 1.8))
                 height[i] = h
             }
         }
@@ -128,10 +214,39 @@ enum WaxSeal {
                     let hy = (height[min(s - 1, y + 1) * s + x] - height[max(0, y - 1) * s + x]) / 2
                     let n = normalised(-hx * slope, -hy * slope, 1)
                     let diffuse = max(0, n.0 * light.0 + n.1 * light.1 + n.2 * light.2)
-                    let spec = pow(max(0, n.0 * half.0 + n.1 * half.1 + n.2 * half.2), 40) * 0.55
-                    colour = deep.mix(wine, smoothstep(0.15, 0.62, diffuse)).mix(burgundy, smoothstep(0.62, 0.97, diffuse))
+                    let facing = max(0, n.0 * half.0 + n.1 * half.1 + n.2 * half.2)
+                    func shade(_ t: Tones, _ d: Float) -> Colour {
+                        t.shadow.mix(t.lit, smoothstep(0.15, 0.62, d)).mix(t.full, smoothstep(0.62, 0.97, d))
+                    }
+                    // Wax: the rim's tones outside the stamp face, the face's within.
+                    let dx = Float(x) + 0.5 - c, dy = Float(y) + 0.5 - c
+                    let inFace = smoothstep(face + 0.02 * R, face - 0.01 * R, (dx * dx + dy * dy).squareRoot())
+                    let waxGleam = style.rim.gleam.mix(style.face.gleam, inFace)
+                    let spec = pow(facing, 40) * 0.55
                     let depth = 0.8 + 0.2 * min(1, max(0, height[i]))
-                    colour = Colour(r: colour.r * depth + gleam.r * spec, g: colour.g * depth + gleam.g * spec, b: colour.b * depth + gleam.b * spec)
+                    let wax = shade(style.rim, diffuse).mix(shade(style.face, diffuse), inFace)
+                    colour = Colour(r: wax.r * depth + waxGleam.r * spec, g: wax.g * depth + waxGleam.g * spec, b: wax.b * depth + waxGleam.b * spec)
+                    // Platinum: a broad reflection falling from the upper left, sharp highlights on the bevels.
+                    if metal[i] > 0 {
+                        let sky = 0.5 + 0.5 * max(-1, min(1, (-dx * 0.62 - dy * 0.78) / (0.9 * R)))
+                        let brush = brushed(Float(x), Float(y))
+                        let light = 0.6 * diffuse + 0.4 * sky
+                        var p = shade(style.mark, light)
+                        var tint = style.mark.gleam
+                        if let sheen = style.sheen {
+                            p = p.mix(shade(sheen, diffuse), 0.6 * smoothstep(0.42, 0.85, light) * (0.55 + 0.45 * brush))
+                            tint = sheen.gleam
+                        }
+                        let grain = 0.86 + 0.28 * brush
+                        let ps = pow(facing, 50) * 0.75 * (0.4 + brush)
+                        colour = colour.mix(Colour(r: p.r * grain + tint.r * ps, g: p.g * grain + tint.g * ps, b: p.b * grain + tint.b * ps), metal[i])
+                    }
+                    // Gold leaf: deep where it faces away, bright and warm where it catches the light.
+                    if leafGold[i] > 0 {
+                        let gl = shade(style.gold, diffuse)
+                        let gs = pow(facing, 24) * 1.1
+                        colour = colour.mix(Colour(r: gl.r + style.gold.gleam.r * gs, g: gl.g + style.gold.gleam.g * gs, b: gl.b + style.gold.gleam.b * gs), leafGold[i])
+                    }
                 }
                 // Wax over shadow, premultiplied.
                 let alpha = a + shade * (1 - a)
@@ -218,4 +333,12 @@ enum WaxSeal {
         }
         return image
     }
+}
+
+extension WaxSeal.Style {
+    /// Teal melted rim, burgundy face, the mark pressed in with a brushed-platinum sheen, three gold flakes in a row above it (Lyon's chief).
+    static let lyon = WaxSeal.Style(rim: WaxSeal.lyonTeal, face: WaxSeal.burgundyFace, mark: WaxSeal.burgundyFace, sheen: WaxSeal.platinum, gold: WaxSeal.gold,
+                                    flakes: [.init(x: -0.19, y: -0.46, size: 0.062, turn: 0.3), .init(x: 0, y: -0.49, size: 0.07, turn: -0.5),
+                                             .init(x: 0.19, y: -0.46, size: 0.062, turn: 1.1)],
+                                    markWidth: 0.94, markDrop: 0.07)
 }

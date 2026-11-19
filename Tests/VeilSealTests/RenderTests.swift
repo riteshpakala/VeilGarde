@@ -53,15 +53,21 @@ struct RenderTests {
         return bytes
     }
 
-    @Test("the wax: burgundy at the centre, clear at the corners, the same pixels twice, its rim its id's own; the ghost is faint")
+    @Test("the wax: a teal rim, a burgundy face, gold above the mark, clear at the corners, the same pixels twice, its rim its id's own; the ghost is faint")
     func wax() throws {
         let a = try WaxSeal.image(id: SealID(0xabc), size: 200), b = try WaxSeal.image(id: SealID(0xabc), size: 200)
         #expect(a.width == 200 && a.height == 200)
         let pa = Self.rgba(a)
         #expect(pa == Self.rgba(b))
         #expect(pa != Self.rgba(try WaxSeal.image(id: SealID(0xdef), size: 200)), "another id, another rim")
-        let centre = (100 * 200 + 100) * 4
-        #expect(pa[centre + 3] == 255 && Int(pa[centre]) > Int(pa[centre + 1]) + 30 && Int(pa[centre]) > Int(pa[centre + 2]) + 20, "burgundy")
+        func at(_ x: Int, _ y: Int) -> (r: Int, g: Int, b: Int, a: Int) {
+            let i = (y * 200 + x) * 4
+            return (Int(pa[i]), Int(pa[i + 1]), Int(pa[i + 2]), Int(pa[i + 3]))
+        }
+        let rim = at(100, 162), face = at(100, 139), flake = at(100, 63)   // R = 76: 0.82R and 0.52R below the centre, 0.49R above
+        #expect(rim.a == 255 && rim.b > rim.r + 30 && rim.g > rim.r + 15, "teal rim")
+        #expect(face.a == 255 && face.r > face.g + 30 && face.r > face.b + 20, "burgundy face")
+        #expect(flake.r > flake.b + 40 && flake.g > flake.b + 20, "a gold flake above the mark")
         #expect(pa[3] == 0 && pa[(200 * 200 - 1) * 4 + 3] == 0, "the corners are clear")
         let ghost = Self.rgba(try WaxSeal.ghost(size: 200))
         #expect(stride(from: 3, to: ghost.count, by: 4).allSatisfy { ghost[$0] <= 141 }, "never more than 55% opaque")
