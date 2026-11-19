@@ -103,7 +103,7 @@ struct AudioCommand: ParsableCommand {
 
         func run() throws {
             guarded {
-                let r = try AudioWatermark.match(try loadClip(audio), against: try WatermarkCommand.signature(signature),
+                let r = try AudioWatermark.match(try loadClip(audio), against: try SealCommand.signature(signature),
                                                  profile: try profile.map(AudioCommand.profile(named:)), options: MatchOptions(phases: AudioCommand.phases(phases)))
                 if json { try emitJSON(try JSONCoding.prettyEncoder().encode(r), to: "-"); return }
                 print(String(format: "%@: score %.4f over %d bits (z %.1f); offset %d tiles at phase %d frames, the clip's start at column %d, %.3f s into the signed clip; frequency offset %d rows",
@@ -120,7 +120,7 @@ struct AudioCommand: ParsableCommand {
 
         func run() throws {
             guarded {
-                let r = try AudioWatermark.match(try loadClip(audio), against: try WatermarkCommand.signature(signature), profile: try profile.map(AudioCommand.profile(named:)))
+                let r = try AudioWatermark.match(try loadClip(audio), against: try SealCommand.signature(signature), profile: try profile.map(AudioCommand.profile(named:)))
                 print(String(format: "%@ (score %.4f, %d bits, z %.1f, %.3f s)", r.matched ? "match" : "no match", r.result.score, r.result.bitsCompared, r.result.zScore, r.seconds))
                 if !r.matched { throw ExitCode(1) }
             }

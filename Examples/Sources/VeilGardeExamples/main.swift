@@ -221,22 +221,22 @@ func run() throws {
 
     // 8. The other lane: the watermark, read off the warp residual.
     let markImage = try ImageDecoding.cgImage(contentsOf: crops[0].url)
-    let signature = try Watermark.sign(markImage)
+    let signature = try SealGrid.sign(markImage)
     Show.step(8, "watermark", "\(crops[0].name) signed by its fragility pattern: \(signature.rows)×\(signature.cols) tiles, \(signature.codes.count) sections of 4×4, \(signature.measuredBits) bits")
     Show.line("each 32-px tile warped through 16 fixed homographies at two strengths and back; its fragility rate is how much faster the stronger warps' residual grows")
     Show.line("each tile's 4 bits: is its fragility rate above its east, south, south-east and north-east neighbours'? (ordinal, so gain-proof)")
     Show.line("signature: \(signature.compact.prefix(64))… (\(signature.binary.count) bytes, cid \(signature.cid.prefix(16)))")
-    let me = try Watermark.match(markImage, against: signature, options: MatchOptions(phases: [0]))
+    let me = try SealGrid.match(markImage, against: signature, options: MatchOptions(phases: [0]))
     checks.record("the image matches its own signature at offset (0, 0) with score \(Show.f(Float(me.score), 3))", me.matched && me.score == 1 && me.offsetX == 0 && me.offsetY == 0)
     var rng = SplitMix64(seed: 19)
     let side = Int(Double(markImage.width) * 0.5.squareRoot())
     let cx = rng.index(markImage.width - side), cy = rng.index(markImage.height - side)
     if let crop = ImageLoading.renderCrop(markImage, CGRect(x: cx, y: cy, width: side, height: side)) {
-        let m = try Watermark.match(crop, against: signature)
+        let m = try SealGrid.match(crop, against: signature)
         let error = Double(max(abs(m.pixelX - cx), abs(m.pixelY - cy))) / 32
         Show.line(String(format: "a half-area crop at (%d, %d) px: %@, score %.3f over %d bits (z %.1f), found at (%d, %d), off by %.2f tiles",
                          cx, cy, m.matched ? "matched" : "not matched", m.score, m.bitsCompared, m.zScore, m.pixelX, m.pixelY, error))
-        let jpegMatch = try Watermark.match(try ImageCodec.recompressed(markImage, as: .jpeg, quality: 0.75), against: signature, options: MatchOptions(phases: [0]))
+        let jpegMatch = try SealGrid.match(try ImageCodec.recompressed(markImage, as: .jpeg, quality: 0.75), against: signature, options: MatchOptions(phases: [0]))
         Show.line(String(format: "the image re-encoded as JPEG q75: %@, score %.3f", jpegMatch.matched ? "matched" : "not matched", jpegMatch.score))
         Show.line("(reported, not asserted: whether v1 holds on real crops is `veilgarde watermark accept`'s question)")
     }

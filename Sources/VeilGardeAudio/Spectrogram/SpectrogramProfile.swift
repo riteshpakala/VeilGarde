@@ -19,7 +19,7 @@
 //
 
 import Foundation
-import VeilWatermark
+import VeilSeal
 
 public struct SpectrogramProfile: Sendable, Equatable, Codable {
     public let name: String

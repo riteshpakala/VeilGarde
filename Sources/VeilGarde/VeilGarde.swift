@@ -11,4 +11,4 @@
 @_exported import VeilGardeFlywheel
 @_exported import VeilGardeInference
 @_exported import VeilGardeTraining
-@_exported import VeilWatermark
+@_exported import VeilSeal

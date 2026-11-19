@@ -50,7 +50,7 @@ struct AcceptanceTests {
     func criterion(index: Int) throws {
         let (name, rows, killed) = Self.cases[index]
         let audio = AudioAcceptance.summarize(rows, settings: AudioAcceptanceSettings())
-        let image = WatermarkAcceptance.summarize(try rows.map(Self.imageRow), settings: AcceptanceSettings())
+        let image = GridAcceptance.summarize(try rows.map(Self.imageRow), settings: AcceptanceSettings())
         #expect(audio.killed == killed && audio.reasons.count == (killed ? 1 : 0), "\(name): \(audio.reasons)")
         #expect(audio.killed == image.killed && audio.reasons.count == image.reasons.count, "\(name): the carriers disagree")
         #expect(audio.selfMatchRate == image.selfMatchRate && audio.cutMatchRate == image.cropMatchRate && audio.reencodeMedianScore == image.jpegMedianScore)

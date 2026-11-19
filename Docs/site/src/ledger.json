@@ -1549,6 +1549,13 @@
       "rejected": "holding the defaults until the bound × smoothing × shift probe has run",
       "reason": "the owner's word, 2026-11-17: iterate VeilGarde directly through Craft's Rebuild; the probe may still move a default later, and the acceptance run and its K1–K8 bars stay open, so the mark is still under measurement",
       "file": "Sources/VeilWatermark/Mark/MarkSettings.swift"
+    },
+    {
+      "id": "decision-154",
+      "chose": "The watermark and the signature merge as the Burgundy Seal: VeilWatermark becomes VeilSeal (product, module, folder, CLI `seal`, types), the seal is two-fold (a signature derivative found by anchors, paths and the warp residual at each anchor; an encoding derivative, the interlace, hiding the seal's id or a person's message at the same anchors), and the signature is judged first against one kill criterion; the path prototype (branch path-prototype) is folded in by its vocabulary, not its code",
+      "rejected": "keeping vw1 and vgm1 as two products; extending the prototype's tile paths, which rebuild vw1's grid because the hint ignores direction and cannot survive a resize",
+      "reason": "the owner's word, 2026-11-18: one name, signature first, embedding for deterrence; vw1's fixed 32 px tiles matched 0% of crops resized 0.9x and 0.75x (2026-10-19), so the seal resamples each anchor at its own scale and keeps the residual at 32 px",
+      "file": "Package.swift"
     }
   ],
   "commands": [

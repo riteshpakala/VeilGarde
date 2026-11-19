@@ -1,6 +1,6 @@
 # VeilGardeAudio: the watermark on sound
 
-This target carries VeilGarde's watermark to audio. A clip is drawn as its spectrogram, and `Watermark.sign` signs that picture unchanged. Nothing is written into the sound. The picture goes back to sound through the exact inverse transform.
+This target carries VeilGarde's watermark to audio. A clip is drawn as its spectrogram, and `SealGrid.sign` signs that picture unchanged. Nothing is written into the sound. The picture goes back to sound through the exact inverse transform.
 
 These notes direct the research. **For now the research is speech protection only.** Music results are held as observations and are not being pursued.
 

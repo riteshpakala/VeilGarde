@@ -28,7 +28,7 @@
 
 import Foundation
 import VeilGardeCore
-import VeilWatermark
+import VeilSeal
 
 public struct AudioAcceptanceSettings: Codable, Sendable, Equatable {
     public var seed: UInt64 = 0
@@ -167,7 +167,7 @@ public enum AudioAcceptance {
         let profile = settings.spectrogramProfile
         let options = settings.options, phaseZero = settings.phaseZero
         // Pass 1: every signature (the cross matches need the next clip's).
-        var admitted: [(input: AudioAcceptanceInput, image: SpectrogramImage, signature: WatermarkSignature, grid: FragilityGrid)] = []
+        var admitted: [(input: AudioAcceptanceInput, image: SpectrogramImage, signature: GridSignature, grid: FragilityGrid)] = []
         for input in inputs {
             let clip = input.clip
             let label = input.kind == "synthetic" ? input.path : "\(URL(fileURLWithPath: input.path).lastPathComponent)#\(input.segment)"
@@ -178,9 +178,9 @@ public enum AudioAcceptance {
             let level = clip.rmsDBFS
             if level < SpectrogramProfile.minimumRMSDBFS { note(String(format: "accept: skipped %@: %.1f dBFS, under −40", label, level)); continue }
             let image = try AudioWatermark.picture(clip, profile: profile)
-            // One fragility read: the signature is built from it exactly as Watermark.sign builds it (AudioWatermarkTests).
+            // One fragility read: the signature is built from it exactly as SealGrid.sign builds it (AudioWatermarkTests).
             let grid = try AudioWatermark.fragility(image)
-            let signature = WatermarkSignature(grid: TileCodeGrid(grid))
+            let signature = GridSignature(grid: TileCodeGrid(grid))
             admitted.append((input, image, signature, grid))
             if admitted.count % 10 == 0 { note("accept: signed \(admitted.count) of \(inputs.count)") }
         }
@@ -202,7 +202,7 @@ public enum AudioAcceptance {
                 let shifted = q == 0 ? cutClip : AudioTransforms.cut(cutClip, startSample: delta, length: cutClip.frames - delta)
                 let codes = try AudioWatermark.phaseCodes(try AudioWatermark.picture(shifted, profile: profile), phases: settings.phases)
                 cutCodesTried.append(codes)
-                let m = Watermark.match(codes: codes, against: signature, options: options)
+                let m = SealGrid.match(codes: codes, against: signature, options: options)
                 if q == 0 || m.score > cutMatch.score {
                     cutMatch = m
                     cutSubHopOffset = q
@@ -223,13 +223,13 @@ public enum AudioAcceptance {
             let other = admitted[(i + 1) % admitted.count].signature
             var cross = MatchResult.none
             for (q, codes) in cutCodesTried.enumerated() {
-                let m = Watermark.match(codes: codes, against: other, options: options)
+                let m = SealGrid.match(codes: codes, against: other, options: options)
                 if q == 0 || m.score > cross.score { cross = m }
             }
             var speed: [String: MatchResult] = [:]
             for factor in settings.speeds where i % max(1, settings.speedEvery) == 0 {
                 let changed = try AudioConverting.speedChanged(cutClip, by: factor)
-                speed[String(format: "%.2f", factor)] = Watermark.match(codes: try AudioWatermark.phaseCodes(try AudioWatermark.picture(changed, profile: profile), phases: settings.phases),
+                speed[String(format: "%.2f", factor)] = SealGrid.match(codes: try AudioWatermark.phaseCodes(try AudioWatermark.picture(changed, profile: profile), phases: settings.phases),
                                                                        against: signature, options: options)
             }
             let gain = try AudioWatermark.match(try AudioWatermark.picture(AudioTransforms.gained(clip, dB: settings.gainDB), profile: profile), against: signature, options: phaseZero).result

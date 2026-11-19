@@ -114,18 +114,18 @@ struct PackageLayeringTests {
         "VeilGardeInference": ["VeilGardeLens"],
         "VeilGardeTraining": ["VeilGardeLens"],
         "VeilGardeFlywheel": ["VeilGardeTraining", "VeilGardeInference"],
-        "VeilWatermark": ["VeilGardeLens"],
-        "VeilGardeAudio": ["VeilWatermark"],
-        "VeilGarde": ["VeilGardeInference", "VeilGardeTraining", "VeilGardeFlywheel", "VeilWatermark", "VeilGardeAudio"],
+        "VeilSeal": ["VeilGardeLens"],
+        "VeilGardeAudio": ["VeilSeal"],
+        "VeilGarde": ["VeilGardeInference", "VeilGardeTraining", "VeilGardeFlywheel", "VeilSeal", "VeilGardeAudio"],
         "VeilGardeCLI": ["VeilGarde"],
     ]
 
-    @Test("five products: VeilGarde, VeilGardeInference, VeilWatermark, VeilGardeAudio and the veilgarde executable")
+    @Test("five products: VeilGarde, VeilGardeInference, VeilSeal, VeilGardeAudio and the veilgarde executable")
     func products() throws {
         let manifest = try text("Package.swift")
         #expect(manifest.contains(".library(name: \"VeilGarde\""))
         #expect(manifest.contains(".library(name: \"VeilGardeInference\""))
-        #expect(manifest.contains(".library(name: \"VeilWatermark\""))
+        #expect(manifest.contains(".library(name: \"VeilSeal\""))
         #expect(manifest.contains(".library(name: \"VeilGardeAudio\""))
         #expect(manifest.contains(".executable(name: \"veilgarde\""))
         #expect(manifest.components(separatedBy: ".library(name:").count == 5)
@@ -178,8 +178,10 @@ struct PackageLayeringTests {
                 for name in imports(in: body) {
                     if frigateModules.contains(name) {
                         #expect(directProducts.contains(name), "\(target.name)/\(file.lastPathComponent) imports \(name) without listing its Frigate product")
-                    } else if name.hasPrefix("VeilGarde") || name == "VeilWatermark" {
+                    } else if name.hasPrefix("VeilGarde") || name == "VeilSeal" {
                         #expect(layer.contains(name), "\(target.name)/\(file.lastPathComponent) imports \(name), above its layer")
+                    } else if name == "Veil8" || name == "VeilKey" {
+                        #expect(target.name == "VeilSeal" && directProducts.contains(name), "\(target.name)/\(file.lastPathComponent) imports \(name): only VeilSeal lists Veil8")
                     } else if name == "ArgumentParser" {
                         #expect(target.name == "VeilGardeCLI", "\(file.lastPathComponent) imports ArgumentParser outside the CLI")
                     } else {
@@ -190,10 +192,10 @@ struct PackageLayeringTests {
         }
     }
 
-    @Test("the Lens and VeilWatermark list no Frigate umbrella: a package embedding the watermark builds no LLM stack")
+    @Test("the Lens and VeilSeal list no Frigate umbrella: a package embedding the watermark builds no LLM stack")
     func watermarkSkipsTheUmbrella() throws {
         let targets = try manifestTargets()
-        for name in ["VeilGardeLens", "VeilWatermark"] {
+        for name in ["VeilGardeLens", "VeilSeal"] {
             let target = try #require(targets.first { $0.name == name })
             #expect(!target.products.contains("Frigate"), "\(name) lists the Frigate umbrella")
         }

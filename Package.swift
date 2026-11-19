@@ -6,7 +6,7 @@
 // read them, the trainers and the flywheel that grow them, and a watermark read off a
 // perspective-warp residual.
 //
-// Five products: VeilGarde (everything), VeilGardeInference (the detector alone), VeilWatermark
+// Five products: VeilGarde (everything), VeilGardeInference (the detector alone), VeilSeal
 // (the signature alone), VeilGardeAudio (the watermark on audio alone) and the `veilgarde`
 // executable. Nine targets, in layers:
 //   VeilGardeCore       the domain, Foundation + Crypto only, Swift 6 strict: Support/ (JSON,
@@ -29,11 +29,13 @@
 //                       trainable members), Engine/, Artifacts/                  (Swift 5 mode)
 //   VeilGardeFlywheel   the regime that grows the stack: Area/, Store/, Acquire/, Ingest/,
 //                       Candidates/, Battery/, Promote/                          (Swift 5 mode)
-//   VeilWatermark       the crop-robust signature on the warp residual: Residual/ (the warp
-//                       round trip and the fragility rate), Signature/, Sections/, Match/,
-//                       Acceptance/; and the pixel mark: Mark/ (the payload, the embedder, the
-//                       blind reader, ImageMark), Store/ (the signature store), Render/ (PNG, the
-//                       digests and overlays)                  (MLX through Frigate, Swift 5 mode)
+//   VeilSeal            the Burgundy Seal: a picture's seal, made from its anchors, the paths
+//                       between them and the warp residual of their neighbourhoods, found again in
+//                       a crop, a resize, a re-encode or an edit; Anchor/, Path/, Seal/ (the seal,
+//                       its store, BurgundySeal), Residual/ (the warp round trip and the fragility
+//                       rate), Signature/, Sections/, Match/ (the grid signature, vw1), Mark/ (the
+//                       hidden mark), Render/ (PNG, the wax seal and the detection graphic),
+//                       Acceptance/              (MLX through Frigate, Veil8's key stream, Swift 5 mode)
 //   VeilGardeAudio      the watermark's second carrier: Audio/ (the clip, and the two AVFoundation
 //                       doors that read, write and convert it), Spectrogram/ (the two profiles, the
 //                       STFT and the 8-bit picture the lens reads unchanged), Watermark/ (a clip
@@ -45,9 +47,10 @@
 // Invariants PackageLayeringTests holds: exactly these five products; MLX only through Frigate
 // (no mlx-swift URL here, and every MLX or Frigate import sits in a target that lists that
 // product); Core imports Foundation and Crypto only; Training never imports Inference or the
-// Flywheel; VeilWatermark imports Core, Lens and, for its residual, MLX and MLXAccelerate, and neither
+// Flywheel; VeilSeal imports Core, Lens, Veil8 and VeilKey and, for its residual, MLX, MLXAccelerate and
+// MLXFFT, and neither
 // it nor the Lens lists the Frigate umbrella (Inference alone does, for FrigateBoost);
-// VeilGardeAudio imports VeilWatermark and, for its STFT, MLX, and AVFoundation only in its two
+// VeilGardeAudio imports VeilSeal and, for its STFT, MLX, and AVFoundation only in its two
 // doors; nothing under Sources/ imports MLXLLM, MLXLMCommon, AppKit (outside the image decoder) or
 // UIKit; no type is named like a module; every Swift file opens with a WHAT: header.
 //
@@ -103,12 +106,14 @@ let package = Package(
     products: [
         .library(name: "VeilGarde", targets: ["VeilGarde"]),
         .library(name: "VeilGardeInference", targets: ["VeilGardeInference"]),
-        .library(name: "VeilWatermark", targets: ["VeilWatermark"]),
+        .library(name: "VeilSeal", targets: ["VeilSeal"]),
         .library(name: "VeilGardeAudio", targets: ["VeilGardeAudio"]),
         .executable(name: "veilgarde", targets: ["VeilGardeCLI"]),
     ],
     dependencies: [
         frigateDependency,
+        // Veil8: the keyed, one-way neighbourhood encoding and the key file the seal is keyed with.
+        .package(url: "https://github.com/riteshpakala/Veil8.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.2.0"),
     ],
@@ -133,7 +138,7 @@ let package = Package(
             dependencies: [
                 "VeilGardeLens",
                 // FrigateBoost's XGBoostTreeModel, the evaluator the camera head is scored with: the one
-                // use of the Frigate umbrella, kept out of the Lens so VeilWatermark's graph stays small.
+                // use of the Frigate umbrella, kept out of the Lens so VeilSeal's graph stays small.
                 .product(name: "Frigate", package: "Frigate"),
             ],
             // The shipped bundle: the shipped artifacts, by name, bound by manifest.json. Weights are
@@ -177,7 +182,7 @@ let package = Package(
             swiftSettings: v5
         ),
         .target(
-            name: "VeilWatermark",
+            name: "VeilSeal",
             dependencies: [
                 "VeilGardeLens",
                 // The warp residual it reads: Frigate's warp tap tables, bicubic gathers and Gaussian blur;
@@ -185,13 +190,16 @@ let package = Package(
                 .product(name: "MLX", package: "Frigate"),
                 .product(name: "MLXAccelerate", package: "Frigate"),
                 .product(name: "MLXFFT", package: "Frigate"),
+                // The seal's key stream and key file.
+                .product(name: "Veil8", package: "Veil8"),
+                .product(name: "VeilKey", package: "Veil8"),
             ],
             swiftSettings: v5
         ),
         .target(
             name: "VeilGardeAudio",
             dependencies: [
-                "VeilWatermark",
+                "VeilSeal",
                 // The STFT and its inverse, and the lag between two signals: MLXFFT lives in the MLX module.
                 .product(name: "MLX", package: "Frigate"),
             ],
@@ -201,7 +209,7 @@ let package = Package(
         ),
         .target(
             name: "VeilGarde",
-            dependencies: ["VeilGardeInference", "VeilGardeTraining", "VeilGardeFlywheel", "VeilWatermark", "VeilGardeAudio"],
+            dependencies: ["VeilGardeInference", "VeilGardeTraining", "VeilGardeFlywheel", "VeilSeal", "VeilGardeAudio"],
             swiftSettings: v5
         ),
         .executableTarget(
@@ -217,7 +225,7 @@ let package = Package(
         .testTarget(name: "VeilGardeInferenceTests", dependencies: ["VeilGardeInference"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeTrainingTests", dependencies: ["VeilGardeTraining", .product(name: "Frigate", package: "Frigate")], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeFlywheelTests", dependencies: ["VeilGardeFlywheel"], swiftSettings: v5),
-        .testTarget(name: "VeilWatermarkTests", dependencies: ["VeilWatermark"], exclude: ["Fixtures"], swiftSettings: v5),
+        .testTarget(name: "VeilSealTests", dependencies: ["VeilSeal"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeAudioTests", dependencies: ["VeilGardeAudio"], exclude: ["Fixtures"], swiftSettings: v5),
         .testTarget(name: "VeilGardeCLITests", dependencies: ["VeilGardeCLI"], swiftSettings: v5),
     ]

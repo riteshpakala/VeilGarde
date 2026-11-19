@@ -3,10 +3,10 @@
 //  VeilGardeAudio
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The thin door from a clip to the watermark: its picture, its signature by Watermark.sign,
+//  WHAT: The thin door from a clip to the watermark: its picture, its signature by SealGrid.sign,
 //        its fragility grid, and a match of a clip against a signature with the grid phases read
 //        along time only; the match carries the offset in seconds.
-//  PIN:  Nothing in VeilWatermark changes or is bypassed: the signature is Watermark.sign of the
+//  PIN:  Nothing in VeilSeal changes or is bypassed: the signature is SealGrid.sign of the
 //        picture's bitmap, a vw1 no different from an image's. Matching reads
 //        NativePlane.fragility(originX: px, originY: 0) for px in the phases, 0, 8, 16 and 24 by
 //        default, four grid reads instead of sixteen, since a cut keeps every frequency row; the
@@ -19,7 +19,7 @@ import CoreGraphics
 import Foundation
 import VeilGardeCore
 import VeilGardeLens
-import VeilWatermark
+import VeilSeal
 
 public struct AudioMatchResult: Codable, Sendable, Equatable {
     /// The watermark's own result, offsets in tiles and the phase in pixels.
@@ -77,12 +77,12 @@ public enum AudioWatermark {
     }
 
     /// `clip`'s signature: the watermark's own, read off its picture.
-    public static func sign(_ clip: AudioClip, profile: SpectrogramProfile) throws -> WatermarkSignature {
+    public static func sign(_ clip: AudioClip, profile: SpectrogramProfile) throws -> GridSignature {
         try sign(try picture(clip, profile: profile))
     }
 
-    public static func sign(_ image: SpectrogramImage) throws -> WatermarkSignature {
-        try Watermark.sign(try image.cgImage)
+    public static func sign(_ image: SpectrogramImage) throws -> GridSignature {
+        try SealGrid.sign(try image.cgImage)
     }
 
     /// Every full tile's fragility rate of the picture, at phase (0, 0).
@@ -103,19 +103,19 @@ public enum AudioWatermark {
     }
 
     /// Where `clip` sits on `signature`; the profile is the signature's own unless given.
-    public static func match(_ clip: AudioClip, against signature: WatermarkSignature, profile: SpectrogramProfile? = nil,
+    public static func match(_ clip: AudioClip, against signature: GridSignature, profile: SpectrogramProfile? = nil,
                              options: MatchOptions = .default) throws -> AudioMatchResult {
         let p = try profile ?? self.profile(of: signature)
         return try match(try picture(clip, profile: p), against: signature, options: options)
     }
 
-    public static func match(_ image: SpectrogramImage, against signature: WatermarkSignature, options: MatchOptions = .default) throws -> AudioMatchResult {
-        let result = Watermark.match(codes: try phaseCodes(image, phases: options.phases), against: signature, options: options)
+    public static func match(_ image: SpectrogramImage, against signature: GridSignature, options: MatchOptions = .default) throws -> AudioMatchResult {
+        let result = SealGrid.match(codes: try phaseCodes(image, phases: options.phases), against: signature, options: options)
         return AudioMatchResult(result: result, profile: image.profile, frames: image.width)
     }
 
     /// The profile a signature was made under, from its tile rows.
-    public static func profile(of signature: WatermarkSignature) throws -> SpectrogramProfile {
+    public static func profile(of signature: GridSignature) throws -> SpectrogramProfile {
         guard let p = SpectrogramProfile.inferred(rows: signature.rows) else {
             throw VeilGardeFailure.data("a signature of \(signature.rows) tile rows fits no audio profile", hint: "music pictures have 32 tile rows, speech 16")
         }

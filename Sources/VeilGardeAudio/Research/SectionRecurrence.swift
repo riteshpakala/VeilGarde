@@ -17,7 +17,7 @@
 //
 
 import Foundation
-import VeilWatermark
+import VeilSeal
 
 public struct SectionPeak: Codable, Sendable, Equatable {
     public var offset: Int

@@ -1,5 +1,5 @@
 {
-  "originHash" : "9abfb5ad414b6b66c71755fac70d4475ff208d4cf381b6bdbd230c6624f6ca72",
+  "originHash" : "7f27139d716f6fb7dd2e38758be0489808b49589d6a4541f2d85a39da7bea4a4",
   "pins" : [
     {
       "identity" : "opencv-spm",
@@ -53,6 +53,15 @@
       "state" : {
         "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
         "version" : "1.1.1"
+      }
+    },
+    {
+      "identity" : "veil8",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/riteshpakala/Veil8.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "95eb643fe7d5a7b3fa6050aae50da22b752192a1"
       }
     },
     {

@@ -7,7 +7,7 @@
 //        once per file and shared.
 //  PIN:  The only library file that imports the Frigate umbrella, for FrigateBoost's evaluator, so the
 //        umbrella (and the LLM stack it brings) sits in VeilGardeInference, not in the Lens that
-//        VeilWatermark's consumers build (moved 2026-11-17). Core's GBDTModel agrees with it bit for bit
+//        VeilSeal's consumers build (moved 2026-11-17). Core's GBDTModel agrees with it bit for bit
 //        on the shipped camera head (EvaluatorTests).
 //
 

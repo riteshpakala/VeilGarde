@@ -22,7 +22,7 @@ import Foundation
 import MLX
 import VeilGardeCore
 import VeilGardeLens
-import VeilWatermark
+import VeilSeal
 
 public struct FragilityTrace: Sendable, Equatable {
     public let profile: SpectrogramProfile
