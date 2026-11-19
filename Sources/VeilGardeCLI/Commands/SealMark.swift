@@ -211,3 +211,68 @@ extension SealCommand {
         }
     }
 }
+
+extension SealCommand {
+    struct SealAccept: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "accept", abstract: "The Burgundy Seal's acceptance (decision-155): seal a final_mixed sample, detect every change, judge the bars.",
+            discussion: "Tuning: --seed 1 --excluding 0,2. Acceptance: --seed 0 (the null is --null-seed 2). Rows go beside --out as .rows.jsonl.")
+        @Option(help: "Pictures per label to seal.") var perLabel: Int = 100
+        @Option(help: "Never-sealed pictures per label (the null).") var nullPerLabel: Int = 50
+        @Option(help: "The sealed sample's seed.") var seed: UInt64 = 0
+        @Option(help: "The null sample's seed.") var nullSeed: UInt64 = 2
+        @Option(help: "Seeds whose samples are left out, comma-separated.") var excluding: String = ""
+        @Option(help: "Changes to run, comma-separated (default: all).") var changes: String?
+        @Option(help: "The neighbourhood measure: hsl, structure, phase or census.") var measure: String = BurgundySeal.defaultMeasure
+        @Option(help: "Found when inliers reach this.") var inliers: Int = SealSearch.foundInliers
+        @Option(help: "Found when retraced hops reach this.") var hops: Int = SealSearch.foundHops
+        @Option(help: "final_mixed's folder (default: final_mixed under VEILGARDE_DATASETS, else the work area's datasets/).") var dataset: String?
+        @Option(help: "Write the report JSON here.") var out: String
+        @OptionGroup var workArea: WorkAreaOptions
+
+        func run() throws {
+            guarded {
+                _ = try workArea.resolve()
+                guard let dataset = dataset.map(datasetURL) ?? WorkArea.datasets().map({ $0.appendingPathComponent("final_mixed") }) else {
+                    throw VeilGardeFailure.usage("no dataset: pass --dataset or set VEILGARDE_DATASETS")
+                }
+                let all = try AcceptanceSample.dataset(dataset)
+                let left = excluding.split(separator: ",").compactMap { UInt64($0.trimmingCharacters(in: .whitespaces)) }
+                var out1 = Set<URL>()
+                for s in left { for item in AcceptanceSample.sample(all, perLabel: 100, seed: s) { out1.insert(item.url) } }
+                let sealed = AcceptanceSample.sample(all, perLabel: perLabel, seed: seed).filter { !out1.contains($0.url) }
+                let sealedSet = Set(sealed.map(\.url))
+                let null = AcceptanceSample.sample(all, perLabel: nullPerLabel, seed: nullSeed).filter { !out1.contains($0.url) && !sealedSet.contains($0.url) }
+                var settings = SealAcceptanceSettings()
+                settings.seed = seed
+                settings.perLabel = perLabel
+                settings.nullSeed = nullSeed
+                settings.nullPerLabel = nullPerLabel
+                settings.excluding = left
+                settings.foundInliers = inliers
+                settings.foundHops = hops
+                settings.measure = measure
+                if let changes {
+                    settings.changes = try changes.split(separator: ",").map {
+                        guard let c = SealChange(rawValue: $0.trimmingCharacters(in: .whitespaces)) else { throw VeilGardeFailure.usage("no change \($0)") }
+                        return c
+                    }
+                }
+                note("accept: \(sealed.count) sealed, \(null.count) never sealed, \(settings.changes.count) changes, from \(dataset.path)")
+                let outURL = datasetURL(out)
+                let report = try SealAcceptance.run(sealed: sealed, null: null, settings: settings,
+                                                    rows: outURL.deletingPathExtension().appendingPathExtension("rows.jsonl"), log: { note($0) })
+                for r in report.rates { print(String(format: "%-14@ %-10@ %5.1f%%  (%d/%d)", r.change, r.group, r.rate * 100, r.found, r.tried)) }
+                for g in report.groups { print(String(format: "group %-10@ %5.1f%%  bar %.0f%%", g.change, g.rate * 100, (g.bar ?? 0) * 100)) }
+                print("false matches \(report.falseMatches) (\(report.falseFromNull) in the null) at inliers ≥ \(inliers), hops ≥ \(hops)")
+                for p in report.sweep.prefix(12) {
+                    print(String(format: "sweep: inliers ≥ %2d hops ≥ %2d → class I %.1f%% · combined %.1f%% · filters %.1f%% · recapture %.1f%%",
+                                 p.inliers, p.hops, p.classI * 100, p.combined * 100, p.filters * 100, p.recapture * 100))
+                }
+                print(report.passed ? "the seal passes decision-155" : "KILLED: " + report.failing.joined(separator: "; "))
+                try JSONCoding.write(report, to: outURL)
+                note(String(format: "report: %@ (%.0f s)", out, report.seconds))
+            }
+        }
+    }
+}

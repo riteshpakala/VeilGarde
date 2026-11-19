@@ -103,3 +103,18 @@ extension NeighbourhoodMeasure {
         }
     }
 }
+
+/// The measures a seal can be read with, by name.
+public enum NeighbourhoodMeasures {
+    public static let names = ["hsl", "structure", "phase", "census"]
+
+    public static func named(_ name: String, key: SealKey) -> (any NeighbourhoodMeasure)? {
+        switch name {
+        case "hsl": return HSLPattern(key: key)
+        case "structure": return StructurePattern(key: key)
+        case "phase": return PhasePattern(key: key)
+        case "census": return CensusPattern(key: key)
+        default: return nil
+        }
+    }
+}

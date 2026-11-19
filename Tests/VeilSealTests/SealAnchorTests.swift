@@ -104,7 +104,7 @@ struct SealAnchorTests {
         #expect(HSLPattern(key: SealKey(phrase: "another")).pairs.map(\.0) != Self.measure.pairs.map(\.0), "another key, other comparisons")
     }
 
-    @Test("a path reads the same after the anchors are moved, scaled and turned together")
+    @Test("a path walks the same from its start after the anchors are moved, scaled and turned together; starts spread over the picture")
     func pathsAreSimilarityInvariant() {
         let record = MarkFixture.record(count: 120)
         let s: Float = 1.7, t: Float = 0.6
@@ -116,13 +116,19 @@ struct SealAnchorTests {
             b.angle = a.angle + t
             return b
         }
+        // Where paths start depends on the anchors' bounding box, which a turn changes; the walk from a start does not.
         let a = PathWalker.walk(record.anchors, pointerBits: Self.measure.pointerBits)
-        let b = PathWalker.walk(moved, pointerBits: Self.measure.pointerBits)
+        let b = a.compactMap { PathWalker.chain(from: $0.anchors[0], anchors: moved, pointerBits: Self.measure.pointerBits) }
         #expect(a.map(\.anchors) == b.map(\.anchors))
         #expect(!a.isEmpty && a.allSatisfy { $0.hops.count == $0.anchors.count - 1 })
         for (x, y) in zip(a.flatMap(\.hops), b.flatMap(\.hops)) {
             #expect(abs(x.reach - y.reach) < 1e-3 && abs(x.scale - y.scale) < 1e-3)
         }
+        // Every quarter of the picture holds a start.
+        let xs = record.anchors.map(\.x), ys = record.anchors.map(\.y)
+        let mx = (xs.min()! + xs.max()!) / 2, my = (ys.min()! + ys.max()!) / 2
+        let quarters = Set(a.map { p in (record.anchors[p.anchors[0]].x < mx ? 0 : 1) + (record.anchors[p.anchors[0]].y < my ? 0 : 2) })
+        #expect(quarters.count == 4, "starts in quarters \(quarters)")
     }
 
     @Test("consensus recovers a similarity and a homography through 60% outliers; retracing walks every shared hop")
@@ -173,5 +179,25 @@ struct SealAnchorTests {
         #expect(Code256(hex: c.hex) == c && c.distance(Code256()) == 5)
         let data = try JSONEncoder().encode(c)
         #expect(try JSONDecoder().decode(Code256.self, from: data) == c)
+    }
+}
+
+extension SealAnchorTests {
+    @Test("every measure is keyed, reads a picture the same twice, and keeps a JPEG's partners near and strangers far", arguments: NeighbourhoodMeasures.names)
+    func measures(name: String) throws {
+        let measure = try #require(NeighbourhoodMeasures.named(name, key: .default))
+        let other = try #require(NeighbourhoodMeasures.named(name, key: SealKey(phrase: "another")))
+        #expect(measure.name == name && measure.pointerBits.count >= 3 && measure.pointerBits.allSatisfy { (0..<256).contains($0) })
+        let cg = try Self.picture("crop_fox.png")
+        let a = try AnchorReading.read(cg, key: .default, measures: [measure, other], count: AnchorReading.sealCount, residual: false)
+        #expect(try AnchorReading.read(cg, key: .default, measure: measure, count: AnchorReading.sealCount, residual: false).anchors == a[0].anchors)
+        #expect(zip(a[0].anchors, a[1].anchors).filter { $0.code != $1.code }.count > a[0].anchors.count / 2, "another key, other codes")
+        let b = try AnchorReading.read(try ImageCodec.recompressed(cg, as: .jpeg, quality: 0.75), key: .default, measure: measure,
+                                       count: AnchorReading.searchCount, residual: false)
+        let (_, partners) = Self.repeatability(a[0], b, scale: 1) { ($0, $1) }
+        let near = Double(partners.map { $0.0.code.distance($0.1.code) }.reduce(0, +)) / Double(max(1, partners.count))
+        let far = zip(a[0].anchors.prefix(200), a[0].anchors.dropFirst(200).prefix(200)).map { $0.code.distance($1.code) }
+        let strangers = Double(far.reduce(0, +)) / Double(max(1, far.count))
+        #expect(partners.count > 100 && near < 32 && strangers > 72, "\(name): \(partners.count) partners \(near) bits apart, strangers \(strangers)")
     }
 }

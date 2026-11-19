@@ -73,6 +73,8 @@ struct CommandTreeTests {
         ["seal", "render", "seal", "00112233aabbccdd", "--picture", "x.jpg", "--out", "d.png", "--store", "/tmp/s"],
         ["seal", "render", "detection", "m.png", "--out", "o.png", "--store", "/tmp/s"], ["seal", "records", "--json", "--store", "/tmp/s"],
         ["seal", "resizing-test", "x.jpg", "--scales", "50,200"],
+        ["seal", "accept", "--per-label", "10", "--null-per-label", "5", "--seed", "1", "--null-seed", "3", "--excluding", "0,2", "--measure", "hsl",
+         "--changes", "crop50,recapture", "--inliers", "12", "--hops", "3", "--dataset", "/data/fm", "--out", "r.json"],
         ["audio", "spectrogram", "clip.wav", "--out", "clip.png", "--profile", "speech"], ["audio", "sign", "clip.wav", "--json"],
         ["audio", "match", "cut.wav", "vw1:AAAA", "--phases", "0,16", "--json"], ["audio", "verify", "clip.m4a", "sig.txt", "--profile", "music"],
         ["audio", "roundtrip", "clip.aiff", "--out", "back.wav", "--from-image", "--depth", "int24", "--json"],

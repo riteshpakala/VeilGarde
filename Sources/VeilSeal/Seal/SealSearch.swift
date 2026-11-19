@@ -56,10 +56,10 @@ public enum SealSearch {
     }
 
     /// The strongest reading among `records`: found ones first, then by inliers.
-    static func best(_ records: [SealRecord], in reading: AnchorReading, pointerBits: [Int]) -> SealMatch? {
+    static func best(_ records: [SealRecord], score: (SealRecord) -> SealMatch?) -> SealMatch? {
         var best: SealMatch?
         for record in records {
-            guard let m = score(record, in: reading, pointerBits: pointerBits) else { continue }
+            guard let m = score(record) else { continue }
             if let b = best, (b.found ? 1 : 0, b.inliers, b.retraced) >= (m.found ? 1 : 0, m.inliers, m.retraced) { continue }
             best = m
         }

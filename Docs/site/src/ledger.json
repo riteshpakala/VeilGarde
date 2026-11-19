@@ -1563,6 +1563,13 @@
       "rejected": "bars chosen after seeing seed 0; counting a copy found when it names any seal; leaving the null to strangers that are synthetic noise",
       "reason": "the owner's word, 2026-11-18: the proposed bars are the kill criterion, signature first; a criterion stated after the run measures nothing",
       "file": "Sources/VeilSeal/Acceptance/SealAcceptance.swift"
+    },
+    {
+      "id": "decision-156",
+      "chose": "The tuning sample's choices (seed 1, 100 per label less seed 0's and 2's, null seed 3), recorded before seed 0 runs: new seals are read with PhasePattern (signs of 128 keyed zero-mean Gabor responses), and detect reads each stored seal with the measure it names; paths start at 128 anchors spread over an 8 x 8 grid of the anchors' bounding box (strongest of each cell first) instead of the 96 strongest anywhere; a picture under 768 px on its long side is drawn up to 768, at most 2x; the found rule stays inliers >= 12 and retraced hops >= 3; each measure's pointer bits stay chosen by its own key-independent rule",
+      "rejected": "HSL as the default (it ties on what is found, but holds 5-24% fewer inliers under region layers, gradients and grayscale, and 13% fewer at the recapture's tenth percentile); StructurePattern (a stranger reached 12 inliers); CensusPattern (a stranger reached 8; weaker under grayscale); pointer bits pinned by measured flip rate (the pairs are drawn from each person's key, so an index measured on the default key means nothing on another); dropping the hop requirement (no stranger retraced a hop, but the null holds no hard negatives yet)",
+      "reason": "seed 1, 186 sealed and 91 never sealed, 28 changes each: found rates for the four measures tie within a picture (Class I 98.8-99.2%), the measures differ only in inliers held; phase's strangers reached at most 6 inliers (hsl 7, census 8, structure 12). With phase, the spread starts and the small-picture draw: Class I 99.6%, combined 98.9%, filters 100%, recapture 98.9%, 0 false matches, misses 45 -> 11; crops had held up to 106 inliers with no path inside them, and a 227 x 339 picture held 14 anchors at its own size",
+      "file": "Sources/VeilSeal/Seal/BurgundySeal.swift"
     }
   ],
   "commands": [

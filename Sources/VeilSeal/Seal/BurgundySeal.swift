@@ -112,7 +112,10 @@ public enum BurgundySeal {
         return try body()
     }
 
-    static func measure(_ key: SealKey) -> HSLPattern { HSLPattern(key: key) }
+    /// The measure new seals are read with (decision-156: phase, measured against hsl, structure and census).
+    public static let defaultMeasure = "phase"
+
+    static func measure(_ key: SealKey) -> any NeighbourhoodMeasure { NeighbourhoodMeasures.named(defaultMeasure, key: key)! }
 
     // MARK: Seal
 
@@ -215,15 +218,20 @@ public enum BurgundySeal {
     static func detectLocked(_ cg: CGImage, store: SealStore?, key: SealKey) throws -> SealDetection {
         let start = Date()
         defer { LensRuntime.releaseMemory() }
-        let pattern = measure(key)
-        let reading = try AnchorReading.read(cg, key: key, measure: pattern, count: AnchorReading.searchCount, residual: true)
-        let interlaced = MarkDecoder.read(try NativePlane(cg), key: key).id
         let records = try store?.records() ?? []
-        var match = SealSearch.best(records, in: reading, pointerBits: pattern.pointerBits)
+        // Each seal is read with the measure it names: the default first, then any other the store holds.
+        let names = [defaultMeasure] + Set(records.map(\.measure)).subtracting([defaultMeasure]).sorted()
+        let measures = names.compactMap { NeighbourhoodMeasures.named($0, key: key) }
+        let readings = try AnchorReading.read(cg, key: key, measures: measures, count: AnchorReading.searchCount, residual: true)
+        let byName = Dictionary(uniqueKeysWithValues: zip(measures.map(\.name), zip(readings, measures.map(\.pointerBits))))
+        let reading = readings[0]
+        let score: (SealRecord) -> SealMatch? = { r in byName[r.measure].flatMap { SealSearch.score(r, in: $0.0, pointerBits: $0.1) } }
+        let interlaced = MarkDecoder.read(try NativePlane(cg), key: key).id
+        var match = SealSearch.best(records, score: score)
         var verdict = SealVerdict.none
         if let id = interlaced {
             if let named = records.first(where: { $0.id == id }) {
-                let own = match?.id == id ? match : SealSearch.score(named, in: reading, pointerBits: pattern.pointerBits)
+                let own = match?.id == id ? match : score(named)
                 if let own, own.found {
                     match = own
                     verdict = .sealed
