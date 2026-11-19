@@ -23,6 +23,50 @@ public enum Watermark {
         return WatermarkSignature(grid: TileCodeGrid(try NativePlane(cg).fragility()))
     }
 
+    /// Sign an image using the path-based approach: trace paths from anchor pixels, cluster them,
+    /// and derive a signature from the cluster centroids. More robust to resizing and compression.
+    public static func signPath(_ cg: CGImage, anchorCount: Int = 8, clusterK: Int = 4) throws -> WatermarkSignature {
+        defer { LensRuntime.releaseMemory() }
+        
+        let plane = try NativePlane(cg)
+        let fragilityGrid = plane.fragility()
+        
+        // Choose anchors from high-fragility regions
+        let anchors = PathTracer.chooseAnchors(from: fragilityGrid, count: anchorCount, minFragility: 0.5)
+        
+        // Trace paths from anchors
+        let tracerResult = PathTracer.trace(grid: fragilityGrid, anchors: anchors, includeRetracing: true)
+        
+        // Cluster the paths
+        let allPaths = tracerResult.forwardPaths + tracerResult.retracingPaths
+        let clustered = PathClusterer.cluster(paths: allPaths, k: clusterK)
+        
+        // Build a TileCodeGrid from the clustered signature bits and masks
+        // We need to reconstruct a grid-like structure from the cluster hints
+        let rows = fragilityGrid.rows
+        let cols = fragilityGrid.cols
+        var bits = [UInt8](repeating: 0, count: rows * cols)
+        var masks = [UInt8](repeating: 0, count: rows * cols)
+        
+        // Aggregate hints from all cluster centroids into a single grid
+        for cluster in clustered.clusters {
+            for hint in cluster.centroid.hints {
+                let idx = hint.row * cols + hint.col
+                bits[idx] |= hint.bits
+                masks[idx] |= hint.mask
+            }
+        }
+        
+        // Normalize: if a bit position was set by any centroid, keep it; mask indicates coverage
+        for i in bits.indices {
+            // Keep the bits that were actually measured (mask > 0)
+            bits[i] = bits[i] & masks[i]
+        }
+        
+        let tileCodeGrid = TileCodeGrid(rows: rows, cols: cols, bits: bits, masks: masks)
+        return WatermarkSignature(grid: tileCodeGrid)
+    }
+
     /// The image's tile codes at each phase, for matching against one or more signatures.
     public static func phaseCodes(_ cg: CGImage, phases: [Int] = MatchOptions.default.phases) throws -> [(px: Int, py: Int, codes: TileCodeGrid)] {
         defer { LensRuntime.releaseMemory() }
