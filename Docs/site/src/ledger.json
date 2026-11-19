@@ -1556,6 +1556,13 @@
       "rejected": "keeping vw1 and vgm1 as two products; extending the prototype's tile paths, which rebuild vw1's grid because the hint ignores direction and cannot survive a resize",
       "reason": "the owner's word, 2026-11-18: one name, signature first, embedding for deterrence; vw1's fixed 32 px tiles matched 0% of crops resized 0.9x and 0.75x (2026-10-19), so the seal resamples each anchor at its own scale and keeps the residual at 32 px",
       "file": "Package.swift"
+    },
+    {
+      "id": "decision-155",
+      "chose": "The Burgundy Seal's kill criterion, fixed before any acceptance run. Sample: final_mixed, AcceptanceSample seed 0, 100 per label (200 pictures); each decoded, flattened and scaled to a long side of at most 2048 px (the picture as shared), sealed into one store, and every copy detected against that whole store. Found = verdict sealed naming the copy's own seal. Class I: at least 95% found for each of crop 50% and 25% of the area at a seeded offset, resize 0.5, 0.75, 1.5 and 2.0x, JPEG q90, q75 and q60; at least 90% for crop 50% + 0.75x + q75. Class II (partial): at least 80% found across the filters and region layers (brightness +20, contrast 1.3x, gamma 0.8, saturation 0.5x, hue +15 degrees, grayscale, a warm curve, blur sigma 1.5, sharpen, noise sigma 5; a solid colour at 30% over a region in normal, multiply, screen and overlay; a gradient overlay; a vignette; a sticker over 15% of the area), at least 60% for the simulated photo of a photo (corners moved up to 6%, a turn up to 5 degrees, blur sigma 1, a colour cast, a vignette, noise sigma 3, JPEG q80). Null: 0 false matches, i.e. no copy names another picture's seal, and 100 pictures never sealed (seed 2, none of seed 0's) each read as none in every copy. Generative edits are not run here (no weights on this Mac); the owner tests them in Craft. The measure, the pointer's bits and the found thresholds (inliers I*, retraced hops H*) are chosen on a tuning sample (seed 1, none of seed 0's or seed 2's) and recorded before seed 0 runs; failing any bar kills the signature, and the interlace is not built on a killed signature",
+      "rejected": "bars chosen after seeing seed 0; counting a copy found when it names any seal; leaving the null to strangers that are synthetic noise",
+      "reason": "the owner's word, 2026-11-18: the proposed bars are the kill criterion, signature first; a criterion stated after the run measures nothing",
+      "file": "Sources/VeilSeal/Acceptance/SealAcceptance.swift"
     }
   ],
   "commands": [
