@@ -3,20 +3,24 @@
 //  VeilSeal
 //  SPDX-License-Identifier: GPL-3.0-only
 //
-//  WHAT: The Burgundy Seal itself: a letter seal in the colours of the arms of Lyon — melted teal wax
-//        (the shield's border) around a burgundy stamp face (its field), the RR mark pressed into the
-//        face with a brushed-platinum sheen (its lion) and three gold flakes in a row above it (its
-//        chief's fleurs-de-lis) — drawn from a height field and lit from the upper left. Each seal's wax
-//        runs its own way: the rim's lobes and drips, the flakes' torn edges and the brushing are seeded
-//        from the seal's id. `ghost` is the outline a picture that holds no seal is shown with.
-//  PIN:  Height = a dome rising 0.18R in from a rim r(θ) = R(1 + Σ waves + Σ drips), a stamp face
-//        pressed 0.55 inside 0.70R with the wax pushed up into a ridge at its edge, two engraved rings,
-//        the RR mark (0.94R wide, 0.07R below the centre) pressed 0.32 deeper with its silhouette
-//        softened by two box blurs, and gold leaf raised 0.06 with a crinkle. Shading: diffuse between
-//        each surface's three tones (Style.lyon, sampled from a photograph of the arms on a Lyon
-//        facade); the mark's lit faces lean to platinum, streaked by value noise drawn along a stroke
-//        20° off the horizontal; Blinn-Phong highlights (wax 40, mark 50, gold 24), a soft shadow down
-//        and right. Seeds: SplitMix64 of the id. Pure CPU, no CoreText, the same pixels every time.
+//  WHAT: The Burgundy Seal itself: a letter seal in the colours of the arms of Lyon — a thin rim of
+//        teal wax (the shield's border) curling up and melting in over a burgundy stamp face (its
+//        field), the RR mark pressed into the face with a brushed-platinum sheen (its lion) and three
+//        gold flakes in a row above it (its chief's fleurs-de-lis) — drawn from a height field and lit
+//        from the upper left. Each seal's wax runs its own way: the rim's lobes, drips and tongues, the
+//        flakes' torn edges and the brushing are seeded from the seal's id. `ghost` is the outline a
+//        picture that holds no seal is shown with.
+//  PIN:  Height = a thin rim r(θ) = R(0.86 + Σ waves + 0.45 Σ drips) climbing from its outer edge
+//        to a crest at its lip, 0.70R less the tongues melting inward (wide, so they round off), where
+//        it rolls 0.045R over onto a face sitting low; ahead of the lip the red is pushed up into a
+//        swell and a fainter ripple and marbled with teal veins drawn along the rim. Then two engraved
+//        rings (half smoothed over where the red was pushed), the RR mark (0.94R wide, 0.07R below the
+//        centre) pressed 0.32 deeper with its silhouette softened by two box blurs, and gold leaf
+//        raised 0.06 with a crinkle. R = 0.42 of the picture. Shading: diffuse between each surface's
+//        three tones (Style.lyon, sampled from a photograph of the arms on a Lyon facade); the mark's
+//        lit faces lean to platinum, streaked by value noise drawn along a stroke 20° off the
+//        horizontal; Blinn-Phong highlights (wax 40, mark 50, gold 24), a soft shadow down and right.
+//        Seeds: SplitMix64 of the id. Pure CPU, no CoreText, the same pixels every time.
 //
 
 import CoreGraphics
@@ -74,7 +78,7 @@ enum WaxSeal {
     /// The seal for `id`, `size` px square, with alpha.
     static func image(id: SealID, size: Int) throws -> CGImage {
         let style = Style.lyon
-        let s = size, c = Float(s) / 2, R = Float(s) * 0.38
+        let s = size, c = Float(s) / 2, R = Float(s) * 0.42
         var rng = SplitMix64(seed: id.value ^ 0xB0E6_A4D1_5EA1_0001)
         let base: [(Float, Float)] = [(3, 0.022), (5, 0.016), (7, 0.010), (11, 0.006)]
         let waves: [(k: Float, a: Float, phase: Float)] = base.map {
@@ -85,15 +89,25 @@ enum WaxSeal {
         for _ in 0..<dripCount {
             drips.append((at: Float(rng.unit() * 2 * .pi), size: Float(0.05 + 0.10 * rng.unit()), width: Float(0.10 + 0.20 * rng.unit())))
         }
+        func bump(_ theta: Float, _ at: Float, _ width: Float) -> Float {
+            var delta = theta - at
+            while delta > .pi { delta -= 2 * .pi }
+            while delta < -.pi { delta += 2 * .pi }
+            return exp(-delta * delta / (2 * width * width))
+        }
         func rim(_ theta: Float) -> Float {
-            var r: Float = 1
+            var r: Float = 0.86
             for w in waves { r += w.a * sin(w.k * theta + w.phase) }
-            for d in drips {
-                var delta = theta - d.at
-                while delta > .pi { delta -= 2 * .pi }
-                while delta < -.pi { delta += 2 * .pi }
-                r += d.size * exp(-delta * delta / (2 * d.width * d.width))
-            }
+            for d in drips { r += 0.45 * d.size * bump(theta, d.at, d.width) }
+            return R * r
+        }
+        // The rim's inner edge, where its lip rolls onto the face: tongues of wax melt inward.
+        let tongues: [(at: Float, size: Float, width: Float)] = (0..<(5 + Int(rng.unit() * 3))).map { _ in
+            (at: Float(rng.unit() * 2 * .pi), size: Float(0.022 + 0.042 * rng.unit()), width: Float(0.17 + 0.20 * rng.unit()))
+        }
+        func lip(_ theta: Float) -> Float {
+            var r: Float = 0.70
+            for t in tongues { r -= t.size * bump(theta, t.at, t.width) }
             return R * r
         }
 
@@ -156,9 +170,12 @@ enum WaxSeal {
         var coverage = [Float](repeating: 0, count: s * s)
         var metal = [Float](repeating: 0, count: s * s)
         var leafGold = [Float](repeating: 0, count: s * s)
+        var rimWax = [Float](repeating: 0, count: s * s)
+        var hollow = [Float](repeating: 0, count: s * s)
+        var veins = [Float](repeating: 0, count: s * s)
         let face = 0.70 * R
-        var noise = SplitMix64(seed: id.value)
-        let grain = (0..<(64 * 64)).map { _ in Float(noise.unit()) }
+        var grainSeed = SplitMix64(seed: id.value)
+        let grain = (0..<(64 * 64)).map { _ in Float(grainSeed.unit()) }
         func grainAt(_ x: Float, _ y: Float, _ spacing: Float) -> Float {
             let u = x / spacing, v = y / spacing
             let x0 = Int(u.rounded(.down)), y0 = Int(v.rounded(.down)), ax = u - Float(x0), ay = v - Float(y0)
@@ -170,21 +187,49 @@ enum WaxSeal {
             for x in 0..<s {
                 let dx = Float(x) + 0.5 - c, dy = Float(y) + 0.5 - c
                 let rho = (dx * dx + dy * dy).squareRoot()
-                let edge = rim(atan2(dy, dx))
+                let theta = atan2(dy, dx)
+                let edge = rim(theta)
                 let inside = edge - rho
                 let i = y * s + x
                 coverage[i] = min(1, max(0, inside + 0.5))
                 guard inside > -1 else { continue }
-                var h = smoothstep(0, 0.18 * R, inside) + 0.15 * (1 - min(1, (rho / edge) * (rho / edge)))
-                h -= 0.55 * smoothstep(face + 0.025 * R, face - 0.025 * R, rho)
-                let ridge = (rho - face * 1.05) / (0.04 * R)
-                h += 0.22 * exp(-ridge * ridge)
+                // The face sits low; the rim climbs from its outer edge to a crest at the lip and rolls over onto the face.
+                var h: Float
+                var impact: Float = 0
+                let inner = lip(theta), roll = 0.045 * R
+                let faceH: Float = 0.45 + 0.08 * (1 - min(1, (rho / face) * (rho / face)))
+                let climb = min(1, max(0, (edge - rho) / max(1, edge - inner)))
+                let wax = smoothstep(0, 0.07 * R, inside) * (0.6 + 0.75 * climb * climb)
+                if rho >= inner {
+                    rimWax[i] = 1
+                    h = wax
+                } else {
+                    let t = (inner - rho) / roll
+                    let lipH = t < 1 ? faceH + (wax - faceH) * (1 - t * t).squareRoot() : faceH - 1
+                    rimWax[i] = smoothstep(-0.01, 0.04, lipH - faceH)
+                    // Where the teal ran in, the red is pushed up into a swell and a fainter ripple, and marbled with teal.
+                    let d = max(0, inner - roll - rho)
+                    let swell = (d - 0.035 * R) / (0.032 * R), ripple = (d - 0.11 * R) / (0.025 * R)
+                    impact = exp(-swell * swell) + 0.35 * exp(-ripple * ripple)
+                    let red = 1 - rimWax[i]
+                    // Streaks run along the rim; two samples a turn apart, crossfaded, close the seam at θ = ±π.
+                    func marbleAt(_ t: Float) -> Float {
+                        let along = t * R / fine, across = rho / fine
+                        return 0.7 * noise(along / 26, across / 3.2, id.value ^ 0x7EA1) + 0.3 * noise(along / 9, across / 1.4, id.value ^ 0x7EA2)
+                    }
+                    let w = (theta + .pi) / (2 * .pi)
+                    let marble = w * marbleAt(theta) + (1 - w) * marbleAt(theta + 2 * .pi)
+                    veins[i] = red * exp(-d / (0.11 * R)) * (0.22 + 0.78 * smoothstep(0.5, 0.66, marble))
+                    hollow[i] = red * 0.22 * exp(-d / (0.03 * R))
+                    h = max(faceH + 0.2 * red * impact, lipH)
+                }
+                let under = 1 - rimWax[i]
                 let ring1 = (rho - 0.62 * R) / (0.009 * R), ring2 = (rho - 0.585 * R) / (0.006 * R)
-                h += 0.10 * exp(-ring1 * ring1) + 0.07 * exp(-ring2 * ring2)
-                let m = mark(Float(x) + 0.5, Float(y) + 0.5)
+                h += under * (1 - 0.6 * min(1, impact)) * (0.10 * exp(-ring1 * ring1) + 0.07 * exp(-ring2 * ring2))
+                let m = under * mark(Float(x) + 0.5, Float(y) + 0.5)
                 h -= 0.32 * m
                 metal[i] = smoothstep(0.3, 0.7, m)
-                let g = flake(Float(x) + 0.5, Float(y) + 0.5)
+                let g = under * flake(Float(x) + 0.5, Float(y) + 0.5)
                 leafGold[i] = g
                 // Wax grain, smoothed under the polished mark; gold leaf crinkles.
                 h += (1 - 0.7 * metal[i]) * (0.025 * grainAt(Float(x), Float(y), 7) + 0.012 * grainAt(Float(x) + 31, Float(y) + 17, 2.5))
@@ -220,11 +265,11 @@ enum WaxSeal {
                     }
                     // Wax: the rim's tones outside the stamp face, the face's within.
                     let dx = Float(x) + 0.5 - c, dy = Float(y) + 0.5 - c
-                    let inFace = smoothstep(face + 0.02 * R, face - 0.01 * R, (dx * dx + dy * dy).squareRoot())
+                    let inFace = 1 - rimWax[i]
                     let waxGleam = style.rim.gleam.mix(style.face.gleam, inFace)
                     let spec = pow(facing, 40) * 0.55
-                    let depth = 0.8 + 0.2 * min(1, max(0, height[i]))
-                    let wax = shade(style.rim, diffuse).mix(shade(style.face, diffuse), inFace)
+                    let depth = (0.8 + 0.2 * min(1, max(0, height[i]))) * (1 - hollow[i])
+                    let wax = shade(style.rim, diffuse).mix(shade(style.face, diffuse), inFace).mix(shade(style.rim, diffuse), 0.9 * veins[i])
                     colour = Colour(r: wax.r * depth + waxGleam.r * spec, g: wax.g * depth + waxGleam.g * spec, b: wax.b * depth + waxGleam.b * spec)
                     // Platinum: a broad reflection falling from the upper left, sharp highlights on the bevels.
                     if metal[i] > 0 {

@@ -64,7 +64,7 @@ struct RenderTests {
             let i = (y * 200 + x) * 4
             return (Int(pa[i]), Int(pa[i + 1]), Int(pa[i + 2]), Int(pa[i + 3]))
         }
-        let rim = at(100, 162), face = at(100, 139), flake = at(100, 63)   // R = 76: 0.82R and 0.52R below the centre, 0.49R above
+        let rim = at(100, 166), face = at(100, 146), flake = at(100, 59)   // R = 84: 0.78R and 0.55R below the centre, 0.49R above
         #expect(rim.a == 255 && rim.b > rim.r + 30 && rim.g > rim.r + 15, "teal rim")
         #expect(face.a == 255 && face.r > face.g + 30 && face.r > face.b + 20, "burgundy face")
         #expect(flake.r > flake.b + 40 && flake.g > flake.b + 20, "a gold flake above the mark")
