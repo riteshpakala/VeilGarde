@@ -34,6 +34,8 @@ public struct SealAcceptanceSettings: Codable, Sendable {
     public var changes: [SealChange] = SealChange.allCases
     public var foundInliers = SealSearch.foundInliers
     public var foundHops = SealSearch.foundHops
+    public var foundCells = SealSearch.foundCells
+    public var foundAgreement = SealSearch.foundAgreement
     /// The neighbourhood measure the seals are read with (NeighbourhoodMeasures).
     public var measure = BurgundySeal.defaultMeasure
     /// How anchors are kept (strength, or the warp's fragility: that reads the residual on the GPU, one picture at a time).
@@ -52,6 +54,10 @@ public struct SealScore: Codable, Sendable {
     public var possible: Int
     public var coverage: Double
     public var scale: Double
+    /// Cells of an 8×8 grid over the seal's picture holding a shared anchor.
+    public var cells: Int
+    /// Shared anchors over the seal's anchors the transform puts inside the copy at a scale it can see.
+    public var agreement: Double
 }
 
 public struct SealAcceptanceRow: Codable, Sendable {
@@ -153,6 +159,8 @@ public enum SealAcceptance {
         }
         let lock = NSLock()
         AnchorFinder.weakContrast = settings.weakContrast
+        cellsNeeded = settings.foundCells
+        agreementNeeded = settings.foundAgreement
 
         // Seal every picture, in parallel.
         var records = [SealRecord?](repeating: nil, count: sealed.count)
@@ -209,7 +217,8 @@ public enum SealAcceptance {
                 for (n, record) in kept.enumerated() {
                     let picture = order[n]
                     guard let m = SealSearch.score(record, in: reading, pointerBits: measure.pointerBits) else { continue }
-                    let score = SealScore(seal: picture, inliers: m.inliers, retraced: m.retraced, possible: m.possible, coverage: m.coverage, scale: m.scale)
+                    let score = SealScore(seal: picture, inliers: m.inliers, retraced: m.retraced, possible: m.possible, coverage: m.coverage, scale: m.scale,
+                                          cells: m.cells, agreement: m.agreement)
                     if job.sealed, picture == job.picture {
                         own = score
                         if m.found || m.inliers >= 8 {
@@ -221,7 +230,7 @@ public enum SealAcceptance {
                         others.append(score)
                     }
                 }
-                if job.sealed, own == nil { own = SealScore(seal: job.picture, inliers: 0, retraced: 0, possible: 0, coverage: 0, scale: 0) }
+                if job.sealed, own == nil { own = SealScore(seal: job.picture, inliers: 0, retraced: 0, possible: 0, coverage: 0, scale: 0, cells: 0, agreement: 0) }
                 mine.append(SealAcceptanceRow(picture: job.picture, path: job.item.url.lastPathComponent, sealed: job.sealed, change: change.rawValue,
                                               width: copy.width, height: copy.height, anchors: reading.anchors.count, own: own, others: others,
                                               held: held, inside: inside, seconds: Date().timeIntervalSince(t0)))
@@ -250,9 +259,13 @@ public enum SealAcceptance {
         return report
     }
 
+    /// The spread a found seal needs, for the run being judged (SealSearch.foundCells unless a run sets another).
+    nonisolated(unsafe) static var cellsNeeded = SealSearch.foundCells
+    nonisolated(unsafe) static var agreementNeeded = SealSearch.foundAgreement
+
     static func passes(_ s: SealScore?, _ inliers: Int, _ hops: Int) -> Bool {
         guard let s else { return false }
-        return s.inliers >= inliers && s.retraced >= hops
+        return s.inliers >= inliers && s.retraced >= hops && s.cells >= cellsNeeded && s.agreement >= agreementNeeded
     }
 
     /// The seal's anchors the transform puts inside the copy, how many the copy holds again (within max(3, σ/2), scale within 1.5×),

@@ -25,7 +25,7 @@ struct RenderTests {
     static func detection(_ verdict: SealVerdict, interlaced: SealID? = nil) -> SealDetection {
         let record = MarkFixture.record()
         let match = SealMatch(id: record.id, label: "Ana", createdAt: record.createdAt, candidates: 300, inliers: 240, retraced: 80, possible: 91,
-                              coverage: 0.25, scale: 0.5, projective: false, residualAgreement: 0.8, transform: .identity, found: verdict == .sealed,
+                              coverage: 0.25, cells: 16, agreement: 0.4, scale: 0.5, projective: false, residualAgreement: 0.8, transform: .identity, found: verdict == .sealed,
                               anchors: [], trails: [], portion: [])
         var d = SealDetection(verdict: verdict, match: verdict == .unknownSeal || verdict == .contentMismatch ? nil : match, interlaced: interlaced,
                               width: 512, height: 512, anchors: 900, seals: 3, keyFingerprint: SealKey.default.fingerprint, seconds: 1, summary: "")

@@ -228,6 +228,8 @@ extension SealCommand {
         @Option(help: "The weak contrast floor that fills a picture short of strong anchors (default: the seal's).") var weakContrast: Float?
         @Option(help: "Found when inliers reach this.") var inliers: Int = SealSearch.foundInliers
         @Option(help: "Found when retraced hops reach this.") var hops: Int = SealSearch.foundHops
+        @Option(help: "Found when the shared anchors sit in this many cells of an 8×8 grid.") var cells: Int = SealSearch.foundCells
+        @Option(help: "Found when the shared anchors are this share of the seal's anchors inside the copy.") var agreement: Double = SealSearch.foundAgreement
         @Option(help: "final_mixed's folder (default: final_mixed under VEILGARDE_DATASETS, else the work area's datasets/).") var dataset: String?
         @Option(help: "Write the report JSON here.") var out: String
         @OptionGroup var workArea: WorkAreaOptions
@@ -253,6 +255,8 @@ extension SealCommand {
                 settings.excluding = left
                 settings.foundInliers = inliers
                 settings.foundHops = hops
+                settings.foundCells = cells
+                settings.foundAgreement = agreement
                 settings.measure = measure
                 guard let chosen = AnchorSelection(rawValue: selection) else { throw VeilGardeFailure.usage("no selection \(selection)") }
                 settings.selection = chosen
@@ -277,6 +281,80 @@ extension SealCommand {
                 print(report.passed ? "the seal passes decision-155" : "KILLED: " + report.failing.joined(separator: "; "))
                 try JSONCoding.write(report, to: outURL)
                 note(String(format: "report: %@ (%.0f s)", out, report.seconds))
+            }
+        }
+    }
+}
+
+extension SealCommand {
+    struct Derivation: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "derivation", abstract: "A study: does the warp residual tell a copy of a sealed picture from another shot of the same scene?",
+            discussion: "Pairs are consecutive iPhone frames of final_mixed (IMG numbers at most --gap apart) whose anchors match. One row per pair, kind and change.")
+        @Option(help: "Where pairs come from: native (native_cam_pool: same title stem, camera and size) or iphone (final_mixed's consecutive frames).") var source: String = "native"
+        @Option(help: "The datasets folder (default: VEILGARDE_DATASETS).") var datasets: String?
+        @Option(help: "iphone: frames at most this many IMG numbers apart.") var gap: Int = 2
+        @Option(help: "At most this many pairs.") var limit: Int = 1000
+        @Option(help: "Write the rows (JSON lines) here.") var out: String
+        @OptionGroup var workArea: WorkAreaOptions
+
+        /// native_cam_pool's series: photos whose titles share a stem (no digits, no parentheses, no extension), from one
+        /// camera at one size, consecutive by page id; byte-identical files left out.
+        static func nativePairs(_ root: URL, limit: Int) throws -> [(URL, URL)] {
+            struct Row: Decodable { let file: String; let pageid: String; let make: String?; let model: String?; let w: Int?; let h: Int?; let title: String? }
+            let pool = root.appendingPathComponent("native_cam_pool")
+            var groups: [String: [Row]] = [:]
+            for line in try String(contentsOf: pool.appendingPathComponent("manifest.jsonl"), encoding: .utf8).components(separatedBy: .newlines) where !line.isEmpty {
+                guard let row = try? JSONDecoder().decode(Row.self, from: Data(line.utf8)), let title = row.title, let w = row.w, let h = row.h else { continue }
+                var stem = title.lowercased().replacingOccurrences(of: "file:", with: "")
+                stem = stem.replacingOccurrences(of: #"\([^)]*\)"#, with: " ", options: .regularExpression)
+                stem = stem.replacingOccurrences(of: #"\.(jpe?g|png|tiff?)$"#, with: "", options: .regularExpression)
+                stem = stem.replacingOccurrences(of: #"[0-9_\-.,]+"#, with: " ", options: .regularExpression)
+                stem = stem.split(separator: " ").joined(separator: " ")
+                guard stem.count >= 4 else { continue }
+                groups["\(stem)|\(row.make ?? "")|\(row.model ?? "")|\(w)x\(h)", default: []].append(row)
+            }
+            var pairs: [(URL, URL)] = []
+            for key in groups.keys.sorted() {
+                let rows = groups[key]!.sorted { (Int($0.pageid) ?? 0) < (Int($1.pageid) ?? 0) }
+                for (a, b) in zip(rows, rows.dropFirst()) {
+                    let ua = pool.appendingPathComponent("img/" + a.file), ub = pool.appendingPathComponent("img/" + b.file)
+                    let sa = (try? FileManager.default.attributesOfItem(atPath: ua.path)[.size] as? Int) ?? -1
+                    let sb = (try? FileManager.default.attributesOfItem(atPath: ub.path)[.size] as? Int) ?? -2
+                    guard sa > 0, sb > 0 else { continue }
+                    if sa == sb, (try? Data(contentsOf: ua)) == (try? Data(contentsOf: ub)) { continue }
+                    pairs.append((ua, ub))
+                }
+            }
+            return Array(pairs.prefix(limit))
+        }
+
+        func run() throws {
+            guarded {
+                _ = try workArea.resolve()
+                guard let root = datasets.map(datasetURL) ?? WorkArea.datasets() else {
+                    throw VeilGardeFailure.usage("no datasets: pass --datasets or set VEILGARDE_DATASETS")
+                }
+                let pairs: [(URL, URL)]
+                if source == "native" {
+                    pairs = try Self.nativePairs(root, limit: limit)
+                    note("derivation: \(pairs.count) series pairs from native_cam_pool")
+                } else {
+                    let dataset = root.appendingPathComponent("final_mixed")
+                    let text = try String(contentsOf: dataset.appendingPathComponent("manifest.csv"), encoding: .utf8)
+                    var frames: [(Int, URL)] = []
+                    for line in text.components(separatedBy: .newlines).dropFirst() where !line.isEmpty {
+                        let f = line.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+                        guard f.count >= 6, f[2] == "iphone", let r = f[5].range(of: #"IMG_(\d+)"#, options: .regularExpression),
+                              let number = Int(f[5][r].dropFirst(4)) else { continue }
+                        frames.append((number, dataset.appendingPathComponent((f[1] == "generated" ? "generated/" : "real/") + f[0])))
+                    }
+                    frames.sort { $0.0 < $1.0 }
+                    pairs = zip(frames, frames.dropFirst()).filter { $1.0 - $0.0 <= gap }.prefix(limit).map { ($0.1, $1.1) }
+                    note("derivation: \(pairs.count) consecutive pairs from \(frames.count) iPhone frames")
+                }
+                let rows = try SealDerivation.run(pairs: Array(pairs), rows: datasetURL(out), log: { note($0) })
+                note("derivation: \(Set(rows.map(\.pair)).count) re-shoot pairs, \(rows.count) rows → \(out)")
             }
         }
     }

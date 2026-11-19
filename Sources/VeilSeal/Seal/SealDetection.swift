@@ -58,6 +58,10 @@ public struct SealMatch: Codable, Sendable, Equatable {
     public var possible: Int
     /// The share of the original's area the found picture holds, 0–1.
     public var coverage: Double
+    /// Of an 8×8 grid over the original, the cells that hold a shared anchor: how far the agreement spreads.
+    public var cells: Int
+    /// Shared anchors over the seal's anchors the transform puts inside the found picture at a scale it can see, 0–1.
+    public var agreement: Double
     /// Found pixels per original pixel, at the original's centre.
     public var scale: Double
     public var projective: Bool

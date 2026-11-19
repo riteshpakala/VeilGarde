@@ -36,6 +36,8 @@ public struct AnchorReading: Sendable {
     public var workingWidth: Int
     public var workingHeight: Int
     public var toOriginal: Double
+    /// With the residual read: each anchor's 4×4 cell energies, 16 per anchor (not kept in a seal).
+    public var residualCells: [Float]? = nil
 
     public static let sealCount = 1000
     public static let searchCount = 1500
@@ -60,7 +62,8 @@ public struct AnchorReading: Sendable {
             let side = CanonicalPatch.side * CanonicalPatch.side * 3
             found = kept.map { found[$0] }
             squares = kept.flatMap { squares[($0 * side)..<(($0 + 1) * side)] }
-            warp = AnchorResidualRead(fragility: kept.map { w.fragility[$0] }, bits: kept.map { w.bits[$0] })
+            warp = AnchorResidualRead(fragility: kept.map { w.fragility[$0] }, bits: kept.map { w.bits[$0] },
+                                      cells: kept.flatMap { w.cells[($0 * 16)..<(($0 + 1) * 16)] })
         }
         let k = Float(image.toOriginal)
         return measures.map { measure in
@@ -70,7 +73,8 @@ public struct AnchorReading: Sendable {
                        fragility: warp?.fragility[n], residual: warp?.bits[n])
             }
             return AnchorReading(anchors: anchors, width: image.originalWidth, height: image.originalHeight,
-                                 workingWidth: image.width, workingHeight: image.height, toOriginal: image.toOriginal)
+                                 workingWidth: image.width, workingHeight: image.height, toOriginal: image.toOriginal,
+                                 residualCells: warp?.cells)
         }
     }
 }

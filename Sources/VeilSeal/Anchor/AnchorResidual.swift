@@ -17,11 +17,14 @@
 
 import Foundation
 import MLX
+import VeilGardeLens
 
 public struct AnchorResidualRead: Sendable {
     public var fragility: [Float]
     /// 24 bits each, the first pair in bit 23.
     public var bits: [UInt32]
+    /// Each square's 4×4 cell energies (mean |R|), 16 per square.
+    public var cells: [Float] = []
 }
 
 public enum AnchorResidual {
@@ -42,17 +45,23 @@ public enum AnchorResidual {
     /// One MLX workload at a time, whichever thread asks.
     static let gate = NSLock()
 
+    /// MLX keeps freed buffers for reuse with no limit unless told: a long run of readings grew to 40 GB of
+    /// footprint in 60 picture pairs (2026-11-19). The first reading caps the cache (LensRuntime's 64 MB).
+    static let bounded: Void = LensRuntime.configureGPUMemory()
+
     /// FR and residual bits for `count` squares (count × 3072 floats, 0–255).
     public static func read(_ squares: [Float], count: Int, key: SealKey) -> AnchorResidualRead {
         guard count > 0 else { return AnchorResidualRead(fragility: [], bits: []) }
         gate.lock()
         defer { gate.unlock() }
+        _ = bounded
         let ts = WarpConstants.tileSize
         let tables = WarpTables.shared(quantizeLikeCV2: true)
         let all = MLXArray(squares, [count, ts * ts, 3])
         let order = cellPairs(key)
         var fragility: [Float] = []
         var bits: [UInt32] = []
+        var energies: [Float] = []
         fragility.reserveCapacity(count)
         bits.reserveCapacity(count)
         var a = 0
@@ -67,6 +76,7 @@ public enum AnchorResidual {
             MLX.eval(fr, energy)
             fragility += fr.asArray(Float.self)
             let e = energy.asArray(Float.self)
+            energies += e
             for n in 0..<(b - a) {
                 var word: UInt32 = 0
                 for (k, (p, q)) in order.enumerated() where e[n * 16 + p] < e[n * 16 + q] {
@@ -76,6 +86,28 @@ public enum AnchorResidual {
             }
             a = b
         }
-        return AnchorResidualRead(fragility: fragility, bits: bits)
+        return AnchorResidualRead(fragility: fragility, bits: bits, cells: energies)
+    }
+
+    /// The signed high-frequency residual of `count` squares (count × 3072 floats, 0–255): count × 1024 floats.
+    public static func highMaps(_ squares: [Float], count: Int) -> [Float] {
+        guard count > 0 else { return [] }
+        gate.lock()
+        defer { gate.unlock() }
+        _ = bounded
+        let ts = WarpConstants.tileSize
+        let tables = WarpTables.shared(quantizeLikeCV2: true)
+        let all = MLXArray(squares, [count, ts * ts, 3])
+        var out: [Float] = []
+        out.reserveCapacity(count * ts * ts)
+        var a = 0
+        while a < count {
+            let b = min(a + WarpConstants.evalTileBudget, count)
+            let high = WarpResidual.batch(all[a..<b], forward: tables.highForward, back: tables.highBack)
+            MLX.eval(high)
+            out += high.asArray(Float.self)
+            a = b
+        }
+        return out
     }
 }

@@ -1577,6 +1577,13 @@
       "rejected": "the plan's fragility tie-break (within 1 inlier of strength on every change: only the anchors in the one band at the cut can swap, and a picture with fewer candidates than the cap, 47% of the sample and every weak one, keeps them all whatever the order); fragility first (2-3% more inliers on resizes, 5-8% fewer under crops, blur, region layers, gradients and recapture, about 11x slower); a weak floor of 0.015 (8 misses against 9, but 7-20% fewer inliers in the weakest tenth)",
       "reason": "seed 1, 186 sealed and 91 never sealed: under the three selections the tenth percentile of inliers was identical on every change (what limits the weak tail is how many anchors a picture holds, not which); with the weak floor at 0.01 that tenth percentile went 137 -> 240 at 0.5x, 159 -> 335 at 0.75x, 49 -> 96 for a quarter crop, 96 -> 182 combined, 145 -> 289 recapture, 139 -> 327 blur; misses 11 -> 9, a stranger's best unchanged at 6; Class I 99.7%, combined 99.5%, filters 100%, recapture 98.9%",
       "file": "Sources/VeilSeal/Anchor/AnchorFinder.swift"
+    },
+    {
+      "id": "decision-158",
+      "chose": "A seal is found only when its shared anchors also spread over at least 4 cells of an 8x8 grid over the original and are at least 15% of the seal's anchors the transform puts inside the found picture at a scale it can still see (agreement). Seed 0 then passes decision-155: Class I 98.7%, combined 98.5%, filters 98.9%, recapture 98.0%, 0 false matches, a stranger's best 6 inliers",
+      "rejected": "inliers and hops alone (two photos stamped with one caption agreed on 24 anchors in one or two cells; 13 false matches among 300 screenshots, each pair sharing an app's frame or the same stickers over 11-17 cells with 23-84 inliers); an agreement bar of 0.10 (left two reels with the same stickers found, at 11-12%)",
+      "reason": "seed 1 and 300 phone and reel screenshots: a true copy under any of the 28 changes holds at least 19% (recapture lowest, then contrast and blur); app frames sit at 7%, shared stickers at 11-12%; screenshots 13 -> 0 false, found rates unchanged on seed 1 and seed 0. The warp residual does not tell a copy from a second shot on native_cam_pool series (anchors alone do, AUC about 0.99); its own test waits on tripod re-shoots",
+      "file": "Sources/VeilSeal/Seal/SealSearch.swift"
     }
   ],
   "commands": [

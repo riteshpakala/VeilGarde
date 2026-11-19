@@ -277,6 +277,12 @@ public enum BurgundySeal {
                 : "an interlace names \(d.interlaced?.hex ?? "?"); open a store to say whose it is"
         case .none:
             if !haveStore { return "no seal: no store to search, and no interlace" }
+            if let m = d.match, m.inliers >= SealSearch.foundInliers, m.cells < SealSearch.foundCells {
+                return "no seal among \(d.seals): \(name(m)) shares only a small region (\(m.cells) of 64 cells: a caption, a logo, a stamp), not the picture"
+            }
+            if let m = d.match, m.inliers >= SealSearch.foundInliers, m.agreement < SealSearch.foundAgreement {
+                return "no seal among \(d.seals): \(name(m)) shares only scattered parts (\(Int((m.agreement * 100).rounded()))% of its anchors: an app's frame, a sticker), not the picture"
+            }
             if let m = d.match, m.inliers > 0 { return "no seal among \(d.seals): the nearest, \(name(m)), \(strength(m))" }
             return "no seal among \(d.seals)"
         }
